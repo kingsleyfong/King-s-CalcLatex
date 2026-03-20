@@ -54,7 +54,8 @@ export function err<T>(error: string, diagnostics: Diagnostic[] = []): Result<T>
 export type EvalMode = "exact" | "approximate" | "simplify" | "solve" | "factor"
   | "differentiate" | "integrate"
   | "partial_x" | "partial_y" | "partial_z"
-  | "gradient" | "normal";
+  | "gradient" | "normal"
+  | "limit" | "taylor" | "partfrac" | "expand";
 export type PlotMode = "plot2d" | "plot3d" | "geometry"
   | "contour" | "vecfield" | "gradient" | "tangent" | "region";
 
@@ -191,6 +192,10 @@ export interface KCLSettings {
   showPOIs: boolean;
   /** Default arrow scale for vector fields (1.0 = normal) */
   vecfieldArrowScale: number;
+  /** Show tick marks and numeric labels along the 3D axes */
+  show3DAxisTicks: boolean;
+  /** Enable Giac WASM CAS engine (requires giacwasm.js in plugin folder) */
+  enableGiac: boolean;
 }
 
 export const DEFAULT_SETTINGS: KCLSettings = {
@@ -203,4 +208,6 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   plot3d2dMode: "curtain",
   showPOIs: true,
   vecfieldArrowScale: 1.0,
+  show3DAxisTicks: true,
+  enableGiac: true,
 };

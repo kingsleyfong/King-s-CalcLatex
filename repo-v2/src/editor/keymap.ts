@@ -93,7 +93,8 @@ async function handleTabInsertion(
       // evaluate: exact / approximate / simplify / solve / factor
       const result = await plugin.engine.evaluate(trigger.latex, trigger.mode);
       if (!result.ok) return;
-      resultText = result.value.text;
+      // Use LaTeX form for insertion since the text goes inside $...$
+      resultText = result.value.latex || result.value.text;
     }
 
     if (!resultText || resultText.trim() === "") return;

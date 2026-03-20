@@ -36,8 +36,12 @@ const TRIGGER_DEFS: TriggerDef[] = [
   { pattern: /@px\s*$/,      kind: "evaluate", mode: "partial_x" },
   { pattern: /@py\s*$/,      kind: "evaluate", mode: "partial_y" },
   { pattern: /@pz\s*$/,      kind: "evaluate", mode: "partial_z" },
-  { pattern: /@grad\s*$/,    kind: "evaluate", mode: "gradient" },
-  { pattern: /@normal\s*$/,  kind: "evaluate", mode: "normal" },
+  { pattern: /@grad\s*$/,     kind: "evaluate", mode: "gradient" },
+  { pattern: /@normal\s*$/,   kind: "evaluate", mode: "normal" },
+  { pattern: /@limit\s*$/,    kind: "evaluate", mode: "limit" },
+  { pattern: /@taylor\s*$/,   kind: "evaluate", mode: "taylor" },
+  { pattern: /@partfrac\s*$/, kind: "evaluate", mode: "partfrac" },
+  { pattern: /@expand\s*$/,   kind: "evaluate", mode: "expand" },
 
   // Plot triggers
   { pattern: /@plot3d\s*$/,    kind: "plot", mode: "plot3d" },

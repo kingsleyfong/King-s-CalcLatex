@@ -1,0 +1,13 @@
+# Node
+node_modules/
+
+# Build artifacts
+dist/
+
+# Giac WASM binaries (large downloaded files, not committed to repo)
+giac/giacjs/giacwasm.js
+giac/giacjs/giac.js
+
+# OS
+.DS_Store
+Thumbs.db
