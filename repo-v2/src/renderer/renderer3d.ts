@@ -566,6 +566,66 @@ function computeNormalizedTicks(range: [number, number]): { normPositions: numbe
   return { normPositions, mathValues };
 }
 
+/**
+ * Build small perpendicular tick mark line segments along all three axes.
+ *
+ * All positions are in frameGroup (normalized [-1,1]³) space.
+ * Ticks are 2D: a short cross of two segments perpendicular to the axis,
+ * placed at each tick position along the axis.
+ *
+ * Three.js convention (Y-up):
+ *   Math X  → Three.js X
+ *   Math Y  → Three.js Z
+ *   Math Z  → Three.js Y
+ */
+function buildAxisTickMarks(
+  xNormPositions: number[],   // normalized positions along Three.js X axis
+  yMathNormPositions: number[], // normalized positions along Three.js Z axis (math Y)
+  zMathNormPositions: number[], // normalized positions along Three.js Y axis (math Z)
+  isDark: boolean,
+): { mesh: LineSegments; disposables: { dispose(): void }[] } {
+  const tickHalf = 0.035; // half-length of each tick segment in normalized space
+  const positions: number[] = [];
+
+  // X-axis ticks: axis runs along Three.js X at (_, 0, 0).
+  // Draw a cross in the Y-Z plane at each tick x-position.
+  for (const nx of xNormPositions) {
+    // Vertical arm (Three.js Y direction)
+    positions.push(nx, -tickHalf, 0,  nx, tickHalf, 0);
+    // Depth arm (Three.js Z direction)
+    positions.push(nx, 0, -tickHalf,  nx, 0, tickHalf);
+  }
+
+  // Math-Y-axis ticks: axis runs along Three.js Z at (0, 0, _).
+  // Draw a cross in the X-Y plane at each tick z-position.
+  for (const nz of yMathNormPositions) {
+    // Horizontal arm (Three.js X direction)
+    positions.push(-tickHalf, 0, nz,  tickHalf, 0, nz);
+    // Vertical arm (Three.js Y direction)
+    positions.push(0, -tickHalf, nz,  0, tickHalf, nz);
+  }
+
+  // Math-Z-axis ticks: axis runs along Three.js Y at (0, _, 0).
+  // Draw a cross in the X-Z plane at each tick y-position.
+  for (const ny of zMathNormPositions) {
+    // Horizontal arm (Three.js X direction)
+    positions.push(-tickHalf, ny, 0,  tickHalf, ny, 0);
+    // Depth arm (Three.js Z direction)
+    positions.push(0, ny, -tickHalf,  0, ny, tickHalf);
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  const material = new LineBasicMaterial({
+    color: isDark ? 0x888899 : 0x666677,
+    transparent: true,
+    opacity: 0.75,
+  });
+  const mesh = new LineSegments(geometry, material);
+
+  return { mesh, disposables: [geometry, material] };
+}
+
 // ── Scene Object Builders (geometry in worldGroup) ───────────────────
 
 function buildSceneObjects(
@@ -861,6 +921,7 @@ export function create3DGraph(
   spec: PlotSpec,
   isDark: boolean,
   zoomMode: "origin" | "range-center" = "origin",
+  showTicks = true,
 ): GraphHandle {
   let destroyed = false;
   let animationId: number | null = null;
@@ -884,8 +945,9 @@ export function create3DGraph(
   // Per-expression disposables (cleared on each spec update / rebuild)
   const geometryDisposables: { dispose(): void }[] = [];
 
-  // Frame disposables: tick labels + grid lines (regenerated on zoom)
+  // Frame disposables: tick labels + tick mark segments + grid lines (regenerated on zoom)
   const tickDisposables: { dispose(): void }[] = [];
+  const tickMarkDisposables: { dispose(): void }[] = [];
   const gridDisposables: { dispose(): void }[] = [];
 
   // Permanent frame disposables: cube wireframe, axes, axis name labels (only on destroy)
@@ -1137,28 +1199,33 @@ export function create3DGraph(
     const yRange = currentRanges.y;
     const zRange = currentRanges.z || currentRanges.y;
 
+    // Per-axis scaling: each axis independently fills [-1,1] in the cube.
+    // This ensures surfaces always span the full cube regardless of axis
+    // range differences (e.g. z=x²+y² where z>>x,y).
+    // Three.js Y-up: math (x,y,z) → Three.js (x,z,y)
+
     if (zoomMode === "origin") {
-      // Origin mode: center at (0,0,0). Must compute scale from the max absolute
-      // extent so all geometry fits within [-1,1]³ cube around origin.
       const halfX = Math.max(Math.abs(xRange[0]), Math.abs(xRange[1]));
       const halfY = Math.max(Math.abs(yRange[0]), Math.abs(yRange[1]));
       const halfZ = Math.max(Math.abs(zRange[0]), Math.abs(zRange[1]));
-      const maxHalf = Math.max(halfX, halfY, halfZ);
-      const s = maxHalf > 0 ? 1 / maxHalf : 1;
 
-      worldGroup.scale.set(s, s, s);
+      const sX = halfX > 0 ? 1 / halfX : 1;
+      const sY = halfY > 0 ? 1 / halfY : 1;
+      const sZ = halfZ > 0 ? 1 / halfZ : 1;
+
+      worldGroup.scale.set(sX, sZ, sY);
       worldGroup.position.set(0, 0, 0);
     } else {
-      // Range-center mode: center at midpoint of each axis
       const xCen = rangeCenter(xRange);
       const yCen = rangeCenter(yRange);
       const zCen = rangeCenter(zRange);
 
-      const maxSpan = Math.max(rangeSpan(xRange), rangeSpan(yRange), rangeSpan(zRange));
-      const s = maxSpan > 0 ? 2 / maxSpan : 1;
+      const sX = rangeSpan(xRange) > 0 ? 2 / rangeSpan(xRange) : 1;
+      const sY = rangeSpan(yRange) > 0 ? 2 / rangeSpan(yRange) : 1;
+      const sZ = rangeSpan(zRange) > 0 ? 2 / rangeSpan(zRange) : 1;
 
-      worldGroup.scale.set(s, s, s);
-      worldGroup.position.set(-xCen * s, -zCen * s, -yCen * s);
+      worldGroup.scale.set(sX, sZ, sY);
+      worldGroup.position.set(-xCen * sX, -zCen * sZ, -yCen * sY);
     }
   }
 
@@ -1171,6 +1238,14 @@ export function create3DGraph(
     }
     tickDisposables.length = 0;
 
+    // Clear existing tick mark segments
+    for (const d of tickMarkDisposables) {
+      try { d.dispose(); } catch { /* ignore */ }
+    }
+    tickMarkDisposables.length = 0;
+
+    if (!showTicks) return;
+
     const xRange = currentRanges.x;
     const yRange = currentRanges.y;
     const zRange = currentRanges.z || currentRanges.y;
@@ -1179,8 +1254,22 @@ export function create3DGraph(
     const tickFontSize = 52;
     const tickOff = 0.10; // perpendicular offset so labels don't overlap axis line
 
-    // X axis ticks — along the X axis (near y=0, z=0), offset slightly down+back
+    // ── Tick mark segments ──────────────────────────────────
     const xTicks = computeNormalizedTicks(xRange);
+    const yTicks = computeNormalizedTicks(yRange);
+    const zTicks = computeNormalizedTicks(zRange);
+
+    const tickMarks = buildAxisTickMarks(
+      xTicks.normPositions,
+      yTicks.normPositions,
+      zTicks.normPositions,
+      isDark,
+    );
+    frameGroup.add(tickMarks.mesh);
+    tickMarkDisposables.push(...tickMarks.disposables, { dispose: () => frameGroup!.remove(tickMarks.mesh) });
+
+    // ── Tick labels — X axis ────────────────────────────────
+    // Along the X axis (near y=0, z=0), offset slightly down+back
     for (let i = 0; i < xTicks.normPositions.length; i++) {
       const normPos = xTicks.normPositions[i];
       const value = xTicks.mathValues[i];
@@ -1192,8 +1281,8 @@ export function create3DGraph(
       tickDisposables.push(...label.disposables, { dispose: () => frameGroup!.remove(label.sprite) });
     }
 
-    // Math Y axis ticks — along Three.js Z axis (near x=0, y=0), offset slightly left+down
-    const yTicks = computeNormalizedTicks(yRange);
+    // ── Tick labels — Math Y axis ────────────────────────────
+    // Along Three.js Z axis (near x=0, y=0), offset slightly left+down
     for (let i = 0; i < yTicks.normPositions.length; i++) {
       const normPos = yTicks.normPositions[i];
       const value = yTicks.mathValues[i];
@@ -1205,8 +1294,8 @@ export function create3DGraph(
       tickDisposables.push(...label.disposables, { dispose: () => frameGroup!.remove(label.sprite) });
     }
 
-    // Math Z axis ticks — along Three.js Y axis (near x=0, z=0), offset slightly left+back
-    const zTicks = computeNormalizedTicks(zRange);
+    // ── Tick labels — Math Z axis ────────────────────────────
+    // Along Three.js Y axis (near x=0, z=0), offset slightly left+back
     for (let i = 0; i < zTicks.normPositions.length; i++) {
       const normPos = zTicks.normPositions[i];
       const value = zTicks.mathValues[i];
@@ -1340,6 +1429,7 @@ export function create3DGraph(
       // Dispose tracked objects
       disposeSceneObjects(geometryDisposables);
       disposeSceneObjects(tickDisposables);
+      disposeSceneObjects(tickMarkDisposables);
       disposeSceneObjects(gridDisposables);
       disposeSceneObjects(permanentFrameDisposables);
 
@@ -1425,6 +1515,7 @@ export function renderSnapshot(
   spec: PlotSpec,
   isDark: boolean,
   zoomMode: "origin" | "range-center" = "origin",
+  showTicks = true,
 ): string {
   const temp = document.createElement("div");
   temp.style.cssText =
@@ -1432,7 +1523,7 @@ export function renderSnapshot(
   document.body.appendChild(temp);
 
   try {
-    const handle = create3DGraph(temp, spec, isDark, zoomMode);
+    const handle = create3DGraph(temp, spec, isDark, zoomMode, showTicks);
     const canvas = temp.querySelector("canvas");
     const dataUrl = canvas?.toDataURL("image/png") ?? "";
     handle.destroy();

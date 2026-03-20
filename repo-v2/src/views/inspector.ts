@@ -108,6 +108,8 @@ export class GraphInspectorView extends ItemView {
             graphContainer,
             spec,
             this.plugin.isDark(),
+            this.plugin.settings.zoom3dMode,
+            this.plugin.settings.show3DAxisTicks,
           );
         } else {
           this.currentHandle = create2DGraph(

@@ -7,6 +7,7 @@
 
 import { PluginSettingTab, Setting, App } from "obsidian";
 import type KingsCalcLatexPlugin from "./main";
+import { isGiacReady } from "./engine/giac";
 
 export class KCLSettingTab extends PluginSettingTab {
   plugin: KingsCalcLatexPlugin;
@@ -193,6 +194,41 @@ export class KCLSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showPOIs)
           .onChange(async (value) => {
             this.plugin.settings.showPOIs = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── 3D Axis Ticks ────────────────────────────────────────────
+    new Setting(containerEl)
+      .setName("3D axis tick marks")
+      .setDesc(
+        "Show tick marks and numeric labels along the X, Y, and Z axes of 3D graphs.",
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.show3DAxisTicks)
+          .onChange(async (value) => {
+            this.plugin.settings.show3DAxisTicks = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Giac CAS Engine ────────────────────────────────────────────
+    containerEl.createEl("h3", { text: "CAS Engine" });
+
+    new Setting(containerEl)
+      .setName("Enable Giac WASM")
+      .setDesc(
+        "Load Giac computer algebra system for advanced CAS operations " +
+        "(limits, Taylor series, partial fractions, expand, and improved " +
+        "differentiation/integration/solving). Requires giacwasm.js in the plugin folder. " +
+        "Status: " + (isGiacReady() ? "Loaded" : "Not loaded"),
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableGiac)
+          .onChange(async (value) => {
+            this.plugin.settings.enableGiac = value;
             await this.plugin.saveSettings();
           }),
       );

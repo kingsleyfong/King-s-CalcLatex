@@ -17,7 +17,7 @@ import {
   detectInequality,
 } from "./parser";
 import { evaluate } from "./evaluator";
-import { differentiate, integrate, solveEquation } from "./cas";
+import { differentiate, integrate, solveEquation, factorExpression } from "./cas";
 import { convertUnits } from "./units";
 import type {
   EvalMode,

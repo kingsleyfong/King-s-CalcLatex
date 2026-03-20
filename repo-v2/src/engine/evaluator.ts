@@ -6,50 +6,52 @@
  */
 
 import type { BoxedExpression } from "@cortex-js/compute-engine";
-import { parseLatex, getCE, compileToFunction } from "./parser";
+import { parseLatex, getCE, compileToFunction, jsonToLatex } from "./parser";
 import {
   differentiate as casDifferentiate,
   integrate as casIntegrate,
   solveEquation as casSolve,
+  factorExpression as casFactor,
   partialDerivative,
   computeGradient,
   computeNormal,
+  latexToReadable,
 } from "./cas";
+import {
+  giacSimplify,
+  giacLimit,
+  giacTaylor,
+  giacPartfrac,
+  giacExpand,
+} from "./giac";
 import type { EvalMode, EvalResult, Result, Diagnostic } from "../types";
 import { ok, err } from "../types";
 
 /**
- * Extract a LaTeX string from a BoxedExpression.
- * Falls back to string representation if .latex is unavailable.
+ * Extract a standard LaTeX string from a BoxedExpression.
+ * Uses custom jsonToLatex() to avoid CortexJS non-standard output.
  */
 function exprToLatex(expr: BoxedExpression): string {
   try {
+    if (expr.json !== undefined) return jsonToLatex(expr.json);
+  } catch { /* fall through */ }
+  try {
     const latex = expr.latex;
     if (typeof latex === "string" && latex.length > 0) return latex;
-  } catch {
-    // fall through
-  }
+  } catch { /* fall through */ }
   return String(expr);
 }
 
 /**
- * Extract a plain-text string from a BoxedExpression.
- */
-function exprToText(expr: BoxedExpression): string {
-  try {
-    return String(expr);
-  } catch {
-    return "[unprintable]";
-  }
-}
-
-/**
  * Build an EvalResult from a BoxedExpression.
+ * Uses LaTeX→readable conversion for the text field instead of String(expr)
+ * which gives CortexJS MathJSON internal format.
  */
 function toEvalResult(expr: BoxedExpression): EvalResult {
+  const latex = exprToLatex(expr);
   return {
-    latex: exprToLatex(expr),
-    text: exprToText(expr),
+    latex,
+    text: latexToReadable(latex),
   };
 }
 
@@ -109,12 +111,15 @@ export function evaluate(
         return evaluateExact(expr, diagnostics);
       case "approximate":
         return evaluateApproximate(expr, diagnostics, precision);
-      case "simplify":
+      case "simplify": {
+        const giacSimp = giacSimplify(latex);
+        if (giacSimp) return giacSimp;
         return evaluateSimplify(expr, diagnostics);
+      }
       case "solve":
-        return evaluateSolve(expr, latex, diagnostics);
+        return casSolve(latex);
       case "factor":
-        return evaluateFactor(expr, diagnostics);
+        return casFactor(latex);
 
       // CAS operations — delegate to cas.ts
       case "differentiate":
@@ -131,6 +136,16 @@ export function evaluate(
         return computeGradient(latex);
       case "normal":
         return computeNormal(latex);
+
+      // Giac-only operations
+      case "limit":
+        return giacLimit(latex) ?? err("Limit requires Giac CAS. Place giacwasm.js in the plugin folder.");
+      case "taylor":
+        return giacTaylor(latex) ?? err("Taylor series requires Giac CAS. Place giacwasm.js in the plugin folder.");
+      case "partfrac":
+        return giacPartfrac(latex) ?? err("Partial fractions requires Giac CAS. Place giacwasm.js in the plugin folder.");
+      case "expand":
+        return giacExpand(latex) ?? err("Expand requires Giac CAS. Place giacwasm.js in the plugin folder.");
 
       default:
         return err(`Unknown evaluation mode: ${mode as string}`);
@@ -921,37 +936,4 @@ function evaluateSolve(
   }
 }
 
-/** Factor an expression. */
-function evaluateFactor(
-  expr: BoxedExpression,
-  diagnostics: Diagnostic[],
-): Result<EvalResult> {
-  const ce = getCE();
-
-  try {
-    const factored = ce.box(["Factor", expr.json]);
-    const result = factored.evaluate();
-
-    const resultStr = String(result);
-    if (resultStr.includes("Factor")) {
-      diagnostics.push({
-        level: "info",
-        message:
-          "CortexJS could not factor this expression. Future versions will use Giac WASM for advanced factoring.",
-      });
-      return err("Factoring not supported for this expression type yet", diagnostics);
-    }
-
-    return ok(toEvalResult(result), diagnostics);
-  } catch (e) {
-    diagnostics.push({
-      level: "info",
-      message:
-        "Factor operation failed. This may require Giac WASM (planned for future release).",
-    });
-    return err(
-      `Factor failed: ${e instanceof Error ? e.message : String(e)}`,
-      diagnostics,
-    );
-  }
-}
+// evaluateFactor removed — factoring now handled entirely by cas.ts (casFactor)

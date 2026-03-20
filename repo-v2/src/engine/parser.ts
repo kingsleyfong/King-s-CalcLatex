@@ -408,6 +408,288 @@ export function extractTupleComponents(
   return null;
 }
 
+// ── MathJSON → Standard LaTeX ────────────────────────────────────────
+
+/**
+ * Convert a MathJSON node to standard mathematical LaTeX.
+ *
+ * Bypasses CortexJS's `.latex` property which outputs non-standard forms
+ * like `\mathrm{Cube}(x)`, `\exponentialE`, `\exp(3t)`.
+ */
+export function jsonToLatex(node: unknown): string {
+  // Number literal
+  if (typeof node === "number") return formatLatexNum(node);
+
+  // String symbol
+  if (typeof node === "string") {
+    switch (node) {
+      case "Pi": return "\\pi";
+      case "ExponentialE": case "E": return "e";
+      case "ImaginaryUnit": return "i";
+      case "Infinity": case "PositiveInfinity": return "\\infty";
+      case "NegativeInfinity": return "-\\infty";
+      case "Nothing": return "\\emptyset";
+      case "alpha": return "\\alpha"; case "beta": return "\\beta";
+      case "gamma": return "\\gamma"; case "delta": return "\\delta";
+      case "epsilon": return "\\epsilon"; case "theta": return "\\theta";
+      case "lambda": return "\\lambda"; case "mu": return "\\mu";
+      case "sigma": return "\\sigma"; case "phi": return "\\phi";
+      case "omega": return "\\omega";
+      default: return node;
+    }
+  }
+
+  // Object form: { num: "..." } for big numbers/decimals
+  if (typeof node === "object" && node !== null && !Array.isArray(node)) {
+    const obj = node as Record<string, unknown>;
+    if ("num" in obj && typeof obj.num === "string") return obj.num;
+    return String(node);
+  }
+
+  if (!Array.isArray(node)) return String(node);
+
+  const [head, ...args] = node as [string, ...unknown[]];
+
+  switch (head) {
+    case "Add": {
+      if (args.length === 0) return "0";
+      let result = jsonToLatex(args[0]);
+      for (let i = 1; i < args.length; i++) {
+        const a = args[i];
+        if (_isNeg(a)) {
+          result += " - " + jsonToLatex(_negateNode(a));
+        } else {
+          result += " + " + jsonToLatex(a);
+        }
+      }
+      return result;
+    }
+
+    case "Subtract":
+      if (args.length === 1) return "-" + _wrapAdd(args[0]);
+      if (args.length === 2) return jsonToLatex(args[0]) + " - " + _wrapAdd(args[1]);
+      return args.map(jsonToLatex).join(" - ");
+
+    case "Negate":
+      if (args.length === 1) {
+        if (Array.isArray(args[0]) && (args[0][0] === "Add" || args[0][0] === "Subtract"))
+          return "-\\left(" + jsonToLatex(args[0]) + "\\right)";
+        return "-" + jsonToLatex(args[0]);
+      }
+      return "-" + jsonToLatex(args[0]);
+
+    case "Multiply": return _renderMul(args);
+
+    case "Divide":
+      if (args.length === 2)
+        return "\\frac{" + jsonToLatex(args[0]) + "}{" + jsonToLatex(args[1]) + "}";
+      return args.map(jsonToLatex).join(" / ");
+
+    case "Rational":
+      if (args.length === 2 && typeof args[0] === "number" && typeof args[1] === "number") {
+        if (args[1] === 1) return formatLatexNum(args[0]);
+        if (args[0] < 0) return "-\\frac{" + (-args[0]) + "}{" + args[1] + "}";
+        return "\\frac{" + args[0] + "}{" + args[1] + "}";
+      }
+      return "\\frac{" + jsonToLatex(args[0]) + "}{" + jsonToLatex(args[1]) + "}";
+
+    case "Power":
+      if (args.length === 2) {
+        const [base, exp] = args;
+        // x^{1/2} → \sqrt{x}
+        if (_isHalf(exp)) return "\\sqrt{" + jsonToLatex(base) + "}";
+        // x^{1/n} → \sqrt[n]{x}
+        const rd = _rationalDenom(exp);
+        if (rd !== null && rd > 2)
+          return "\\sqrt[" + rd + "]{" + jsonToLatex(base) + "}";
+        // e^{...}
+        if (base === "ExponentialE" || base === "E")
+          return "e^{" + jsonToLatex(exp) + "}";
+        return _wrapBase(base) + "^{" + jsonToLatex(exp) + "}";
+      }
+      return String(node);
+
+    case "Square": return args.length === 1 ? _wrapBase(args[0]) + "^{2}" : String(node);
+    case "Cube":   return args.length === 1 ? _wrapBase(args[0]) + "^{3}" : String(node);
+    case "Sqrt":   return args.length === 1 ? "\\sqrt{" + jsonToLatex(args[0]) + "}" : String(node);
+    case "Root":
+      return args.length === 2
+        ? "\\sqrt[" + jsonToLatex(args[1]) + "]{" + jsonToLatex(args[0]) + "}"
+        : String(node);
+
+    // Trig
+    case "Sin": return "\\sin\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Cos": return "\\cos\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Tan": return "\\tan\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Cot": return "\\cot\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Sec": return "\\sec\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Csc": return "\\csc\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Arcsin": return "\\arcsin\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Arccos": return "\\arccos\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Arctan": case "ArcTan":
+      return "\\arctan\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Sinh": return "\\sinh\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Cosh": return "\\cosh\\left(" + jsonToLatex(args[0]) + "\\right)";
+    case "Tanh": return "\\tanh\\left(" + jsonToLatex(args[0]) + "\\right)";
+
+    // Exp / Log
+    case "Exp": return args.length === 1 ? "e^{" + jsonToLatex(args[0]) + "}" : String(node);
+    case "Ln":  return args.length === 1 ? "\\ln\\left(" + jsonToLatex(args[0]) + "\\right)" : String(node);
+    case "Log":
+      if (args.length === 1) return "\\log\\left(" + jsonToLatex(args[0]) + "\\right)";
+      if (args.length === 2) return "\\log_{" + jsonToLatex(args[1]) + "}\\left(" + jsonToLatex(args[0]) + "\\right)";
+      return String(node);
+    case "Log2": return args.length === 1 ? "\\log_{2}\\left(" + jsonToLatex(args[0]) + "\\right)" : String(node);
+
+    // Misc
+    case "Abs":     return args.length === 1 ? "\\left|" + jsonToLatex(args[0]) + "\\right|" : String(node);
+    case "Half":    return args.length === 1 ? "\\frac{" + jsonToLatex(args[0]) + "}{2}" : String(node);
+    case "Floor":   return args.length === 1 ? "\\lfloor " + jsonToLatex(args[0]) + "\\rfloor" : String(node);
+    case "Ceiling": return args.length === 1 ? "\\lceil " + jsonToLatex(args[0]) + "\\rceil" : String(node);
+
+    // Containers
+    case "Sequence": case "List": return args.map(jsonToLatex).join(", ");
+    case "Delimiter": return args.length >= 1 ? jsonToLatex(args[0]) : "";
+
+    // Relations
+    case "Equal": case "Assign": case "Equation":
+      return args.map(jsonToLatex).join(" = ");
+
+    // Matrix
+    case "Matrix":
+      return _renderMatrix(args);
+
+    default:
+      if (args.length > 0)
+        return "\\operatorname{" + head + "}\\left(" + args.map(jsonToLatex).join(", ") + "\\right)";
+      return head;
+  }
+}
+
+// ── jsonToLatex helpers (private) ─────────────────────────────────────
+
+function formatLatexNum(n: number): string {
+  if (Number.isInteger(n)) return n.toString();
+  return parseFloat(n.toPrecision(10)).toString();
+}
+
+function _isNeg(node: unknown): boolean {
+  if (typeof node === "number") return node < 0;
+  if (Array.isArray(node) && node[0] === "Negate") return true;
+  if (Array.isArray(node) && node[0] === "Multiply") {
+    const first = node[1];
+    if (first === -1 || (typeof first === "number" && first < 0)) return true;
+  }
+  return false;
+}
+
+function _negateNode(node: unknown): unknown {
+  if (typeof node === "number") return -node;
+  if (Array.isArray(node) && node[0] === "Negate") return node[1];
+  if (Array.isArray(node) && node[0] === "Multiply") {
+    if (node[1] === -1) return node.length === 3 ? node[2] : ["Multiply", ...node.slice(2)];
+    if (typeof node[1] === "number" && node[1] < 0)
+      return ["Multiply", -node[1], ...node.slice(2)];
+  }
+  return node;
+}
+
+/** Wrap Add/Subtract in parens (for subtraction RHS). */
+function _wrapAdd(node: unknown): string {
+  const s = jsonToLatex(node);
+  if (Array.isArray(node) && (node[0] === "Add" || node[0] === "Subtract"))
+    return "\\left(" + s + "\\right)";
+  return s;
+}
+
+/** Wrap complex nodes in parens when used as a power base. */
+function _wrapBase(node: unknown): string {
+  const s = jsonToLatex(node);
+  if (!Array.isArray(node)) return s;
+  const h = node[0];
+  if (h === "Add" || h === "Subtract" || h === "Negate" ||
+      (h === "Multiply" && node.length > 2))
+    return "\\left(" + s + "\\right)";
+  return s;
+}
+
+function _isHalf(n: unknown): boolean {
+  if (n === 0.5) return true;
+  if (Array.isArray(n) && n[0] === "Rational" && n[1] === 1 && n[2] === 2) return true;
+  if (Array.isArray(n) && n[0] === "Divide" && n[1] === 1 && n[2] === 2) return true;
+  return false;
+}
+
+function _rationalDenom(n: unknown): number | null {
+  if (Array.isArray(n) && n[0] === "Rational" && n[1] === 1 && typeof n[2] === "number")
+    return n[2] as number;
+  return null;
+}
+
+/** Render a Multiply node with smart implicit vs explicit multiplication. */
+function _renderMul(args: unknown[]): string {
+  if (args.length === 0) return "1";
+  if (args.length === 1) return jsonToLatex(args[0]);
+
+  let coeff: number | null = null;
+  let rest = args;
+  if (typeof args[0] === "number") {
+    coeff = args[0] as number;
+    rest = args.slice(1);
+  }
+
+  if (coeff === -1) {
+    const inner = rest.length === 1 ? jsonToLatex(rest[0]) : _renderMulTerms(rest);
+    return "-" + inner;
+  }
+  if (coeff === 1) {
+    return rest.length === 1 ? jsonToLatex(rest[0]) : _renderMulTerms(rest);
+  }
+
+  if (rest.length === 0) return coeff !== null ? formatLatexNum(coeff) : "1";
+
+  const restStr = _renderMulTerms(rest);
+  if (coeff === null) return restStr;
+
+  // Implicit multiplication for coeff·var/func (e.g. 3x, 2\sin(x))
+  if (rest.length >= 1 && _isSimpleLatex(rest[0]))
+    return formatLatexNum(coeff) + restStr;
+  return formatLatexNum(coeff) + " \\cdot " + restStr;
+}
+
+function _renderMulTerms(terms: unknown[]): string {
+  return terms.map(t => {
+    const s = jsonToLatex(t);
+    if (Array.isArray(t) && (t[0] === "Add" || t[0] === "Subtract"))
+      return "\\left(" + s + "\\right)";
+    return s;
+  }).join("");
+}
+
+/** Check if node renders simply enough for implicit multiplication. */
+function _isSimpleLatex(node: unknown): boolean {
+  if (typeof node === "string") return true;
+  if (!Array.isArray(node)) return false;
+  const h = (node as unknown[])[0];
+  return typeof h === "string" && [
+    "Sin","Cos","Tan","Cot","Sec","Csc","Arcsin","Arccos","Arctan","ArcTan",
+    "Sinh","Cosh","Tanh","Ln","Log","Exp","Sqrt","Root","Square","Cube","Power","Abs",
+  ].includes(h);
+}
+
+function _renderMatrix(args: unknown[]): string {
+  if (args.length !== 1 || !Array.isArray(args[0])) return String(args);
+  const inner = args[0] as [string, ...unknown[]];
+  if (inner[0] !== "List") return String(args);
+  const rows = inner.slice(1);
+  const rowStrs = rows.map(row => {
+    if (Array.isArray(row) && row[0] === "List")
+      return (row as unknown[]).slice(1).map(jsonToLatex).join(" & ");
+    return jsonToLatex(row);
+  });
+  return "\\begin{pmatrix}" + rowStrs.join(" \\\\ ") + "\\end{pmatrix}";
+}
+
 // ── Expression Classification ───────────────────────────────────────
 
 /** Standard coordinate/constant symbols that are NOT free parameters. */

@@ -1,0 +1,17 @@
+{
+  "name": "giacjs",
+  "version": "1.6.0",
+  "description": "Computer Algebra System",
+  "main": "giacsimple.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "CAS",
+    "symbolic",
+    "algebra"
+  ],
+  "url":"https://www-fourier.univ-grenoble-alpes.fr/~parisse/giacjs/",
+  "author": "Bernard Parisse et al",
+  "license": "GPL-3.0-or-later"
+}

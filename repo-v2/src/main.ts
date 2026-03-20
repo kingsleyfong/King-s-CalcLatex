@@ -14,6 +14,7 @@ import { create2DGraph } from "./renderer/renderer2d";
 import { create3DGraph, renderSnapshot } from "./renderer/renderer3d";
 import { KCLSettingTab } from "./settings";
 import { GraphInspectorView, GRAPH_INSPECTOR_VIEW } from "./views/inspector";
+import { initGiac, isGiacReady } from "./engine/giac";
 
 export default class KingsCalcLatexPlugin extends Plugin {
   settings!: KCLSettings;
@@ -31,9 +32,9 @@ export default class KingsCalcLatexPlugin extends Plugin {
   };
   renderer3d = {
     create: (container: HTMLElement, spec: PlotSpec): GraphHandle =>
-      create3DGraph(container, spec, this.isDark(), this.settings.zoom3dMode),
+      create3DGraph(container, spec, this.isDark(), this.settings.zoom3dMode, this.settings.show3DAxisTicks),
     renderSnapshot: (spec: PlotSpec): string =>
-      renderSnapshot(spec, this.isDark(), this.settings.zoom3dMode),
+      renderSnapshot(spec, this.isDark(), this.settings.zoom3dMode, this.settings.show3DAxisTicks),
   };
 
   async onload(): Promise<void> {
@@ -74,6 +75,7 @@ export default class KingsCalcLatexPlugin extends Plugin {
         const status = this.engine.getStatus();
         new Notice(
           `KCL Engine: CortexJS ${status.cortexLoaded ? "loaded" : "not loaded"} | ` +
+          `Giac ${isGiacReady() ? "loaded" : "not loaded"} | ` +
           `Variables: ${status.variableCount}`,
         );
       },
@@ -88,7 +90,18 @@ export default class KingsCalcLatexPlugin extends Plugin {
       },
     });
 
-    // 7. Startup confirmation
+    // 7. Initialize Giac WASM CAS (async, non-blocking)
+    if (this.settings.enableGiac) {
+      const basePath = (this.app.vault.adapter as any).basePath as string;
+      const pluginDir = basePath + "/.obsidian/plugins/" + this.manifest.id;
+      initGiac(pluginDir).then((loaded) => {
+        if (loaded) {
+          console.log("KCL: Giac CAS engine ready");
+        }
+      });
+    }
+
+    // 8. Startup confirmation
     console.log("King's CalcLatex v2 loaded");
   }
 
