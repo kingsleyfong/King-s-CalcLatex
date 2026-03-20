@@ -1,0 +1,492 @@
+/* ════════════════════════════════════════════════════════════════
+   King's CalcLatex v2 — Styles
+   All classes prefixed with kcl- to avoid conflicts
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Inline Result Widget ─────────────────────────────────────── */
+
+.kcl-result {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  color: var(--text-accent);
+  background-color: var(--background-secondary);
+}
+
+.kcl-result-loading {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.kcl-result-error {
+  color: var(--text-error);
+}
+
+/* ── 2D Graph Widget (Custom Canvas Renderer) ────────────────── */
+
+.kcl-graph-2d {
+  display: block;
+  width: 100%;
+  height: 400px;
+  margin: 8px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--background-primary);
+  position: relative;
+  cursor: crosshair;
+}
+
+.kcl-graph-2d canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.kcl-graph-2d.kcl-dragging {
+  cursor: grabbing;
+}
+
+/* ── 2D Reset View Button ──────────────────────────────────── */
+
+.kcl-graph-reset {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.15s ease;
+  z-index: 5;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.kcl-graph-2d:hover .kcl-graph-reset,
+.kcl-graph-3d:hover .kcl-graph-reset {
+  opacity: 0.8;
+}
+
+.kcl-graph-reset:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.theme-light .kcl-graph-reset {
+  background: rgba(0, 0, 0, 0.15);
+  color: #333;
+}
+
+.theme-light .kcl-graph-reset:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ── 3D Graph Widget ──────────────────────────────────────────── */
+
+.kcl-graph-3d {
+  display: block;
+  width: 100%;
+  min-height: 400px;
+  height: 400px;
+  margin: 8px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--background-secondary);
+  position: relative;
+  cursor: pointer;
+}
+
+.kcl-graph-3d canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* ── 3D Snapshot Image ─────────────────────────────────────── */
+
+.kcl-graph-3d-snapshot {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+/* ── "Click to interact" hint overlay ──────────────────────── */
+
+.kcl-graph-3d-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 4px 14px;
+  border-radius: 12px;
+  font-size: 0.78em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.kcl-graph-3d:hover .kcl-graph-3d-hint {
+  opacity: 1;
+}
+
+/* ── Close button (interactive mode) ──────────────────────── */
+
+.kcl-graph-3d-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.kcl-graph-3d-close:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* ── Graph Loading State ──────────────────────────────────────── */
+
+.kcl-graph-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* ── Graph Error State ────────────────────────────────────────── */
+
+.kcl-graph-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-error);
+  font-size: 0.85em;
+  text-align: center;
+  padding: 0 20px;
+}
+
+/* ── Graph Inspector Sidebar ──────────────────────────────────── */
+
+.kcl-inspector {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.kcl-inspector-header h4 {
+  margin: 0 0 4px 0;
+  color: var(--text-accent);
+}
+
+.kcl-inspector-summary {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  margin: 0;
+}
+
+.kcl-inspector-graph {
+  width: 100%;
+  height: 350px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.kcl-inspector-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.kcl-inspector-controls button {
+  flex: 1;
+}
+
+.kcl-inspector-diagnostics {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 12px;
+}
+
+.kcl-inspector-diagnostics h5 {
+  margin: 0 0 8px 0;
+}
+
+.kcl-inspector-diagnostics ul {
+  padding-left: 20px;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  margin: 0;
+}
+
+/* ── Graph Wrapper (graph + slider container) ─────────────────── */
+
+.kcl-graph-wrapper {
+  margin: 8px 0;
+}
+
+.kcl-graph-wrapper .kcl-graph-2d,
+.kcl-graph-wrapper .kcl-graph-3d {
+  margin: 0; /* wrapper handles the margin */
+}
+
+.kcl-slider-container {
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background-color: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Parameter Sliders ────────────────────────────────────────── */
+
+.kcl-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kcl-slider-label {
+  min-width: 30px;
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.kcl-slider-input {
+  flex: 1;
+}
+
+.kcl-slider-value {
+  min-width: 50px;
+  text-align: right;
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+}
+
+/* ── Graph Toolbar (Fullscreen + Screenshot) ──────────────────── */
+
+.kcl-graph-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 80px; /* offset to the left of reset + grid toggle buttons */
+  display: flex;
+  gap: 4px;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.kcl-graph-2d:hover .kcl-graph-toolbar,
+.kcl-graph-3d:hover .kcl-graph-toolbar {
+  opacity: 0.8;
+}
+
+.kcl-graph-toolbar button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  padding: 0;
+}
+
+.kcl-graph-toolbar button:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.theme-light .kcl-graph-toolbar button {
+  background: rgba(0, 0, 0, 0.15);
+  color: #333;
+}
+
+.theme-light .kcl-graph-toolbar button:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ── Browser Fullscreen Mode ──────────────────────────────────── */
+
+.kcl-graph-2d:fullscreen,
+.kcl-graph-3d:fullscreen,
+.kcl-graph-fullscreen {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+.kcl-graph-2d:fullscreen .kcl-graph-toolbar,
+.kcl-graph-3d:fullscreen .kcl-graph-toolbar,
+.kcl-graph-fullscreen .kcl-graph-toolbar {
+  opacity: 0.8;
+}
+
+.kcl-graph-2d:fullscreen .kcl-graph-reset,
+.kcl-graph-3d:fullscreen .kcl-graph-reset,
+.kcl-graph-2d:fullscreen .kcl-graph-3d-close,
+.kcl-graph-3d:fullscreen .kcl-graph-3d-close,
+.kcl-graph-fullscreen .kcl-graph-reset,
+.kcl-graph-fullscreen .kcl-graph-3d-close {
+  opacity: 0.8;
+}
+
+/* ── Fullscreen Hint ─────────────────────────────────────────── */
+
+.kcl-graph-fullscreen-hint {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.kcl-graph-fullscreen-hint.kcl-fading {
+  opacity: 0;
+}
+
+/* ── Copied Toast ────────────────────────────────────────────── */
+
+.kcl-graph-copied-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.kcl-graph-copied-toast.kcl-fading {
+  opacity: 0;
+}
+
+/* ── 3D Expression Labels (HTML overlay) ──────────────────── */
+
+.kcl-graph-3d-labels {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  pointer-events: none;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kcl-graph-3d-label {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+.theme-light .kcl-graph-3d-label {
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+/* ── 3D Hover Tooltip ─────────────────────────────────────── */
+
+.kcl-graph-3d-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.theme-light .kcl-graph-3d-tooltip {
+  background: rgba(255, 255, 255, 0.9);
+  color: #111;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* ── Slider Play/Pause Button ─────────────────────────────── */
+
+.kcl-slider-play {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.kcl-slider-play:hover {
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}

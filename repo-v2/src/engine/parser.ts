@@ -1,0 +1,665 @@
+/**
+ * King's CalcLatex v2 — LaTeX Parser & Expression Compiler
+ *
+ * Parses LaTeX strings into CortexJS BoxedExpressions, classifies them
+ * by type (explicit 2D, implicit 2D, 3D, etc.), and compiles them into
+ * function-plot-compatible strings and JS evaluator functions.
+ */
+
+import { ComputeEngine, type BoxedExpression } from "@cortex-js/compute-engine";
+import type { ExprType } from "../types";
+
+// ── Singleton Compute Engine ────────────────────────────────────────
+
+let _ce: ComputeEngine | null = null;
+
+/** Return the shared ComputeEngine instance (lazy-initialized). */
+export function getCE(): ComputeEngine {
+  if (!_ce) {
+    _ce = new ComputeEngine();
+  }
+  return _ce;
+}
+
+// ── LaTeX Parsing ───────────────────────────────────────────────────
+
+/** Strip math delimiters ($, $$, \(, \), \[, \]) from a LaTeX string. */
+function stripDelimiters(latex: string): string {
+  let s = latex.trim();
+  if (s.startsWith("$$") && s.endsWith("$$")) return s.slice(2, -2).trim();
+  if (s.startsWith("$") && s.endsWith("$")) return s.slice(1, -1).trim();
+  if (s.startsWith("\\[") && s.endsWith("\\]")) return s.slice(2, -2).trim();
+  if (s.startsWith("\\(") && s.endsWith("\\)")) return s.slice(2, -2).trim();
+  return s;
+}
+
+/**
+ * Parse a LaTeX string into a CortexJS BoxedExpression.
+ * Strips math delimiters automatically.
+ */
+export function parseLatex(latex: string): BoxedExpression {
+  const ce = getCE();
+  const clean = stripDelimiters(latex);
+  return ce.parse(clean);
+}
+
+// ── MathJSON → Infix String (function-plot compatible) ──────────────
+
+/**
+ * Operator mapping from MathJSON head names to infix/function-call format.
+ * function-plot understands: x, y, t, sin(), cos(), tan(), sqrt(), log(),
+ * exp(), abs(), ^ for power, and standard arithmetic operators.
+ *
+ * NOTE: CortexJS auto-normalizes some expressions at parse time:
+ *   x^2 → ["Square", x]     (handled specially below, not via this map)
+ *   x^3 → ["Cube", x]       (same)
+ *   These are NOT in this map to allow the Power fallback to remain clean.
+ */
+const UNARY_FN_MAP: Record<string, string> = {
+  Sin: "sin",
+  Cos: "cos",
+  Tan: "tan",
+  Cot: "cot",
+  Sec: "sec",
+  Csc: "csc",
+  Sqrt: "sqrt",
+  Ln: "log",       // function-plot uses log() for natural log
+  Log: "log",
+  Log2: "log2",
+  Exp: "exp",
+  Abs: "abs",
+  Arcsin: "asin",
+  Arccos: "acos",
+  Arctan: "atan",
+  ArcTan: "atan",
+  Arcsinh: "asinh",
+  Arccosh: "acosh",
+  Arctanh: "atanh",
+  Sinh: "sinh",
+  Cosh: "cosh",
+  Tanh: "tanh",
+  Floor: "floor",
+  Ceiling: "ceil",
+  Round: "round",
+  Sign: "sign",
+};
+
+/**
+ * Convert a MathJSON node (from `expr.json`) into an infix string that
+ * function-plot can evaluate directly.
+ */
+function jsonToInfix(node: unknown): string {
+  // Number literal
+  if (typeof node === "number") return node.toString();
+
+  // String symbol (e.g. "x", "y", "Pi")
+  if (typeof node === "string") {
+    if (node === "Pi") return "(Math.PI)";
+    if (node === "ExponentialE" || node === "E") return "(Math.E)";
+    return node;
+  }
+
+  // Array expression: ["Head", ...args]
+  if (Array.isArray(node)) {
+    const [head, ...args] = node as [string, ...unknown[]];
+
+    // Binary arithmetic
+    if (head === "Add") {
+      return "(" + args.map(jsonToInfix).join(" + ") + ")";
+    }
+    if (head === "Subtract" && args.length === 2) {
+      return "(" + jsonToInfix(args[0]) + " - " + jsonToInfix(args[1]) + ")";
+    }
+    if (head === "Multiply") {
+      return "(" + args.map(jsonToInfix).join(" * ") + ")";
+    }
+    if (head === "Divide" && args.length === 2) {
+      return "(" + jsonToInfix(args[0]) + " / " + jsonToInfix(args[1]) + ")";
+    }
+    if (head === "Power" && args.length === 2) {
+      return "(" + jsonToInfix(args[0]) + " ^ " + jsonToInfix(args[1]) + ")";
+    }
+    if (head === "Negate" && args.length === 1) {
+      return "(-" + jsonToInfix(args[0]) + ")";
+    }
+
+    // ── CortexJS list/sequence heads ────────────────────────────────
+    // CortexJS parses (a, b, c) tuples as ["Sequence", a, b, c] or
+    // ["List", a, b, c]. Used for parametric curves. Render as a
+    // parenthesized comma list so callers can detect and split them.
+    if ((head === "Sequence" || head === "List") && args.length > 0) {
+      return "(" + args.map(jsonToInfix).join(", ") + ")";
+    }
+    // ["Delimiter", inner, open, close] — parenthesized expression
+    if (head === "Delimiter" && args.length >= 1) {
+      return jsonToInfix(args[0]);
+    }
+    // ────────────────────────────────────────────────────────────────
+
+    // ── CortexJS auto-normalization heads ───────────────────────────
+    // CortexJS simplifies x^2 → ["Square", x] and x^3 → ["Cube", x]
+    // at parse time. These MUST be handled before the generic fallback,
+    // or they produce invalid output like "square(x)" / "cube(x)".
+    if (head === "Square" && args.length === 1) {
+      return "(" + jsonToInfix(args[0]) + " ^ 2)";
+    }
+    if (head === "Cube" && args.length === 1) {
+      return "(" + jsonToInfix(args[0]) + " ^ 3)";
+    }
+    // ["Root", x, n] = x^(1/n), e.g. cube root: ["Root", x, 3]
+    if (head === "Root" && args.length === 2) {
+      return "((" + jsonToInfix(args[0]) + ") ^ (1 / " + jsonToInfix(args[1]) + "))";
+    }
+    // ["Exp", x] = e^x (some CortexJS versions use this instead of Exp in UNARY_FN_MAP)
+    if (head === "Exp" && args.length === 1) {
+      return "exp(" + jsonToInfix(args[0]) + ")";
+    }
+    // ["Log", x, base] — two-argument log
+    if (head === "Log" && args.length === 2) {
+      return "(log(" + jsonToInfix(args[0]) + ") / log(" + jsonToInfix(args[1]) + "))";
+    }
+    // ["Half", x] = x/2  (CortexJS sometimes emits this)
+    if (head === "Half" && args.length === 1) {
+      return "(" + jsonToInfix(args[0]) + " / 2)";
+    }
+    // ────────────────────────────────────────────────────────────────
+
+    // Unary math functions
+    const fnName = UNARY_FN_MAP[head];
+    if (fnName && args.length === 1) {
+      return fnName + "(" + jsonToInfix(args[0]) + ")";
+    }
+
+    // Rational number: ["Rational", num, den]
+    if (head === "Rational" && args.length === 2) {
+      return "(" + jsonToInfix(args[0]) + " / " + jsonToInfix(args[1]) + ")";
+    }
+
+    // Fallback: treat as a function call — log the unknown head in dev builds
+    if (typeof head === "string" && args.length > 0) {
+      // Unknown CortexJS head: produce (0/0) which evaluates to NaN in both
+      // JS and function-plot math. "NaN" (the JS identifier) is NOT recognised
+      // by function-plot and throws "symbol 'NaN' is undefined".
+      const knownHeadPattern = /^[A-Z][a-zA-Z]+$/;
+      if (knownHeadPattern.test(head)) {
+        return "(0/0)";
+      }
+      return head.toLowerCase() + "(" + args.map(jsonToInfix).join(", ") + ")";
+    }
+  }
+
+  // Object form: { num: "..." } for large numbers or decimals
+  if (typeof node === "object" && node !== null) {
+    const obj = node as Record<string, unknown>;
+    if ("num" in obj && typeof obj.num === "string") return obj.num;
+  }
+
+  return String(node);
+}
+
+/**
+ * Convert a BoxedExpression to a renderer-compatible infix string.
+ * The output is understood by function-plot (2D) and can be parsed for 3D.
+ */
+export function toFnString(expr: BoxedExpression): string {
+  return jsonToInfix(expr.json);
+}
+
+// ── Compile to JS Function ──────────────────────────────────────────
+
+/**
+ * Compile a BoxedExpression into a callable JS function.
+ *
+ * Converts the expression to an infix string and builds a native JS function
+ * via `new Function()`. This is reliable for multi-variable expressions (e.g.
+ * f(x,y) for 3D surfaces) where CortexJS's own compile path has scope issues.
+ *
+ * @param expr - The parsed expression
+ * @param vars - Variable names the function accepts (e.g. ["x"] or ["x","y","z"])
+ * @returns A JS function that maps numeric variable values to a number
+ */
+export function compileToFunction(
+  expr: BoxedExpression,
+  vars: string[],
+): (...args: number[]) => number {
+  // Build JS function from infix string via Function constructor.
+  // We intentionally skip CortexJS's native .compile() because its .evaluate()
+  // only accepts a single-variable scope object — passing { x } leaves y/z
+  // unresolved for multi-variable expressions, producing all-NaN surfaces.
+  const fnStr = toFnString(expr);
+
+  // Replace function-plot-style names with Math.* equivalents
+  const jsStr = fnStr
+    .replace(/\bsin\(/g, "Math.sin(")
+    .replace(/\bcos\(/g, "Math.cos(")
+    .replace(/\btan\(/g, "Math.tan(")
+    .replace(/\bsqrt\(/g, "Math.sqrt(")
+    .replace(/\blog\(/g, "Math.log(")
+    .replace(/\bexp\(/g, "Math.exp(")
+    .replace(/\babs\(/g, "Math.abs(")
+    .replace(/\basin\(/g, "Math.asin(")
+    .replace(/\bacos\(/g, "Math.acos(")
+    .replace(/\batan\(/g, "Math.atan(")
+    .replace(/\batan2\(/g, "Math.atan2(")
+    .replace(/\bsinh\(/g, "Math.sinh(")
+    .replace(/\bcosh\(/g, "Math.cosh(")
+    .replace(/\btanh\(/g, "Math.tanh(")
+    .replace(/\basin\(/g, "Math.asin(")
+    .replace(/\bacos\(/g, "Math.acos(")
+    .replace(/\batan\(/g, "Math.atan(")
+    .replace(/\basinh\(/g, "Math.asinh(")
+    .replace(/\bacosh\(/g, "Math.acosh(")
+    .replace(/\batanh\(/g, "Math.atanh(")
+    .replace(/\bfloor\(/g, "Math.floor(")
+    .replace(/\bceil\(/g, "Math.ceil(")
+    .replace(/\bround\(/g, "Math.round(")
+    .replace(/\bsign\(/g, "Math.sign(")
+    .replace(/\blog2\(/g, "Math.log2(")
+    .replace(/\bpi\b/g, "Math.PI")
+    .replace(/\^/g, "**");
+
+  // ── Free-variable injection ────────────────────────────────────────
+  // Any identifier remaining in jsStr that is NOT in `vars` and NOT a
+  // Math.* property is an unbound parameter (e.g. c, r in a torus).
+  // Inject `const name = value;` bindings so the function doesn't throw.
+  // Values come from the CortexJS engine if previously @persist'd, else 1.
+  const jsStrForAnalysis = jsStr.replace(/\bMath\.[a-zA-Z_][a-zA-Z0-9_]*/g, "__MATH__");
+  const wordPattern = /\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+  const SKIP_IDENTIFIERS = new Set([
+    ...vars,
+    "__MATH__", "NaN", "Infinity", "undefined", "null", "true", "false",
+  ]);
+  const freeVars = new Set<string>();
+  let wm: RegExpExecArray | null;
+  while ((wm = wordPattern.exec(jsStrForAnalysis)) !== null) {
+    if (!SKIP_IDENTIFIERS.has(wm[1])) freeVars.add(wm[1]);
+  }
+
+  let freeVarBindings = "";
+  if (freeVars.size > 0) {
+    const ce = getCE();
+    const parts: string[] = [];
+    for (const v of freeVars) {
+      let defaultVal = 1;
+      try {
+        // .N() forces numeric evaluation, picking up ce.assign() values
+        const assigned = ce.box(v).N();
+        const nv = assigned.numericValue;
+        if (typeof nv === "number" && isFinite(nv)) defaultVal = nv;
+      } catch { /* use 1 */ }
+      parts.push(`const ${v} = ${defaultVal};`);
+    }
+    freeVarBindings = parts.join(" ") + " ";
+  }
+  // ──────────────────────────────────────────────────────────────────
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const fn = new Function(...vars, `"use strict"; ${freeVarBindings}return (${jsStr});`);
+    return (...args: number[]): number => {
+      try {
+        const result = fn(...args) as number;
+        return typeof result === "number" ? result : NaN;
+      } catch {
+        return NaN;
+      }
+    };
+  } catch {
+    return () => NaN;
+  }
+}
+
+// ── Tuple Component Extraction ───────────────────────────────────────
+
+/**
+ * Extract N component BoxedExpressions from a CortexJS tuple/sequence.
+ *
+ * CortexJS represents `(\cos(t), \sin(t), t/3)` as one of:
+ *   ["Sequence", a, b, c]
+ *   ["List", a, b, c]
+ *   ["Delimiter", ["Sequence", a, b, c], "(", ")"]
+ *
+ * Returns the first `n` components as BoxedExpressions, or null if the
+ * expression doesn't have the expected structure.
+ */
+export function extractTupleComponents(
+  expr: BoxedExpression,
+  n: number,
+): BoxedExpression[] | null {
+  const ce = getCE();
+  const json = expr.json;
+
+  if (!Array.isArray(json)) return null;
+  const [head, ...args] = json as [string, ...unknown[]];
+
+  // ── Direct sequence/list ─────────────────────────────────────────
+  // ["Sequence", a, b, c] or ["List", a, b, c]
+  if ((head === "Sequence" || head === "List") && args.length >= n) {
+    return args.slice(0, n).map((a) => ce.box(a as any));
+  }
+
+  // ── Delimited sequence ───────────────────────────────────────────
+  // ["Delimiter", ["Sequence", a, b, c], "(", ")"]
+  if (head === "Delimiter" && Array.isArray(args[0])) {
+    const inner = args[0] as unknown[];
+    const innerHead = inner[0];
+    const innerArgs = inner.slice(1);
+    if (
+      (innerHead === "Sequence" || innerHead === "List") &&
+      innerArgs.length >= n
+    ) {
+      return innerArgs.slice(0, n).map((a) => ce.box(a as any));
+    }
+    // ["Delimiter", inner, "(", ")"] where inner is a single non-sequence expr
+    // (e.g. wrapping a "Divide" expression) — unwrap and recurse
+    if (innerArgs.length === 1) {
+      return extractTupleComponents(ce.box(innerArgs[0] as any), n);
+    }
+  }
+
+  // ── Divided tuple ────────────────────────────────────────────────
+  // Handles \frac{x(t), y(t), z(t)}{n} → LaTeX writes the whole tuple
+  // divided by a scalar. CortexJS produces ["Divide", ["Sequence",...], n].
+  // We extract the components and wrap each as (component / scalar).
+  // NOTE: this divides ALL components by n. If you want only the last
+  // component divided, use inline division: (\cos(t), \sin(t), t/3).
+  if (head === "Divide" && args.length === 2 && Array.isArray(args[0])) {
+    // CortexJS may wrap the numerator in a Delimiter: ["Delimiter", ["Sequence",...], "{", "}"]
+    // Unwrap before checking for Sequence.
+    let seqJson = args[0] as unknown[];
+    if (seqJson[0] === "Delimiter" && Array.isArray(seqJson[1])) {
+      seqJson = seqJson[1] as unknown[];
+    }
+    const seqHead = seqJson[0] as string;
+    const seqArgs = seqJson.slice(1);
+    if (
+      (seqHead === "Sequence" || seqHead === "List") &&
+      seqArgs.length >= n
+    ) {
+      const scalar = args[1];
+      return seqArgs
+        .slice(0, n)
+        .map((a) => ce.box(["Divide", a, scalar] as any));
+    }
+  }
+
+  // ── Multiply with sequence ───────────────────────────────────────
+  // Some CortexJS versions emit ["Multiply", ["Sequence",...], 1/n]
+  if (head === "Multiply" && args.length === 2) {
+    for (let seqIdx = 0; seqIdx <= 1; seqIdx++) {
+      let maybeSeq = args[seqIdx] as unknown[];
+      const scalar = args[1 - seqIdx];
+      if (!Array.isArray(maybeSeq)) continue;
+      // Unwrap Delimiter wrapper if present
+      if (maybeSeq[0] === "Delimiter" && Array.isArray(maybeSeq[1])) {
+        maybeSeq = maybeSeq[1] as unknown[];
+      }
+      if (
+        (maybeSeq[0] === "Sequence" || maybeSeq[0] === "List") &&
+        maybeSeq.length - 1 >= n
+      ) {
+        return maybeSeq
+          .slice(1, n + 1)
+          .map((a) => ce.box(["Multiply", a, scalar] as any));
+      }
+    }
+  }
+
+  return null;
+}
+
+// ── Expression Classification ───────────────────────────────────────
+
+/** Standard coordinate/constant symbols that are NOT free parameters. */
+const COORDINATE_VARS = new Set(["x", "y", "z", "t", "theta", "r"]);
+const KNOWN_CONSTANTS = new Set([
+  "Pi", "ExponentialE", "E", "pi", "e", "True", "False",
+  "ImaginaryUnit", "i",
+]);
+
+/** Recursively collect all symbol names from a MathJSON tree. */
+function collectSymbols(node: unknown, symbols: Set<string>): void {
+  if (typeof node === "string") {
+    if (!KNOWN_CONSTANTS.has(node)) {
+      symbols.add(node);
+    }
+    return;
+  }
+  if (Array.isArray(node)) {
+    const [, ...args] = node;
+    for (const arg of args) {
+      collectSymbols(arg, symbols);
+    }
+  }
+}
+
+/**
+ * Detect all free variables in an expression — symbols that are not
+ * standard coordinates (x, y, z, t) or known constants (pi, e).
+ * These become slider parameters in the UI.
+ */
+export function detectFreeVars(expr: BoxedExpression): string[] {
+  const symbols = new Set<string>();
+  collectSymbols(expr.json, symbols);
+  return Array.from(symbols).filter(
+    (s) => !COORDINATE_VARS.has(s) && !KNOWN_CONSTANTS.has(s),
+  );
+}
+
+/**
+ * Detect if a LaTeX string contains an inequality operator.
+ * Returns the operator and the cleaned parts, or null if not an inequality.
+ */
+export function detectInequality(latex: string): {
+  operator: ">" | "<" | ">=" | "<=";
+  lhs: string;
+  rhs: string;
+  variable: "y" | "x";
+} | null {
+  const clean = stripDelimiters(latex);
+
+  // Order matters: check multi-char operators first
+  const patterns: { re: RegExp; op: ">" | "<" | ">=" | "<=" }[] = [
+    { re: /\\geq\b|\\ge\b/, op: ">=" },
+    { re: /\\leq\b|\\le\b/, op: "<=" },
+    { re: /\\gt\b/, op: ">" },
+    { re: /\\lt\b/, op: "<" },
+    { re: />=/, op: ">=" },
+    { re: /<=/, op: "<=" },
+  ];
+
+  for (const { re, op } of patterns) {
+    const match = clean.match(re);
+    if (match && match.index !== undefined) {
+      const lhs = clean.slice(0, match.index).trim();
+      const rhs = clean.slice(match.index + match[0].length).trim();
+      // Determine which variable is on the LHS
+      const variable = /^x$/.test(lhs) ? "x" : "y";
+      return { operator: op, lhs, rhs, variable };
+    }
+  }
+
+  // Check bare > and < AFTER removing any LaTeX commands that use them
+  // (like \langle \rangle). Must not be inside angle brackets.
+  const noLatex = clean.replace(/\\[a-zA-Z]+/g, "");
+  const gtIdx = noLatex.indexOf(">");
+  if (gtIdx > 0 && noLatex[gtIdx - 1] !== "<") {
+    const lhs = clean.slice(0, gtIdx).trim();
+    const rhs = clean.slice(gtIdx + 1).trim();
+    const variable = /^x$/.test(lhs) ? "x" : "y";
+    return { operator: ">", lhs, rhs, variable };
+  }
+  const ltIdx = noLatex.indexOf("<");
+  if (ltIdx > 0) {
+    const lhs = clean.slice(0, ltIdx).trim();
+    const rhs = clean.slice(ltIdx + 1).trim();
+    const variable = /^x$/.test(lhs) ? "x" : "y";
+    return { operator: "<", lhs, rhs, variable };
+  }
+
+  return null;
+}
+
+/**
+ * Classify a LaTeX expression by its plotting type.
+ *
+ * Detection heuristics:
+ * 0. If the expression contains an inequality → inequality_2d.
+ * 1. If the expression contains `=`, split LHS/RHS and check variable sets.
+ * 2. If it contains z or is mode-forced to 3D → 3D types.
+ * 3. If it contains both x and y on the same side of `=` → implicit_2d.
+ * 4. If it's `y = f(x)` or bare `f(x)` → explicit_2d.
+ * 5. Parametric if (x(t), y(t)) tuple form is detected.
+ */
+export function classifyExpression(latex: string): ExprType {
+  const clean = stripDelimiters(latex);
+
+  // ── Vector detection ──────────────────────────────────────────────────
+  // <a,b,c> or \langle a,b,c \rangle — MUST be before inequality check
+  // because <1,2,3> contains < and > which would falsely trigger detectInequality.
+  const vecClean = clean
+    .replace(/\\langle/g, "<").replace(/\\rangle/g, ">")
+    .replace(/\\left\s*</g, "<").replace(/\\right\s*>/g, ">")
+    .trim();
+  if (/^<[^<>]+,[^<>]+,[^<>]+>$/.test(vecClean)) return "vector_3d";
+
+  // ── Point detection ───────────────────────────────────────────────────
+  // (a,b) or (a,b,c) with NO coordinate variables → literal point, not parametric.
+  // Must be before inequality (which checks for bare < >) and before the
+  // bare-expression fallback that would classify (5,5) as explicit_2d.
+  try {
+    const testExpr = getCE().parse(clean);
+    for (const n of [3, 2] as const) {
+      const comps = extractTupleComponents(testExpr, n);
+      if (comps && comps.length >= n) {
+        const syms = new Set<string>();
+        comps.forEach(c => collectSymbols(c.json, syms));
+        const hasCoordVar = [...syms].some(s => COORDINATE_VARS.has(s));
+        if (!hasCoordVar) return n === 3 ? "point_3d" : "point_2d";
+      }
+    }
+  } catch { /* fall through to normal classification */ }
+
+  // Check for inequality BEFORE equality (since >= contains =)
+  if (detectInequality(clean)) return "inequality_2d";
+  const ce = getCE();
+
+  // Check for polar form: r = f(theta) or r = f(t)
+  const polarMatch = clean.match(/^\\?r\s*=/);
+  if (polarMatch) return "polar";
+
+  // Check for equality: split on = that is not <= or >= or \neq
+  const eqParts = splitOnEquals(clean);
+
+  if (eqParts) {
+    const [lhs, rhs] = eqParts;
+    const lhsTrimmed = lhs.trim();
+    const rhsTrimmed = rhs.trim();
+
+    // ── String-level fast path ───────────────────────────────────────
+    // Detect the most common forms by inspecting the raw LHS/RHS strings
+    // directly. This bypasses CortexJS JSON representation quirks where
+    // a single-symbol expression like "z" might not serialize as the plain
+    // string "z" (causing collectSymbols to miss it and forcing a wrong
+    // implicit_3d classification).
+    //
+    // Rules:
+    //   z = f(x,y)  or  f(x,y) = z  →  explicit_3d
+    //   y = f(x)    or  f(x) = y    →  explicit_2d
+    //   x = f(y)                    →  explicit_2d
+    //   r = f(theta)                →  polar (already handled above)
+
+    if (/^z$/.test(lhsTrimmed) || /^z$/.test(rhsTrimmed)) return "explicit_3d";
+    if (/^y$/.test(lhsTrimmed) || /^y$/.test(rhsTrimmed)) return "explicit_2d";
+    if (/^x$/.test(lhsTrimmed)) return "explicit_2d";
+
+    // ── Symbol-level analysis for compound LHS expressions ──────────
+    // Handles cases like "x^2 + z = y^2 + 1" (implicit_3d) where the
+    // string-level check doesn't apply.
+    const lhsExpr = ce.parse(lhsTrimmed);
+    const rhsExpr = ce.parse(rhsTrimmed);
+
+    const lhsSyms = new Set<string>();
+    const rhsSyms = new Set<string>();
+    collectSymbols(lhsExpr.json, lhsSyms);
+    collectSymbols(rhsExpr.json, rhsSyms);
+    const allSyms = new Set([...lhsSyms, ...rhsSyms]);
+
+    const hasX = allSyms.has("x");
+    const hasY = allSyms.has("y");
+    const hasZ = allSyms.has("z");
+    const hasT = allSyms.has("t") || allSyms.has("theta");
+
+    // 3D cases
+    if (hasZ && (hasX || hasY)) {
+      return "implicit_3d"; // compound LHS/RHS — neither side is just "z"
+    }
+
+    // Parametric 2D: t is the only coordinate variable
+    if (hasT && !hasX && !hasY && !hasZ) {
+      return "parametric_2d";
+    }
+
+    // 2D cases
+    if (hasX && hasY) {
+      return "implicit_2d"; // compound — neither side is just "y" or "x"
+    }
+
+    // Single variable equations: treat as explicit_2d if x present
+    if (hasX) return "explicit_2d";
+    if (hasY) return "explicit_2d";
+  }
+
+  // No equals sign — bare expression, analyze variables
+  const expr = ce.parse(clean);
+  const syms = new Set<string>();
+  collectSymbols(expr.json, syms);
+
+  const hasX = syms.has("x");
+  const hasY = syms.has("y");
+  const hasZ = syms.has("z");
+  const hasT = syms.has("t") || syms.has("theta");
+
+  if (hasZ || (hasX && hasY)) return "explicit_3d";
+  if (hasT && !hasX && !hasY) return "parametric_2d";
+  return "explicit_2d"; // Default: treat as y = f(x)
+}
+
+/** Check if a set of symbols is exactly {"z"} (or another single var) → simple LHS. */
+function isSimpleLHS(syms: Set<string>, target: string): boolean {
+  return syms.size === 1 && syms.has(target);
+}
+
+/**
+ * Split a LaTeX string on the first top-level `=` sign.
+ * Returns null if no `=` is found. Skips `\leq`, `\geq`, `\neq`, `\equiv`.
+ */
+function splitOnEquals(latex: string): [string, string] | null {
+  // Remove relational commands that contain = but aren't equality
+  const cleaned = latex
+    .replace(/\\leq/g, "##LEQ##")
+    .replace(/\\geq/g, "##GEQ##")
+    .replace(/\\neq/g, "##NEQ##")
+    .replace(/\\equiv/g, "##EQUIV##");
+
+  const idx = cleaned.indexOf("=");
+  if (idx === -1) return null;
+
+  // Map index back to original string (same positions since replacements are same length... not exactly)
+  // Simpler approach: find = in the original string that isn't part of \leq, \geq, \neq, \equiv
+  for (let i = 0; i < latex.length; i++) {
+    if (latex[i] === "=") {
+      // Check it's not preceded by \leq, \geq, \neq
+      const before = latex.slice(Math.max(0, i - 5), i);
+      if (before.endsWith("\\leq") || before.endsWith("\\geq") || before.endsWith("\\neq")) {
+        continue;
+      }
+      // Check it's not part of \equiv (= follows \equiv)
+      if (before.endsWith("\\equiv")) continue;
+
+      return [latex.slice(0, i).trim(), latex.slice(i + 1).trim()];
+    }
+  }
+
+  return null;
+}
