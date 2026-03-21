@@ -1234,6 +1234,107 @@ export async function giacGradient(latex: string): Promise<Result<EvalResult> | 
 // ══════════════════════════════════════════════════════════════
 
 /**
+ * Named rule patterns matched against Giac debug messages.
+ * Each entry maps a regex (case-insensitive) to a human-readable rule name.
+ */
+const STEP_RULE_PATTERNS: [RegExp, string][] = [
+  [/integration by parts/i, "Integration by Parts"],
+  [/u[- ]?substitution|change of variable/i, "u-Substitution"],
+  [/partial fraction/i, "Partial Fraction Decomposition"],
+  [/chain rule/i, "Chain Rule"],
+  [/power rule/i, "Power Rule"],
+  [/product rule/i, "Product Rule"],
+  [/quotient rule/i, "Quotient Rule"],
+  [/trig(onometric)?\s+(identity|substitution)/i, "Trigonometric Substitution"],
+  [/l'?hopital|l'?h.pital/i, "L'Hopital's Rule"],
+  [/linearity/i, "Linearity"],
+  [/constant\s+(multiple|factor)/i, "Constant Multiple Rule"],
+  [/sum\s+rule/i, "Sum Rule"],
+  [/logarithm(ic)?\s+(rule|integration|differentiation)/i, "Logarithmic Rule"],
+  [/exponential/i, "Exponential Rule"],
+];
+
+/**
+ * Noise patterns that should be filtered from Giac debug output.
+ * These are internal markers, memory addresses, debug commands, and
+ * other artifacts that carry no mathematical meaning.
+ */
+function isNoiseStep(s: string): boolean {
+  const t = s.trim();
+  if (!t) return true;
+  if (t.startsWith("//")) return true;
+  if (/^debug_infolevel/.test(t)) return true;
+  // Pure numeric lines (debug counters)
+  if (/^\d+$/.test(t)) return true;
+  if (t === "1" || t === "0") return true;
+  // Memory addresses / pointer dumps
+  if (/^0x[0-9a-f]+$/i.test(t)) return true;
+  // Internal variable names like _tmp123, __ret, gen_0
+  if (/^[_]{1,2}[a-zA-Z0-9_]+$/.test(t)) return true;
+  if (/^gen_\d+/.test(t)) return true;
+  // Lines that are just whitespace or single punctuation
+  if (/^[{}\[\]();,]+$/.test(t)) return true;
+  // Very short lines that are just status markers
+  if (t.length <= 2 && !/[=>]/.test(t)) return true;
+  return false;
+}
+
+/**
+ * Classify a Giac debug line into a named rule or return a cleaned description.
+ * If the line matches a known calculus rule, returns the rule name.
+ * If the line contains "=>" or a Unicode arrow, extracts it as an intermediate step.
+ * Otherwise returns the cleaned text.
+ */
+function classifyStep(raw: string): { label: string; intermediate?: string } {
+  const trimmed = raw.trim();
+
+  // Check against known rule patterns
+  for (const [re, name] of STEP_RULE_PATTERNS) {
+    if (re.test(trimmed)) {
+      return { label: name };
+    }
+  }
+
+  // Lines with => or arrows indicate intermediate transformations
+  const arrowMatch = trimmed.match(/^(.+?)\s*(?:=>|→|->)\s*(.+)$/);
+  if (arrowMatch) {
+    const from = arrowMatch[1].trim();
+    const to = arrowMatch[2].trim();
+    return {
+      label: `${giacSyntaxToLatex(from)} \\Rightarrow ${giacSyntaxToLatex(to)}`,
+      intermediate: to,
+    };
+  }
+
+  // Default: clean up and return as-is
+  return { label: trimmed };
+}
+
+/**
+ * Convert common Giac syntax patterns to LaTeX for display in step output.
+ * Handles: ^ → LaTeX power, * → \cdot, common functions, Greek letters.
+ */
+function giacSyntaxToLatex(s: string): string {
+  return s
+    // Exponentiation: x^2 → x^{2}, x^(n+1) → x^{n+1}
+    .replace(/\^(\([^)]+\))/g, (_, exp) => `^{${exp.slice(1, -1)}}`)
+    .replace(/\^(\d+)/g, "^{$1}")
+    // Multiplication: explicit * → \cdot (but not ** which is power)
+    .replace(/(?<!\*)\*(?!\*)/g, " \\cdot ")
+    // Common functions
+    .replace(/\bsqrt\(/g, "\\sqrt{").replace(/\bsqrt\{([^}]+)\}/g, (_, inner) => `\\sqrt{${inner}}`)
+    .replace(/\bsin\(/g, "\\sin(").replace(/\bcos\(/g, "\\cos(").replace(/\btan\(/g, "\\tan(")
+    .replace(/\bln\(/g, "\\ln(").replace(/\blog\(/g, "\\log(").replace(/\bexp\(/g, "\\exp(")
+    .replace(/\barcsin\(/g, "\\arcsin(").replace(/\barccos\(/g, "\\arccos(").replace(/\barctan\(/g, "\\arctan(")
+    // Greek letters
+    .replace(/\bpi\b/g, "\\pi").replace(/\balpha\b/g, "\\alpha").replace(/\bbeta\b/g, "\\beta")
+    .replace(/\btheta\b/g, "\\theta").replace(/\bphi\b/g, "\\phi")
+    // Infinity
+    .replace(/\binf\b/g, "\\infty")
+    .trim();
+}
+
+/**
  * Escape special LaTeX characters in plain-text step descriptions
  * so they render cleanly inside \text{}.
  */
@@ -1249,8 +1350,13 @@ function formatStepText(step: string): string {
 
 /**
  * Build a formatted Result from step-by-step Giac output.
- * Steps are rendered as a numbered list in a gathered environment,
- * with the final answer below a horizontal rule.
+ *
+ * Parses Giac debug messages into structured, numbered steps:
+ * 1. Filters noise lines (debug markers, memory addresses, internal variables)
+ * 2. Classifies each step against known calculus rule patterns
+ * 3. Converts Giac syntax to LaTeX where possible
+ * 4. Numbers each step and formats as gathered LaTeX environment
+ * 5. Ends with "Result: [final answer]"
  */
 function formatStepResultFn(
   operation: string,
@@ -1267,16 +1373,8 @@ function formatStepResultFn(
     .replace(/\\mathit\{([^{}]+)\}/g, "$1")
     .replace(/\\mathrm\{([^{}]+)\}/g, "\\operatorname{$1}");
 
-  // Filter out internal Giac noise
-  const meaningfulSteps = steps.filter((s) => {
-    const t = s.trim();
-    if (!t) return false;
-    if (t.startsWith("//")) return false;
-    if (/^debug_infolevel/.test(t)) return false;
-    if (/^\d+$/.test(t)) return false;
-    if (t === "1") return false;
-    return true;
-  });
+  // Filter out noise and classify meaningful steps
+  const meaningfulSteps = steps.filter((s) => !isNoiseStep(s));
 
   if (meaningfulSteps.length === 0) {
     // No steps captured — just show the result
@@ -1286,22 +1384,52 @@ function formatStepResultFn(
     );
   }
 
+  // Classify and deduplicate steps
+  const classified: { label: string; intermediate?: string }[] = [];
+  const seenLabels = new Set<string>();
+  for (const raw of meaningfulSteps) {
+    const step = classifyStep(raw);
+    // Deduplicate consecutive identical labels (Giac often repeats rule names)
+    if (!seenLabels.has(step.label)) {
+      classified.push(step);
+      seenLabels.add(step.label);
+    }
+  }
+
   // Build multi-line LaTeX: numbered steps + result
-  const stepLines = meaningfulSteps.map(
-    (s, i) => `\\text{${i + 1}. ${formatStepText(s)}}`,
-  );
+  const stepLines = classified.map((step, i) => {
+    const num = i + 1;
+    // If the label contains LaTeX math (arrows, powers), render it as math
+    if (step.label.includes("\\") || step.label.includes("^")) {
+      return `\\text{Step ${num}: }${step.label}`;
+    }
+    return `\\text{Step ${num}: ${formatStepText(step.label)}}`;
+  });
+
+  const resultLine = `\\text{Result: }${cleanResult}`;
   const stepsLatex =
-    stepLines.join(" \\\\ ") + " \\\\ \\hline " + cleanResult;
+    stepLines.join(" \\\\ ") + " \\\\ \\hline " + resultLine;
   const fullLatex = `\\begin{gathered}${stepsLatex}\\end{gathered}`;
 
+  // Plain text version
   const text =
-    meaningfulSteps.map((s, i) => `${i + 1}. ${s}`).join("\n") +
-    "\n= " +
+    classified.map((step, i) => {
+      const num = i + 1;
+      // Strip LaTeX from the label for text output
+      const plainLabel = step.label
+        .replace(/\\Rightarrow/g, "=>")
+        .replace(/\\cdot/g, "*")
+        .replace(/\\[a-zA-Z]+/g, "")
+        .replace(/[{}]/g, "")
+        .trim();
+      return `Step ${num}: ${plainLabel}`;
+    }).join("\n") +
+    "\nResult: " +
     latexToReadable(cleanResult);
 
   return ok(
     { latex: fullLatex, text },
-    [{ level: "info", message: `${operation} with ${meaningfulSteps.length} steps (Giac)` }],
+    [{ level: "info", message: `${operation} with ${classified.length} steps (Giac)` }],
   );
 }
 

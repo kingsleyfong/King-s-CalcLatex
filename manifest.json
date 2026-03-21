@@ -1,0 +1,11 @@
+{
+  "id": "kings-calclatex",
+  "name": "King's CalcLatex",
+  "version": "2.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Browser-native engineering math and high-fidelity graphing for Obsidian.",
+  "author": "kingsleyfong",
+  "authorUrl": "https://github.com/kingsleyfong",
+  "fundingUrl": "",
+  "isDesktopOnly": true
+}

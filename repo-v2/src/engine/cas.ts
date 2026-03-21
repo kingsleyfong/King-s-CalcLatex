@@ -507,6 +507,37 @@ function manualFactor(
   if (!coeffs) return null;
 
   const degree = Math.max(...coeffs.keys(), 0);
+
+  if (degree === 3) {
+    const a3 = coeffs.get(3) || 0;
+    const a2 = coeffs.get(2) || 0;
+    const a1 = coeffs.get(1) || 0;
+    const a0 = coeffs.get(0) || 0;
+    if (Math.abs(a2) > 1e-12 || Math.abs(a1) > 1e-12) return null;
+    if (Math.abs(a0) < 1e-12) return null;
+
+    const cbrtA = Math.cbrt(a3);
+    const cbrtB = Math.cbrt(Math.abs(a0));
+    if (
+      Math.abs(cbrtA - Math.round(cbrtA)) > 1e-10 ||
+      Math.abs(cbrtB - Math.round(cbrtB)) > 1e-10
+    ) return null;
+
+    const ra = Math.round(cbrtA);
+    const rb = Math.round(cbrtB);
+
+    if (a0 > 0) {
+      return {
+        latex: `(${fmtNumLatex(ra)}${v} + ${fmtNumLatex(rb)})(${fmtNumLatex(ra * ra)}${v}^2 - ${fmtNumLatex(ra * rb)}${v} + ${fmtNumLatex(rb * rb)})`,
+        text: `(${fmtNum(ra)}${v} + ${fmtNum(rb)})(${fmtNum(ra * ra)}${v}^2 - ${fmtNum(ra * rb)}${v} + ${fmtNum(rb * rb)})`,
+      };
+    }
+    return {
+      latex: `(${fmtNumLatex(ra)}${v} - ${fmtNumLatex(rb)})(${fmtNumLatex(ra * ra)}${v}^2 + ${fmtNumLatex(ra * rb)}${v} + ${fmtNumLatex(rb * rb)})`,
+      text: `(${fmtNum(ra)}${v} - ${fmtNum(rb)})(${fmtNum(ra * ra)}${v}^2 + ${fmtNum(ra * rb)}${v} + ${fmtNum(rb * rb)})`,
+    };
+  }
+
   if (degree !== 2) return null;
 
   const a = coeffs.get(2) || 0;
