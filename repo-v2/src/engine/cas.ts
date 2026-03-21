@@ -560,12 +560,12 @@ function manualFactor(
  * Symbolic differentiation: d/d(var) of expression.
  * CortexJS handles this well — just fix display.
  */
-export function differentiate(
+export async function differentiate(
   latex: string,
   variable?: string,
-): Result<EvalResult> {
+): Promise<Result<EvalResult>> {
   // Try Giac first — returns null if unavailable
-  const giacResult = giacDifferentiate(latex, variable);
+  const giacResult = await giacDifferentiate(latex, variable);
   if (giacResult) return giacResult;
 
   const diagnostics: Diagnostic[] = [];
@@ -601,19 +601,169 @@ export function differentiate(
 }
 
 /**
+ * Try to extract definite integral bounds and integrand from a LaTeX string.
+ * Returns { lo, hi, integrand } or null. (Mirrors the Giac helper for the fallback path.)
+ */
+function parseDefiniteIntegralCas(
+  latex: string,
+): { lo: string; hi: string; integrand: string } | null {
+  // With braces: \int_{lo}^{hi} rest
+  let m = latex.match(/\\int\s*_\{([^{}]+)\}\s*\^\{([^{}]+)\}\s*([\s\S]*)/);
+  if (m) return { lo: m[1].trim(), hi: m[2].trim(), integrand: m[3].trim() };
+  // Without braces: \int_a^b rest
+  m = latex.match(/\\int\s*_([^\\{}\s])\s*\^([^\\{}\s])\s*([\s\S]*)/);
+  if (m) return { lo: m[1].trim(), hi: m[2].trim(), integrand: m[3].trim() };
+  return null;
+}
+
+/**
+ * Evaluate a MathJSON expression numerically by substituting a numeric value for variable v.
+ * Returns NaN if evaluation fails.
+ */
+function evalNumeric(json: unknown, v: string, val: number): number {
+  const ce = getCE();
+  try {
+    const boxed = ce.box(json as any);
+    const result = boxed.subs({ [v]: ce.number(val) } as any).evaluate();
+    const n = result.numericValue;
+    if (typeof n === "number") return n;
+    if (n && typeof (n as any).re === "number") return (n as any).re;
+    const parsed = parseFloat(String(result));
+    return isNaN(parsed) ? NaN : parsed;
+  } catch {
+    return NaN;
+  }
+}
+
+/**
+ * Numeric definite integral via Gauss-Legendre 5-point quadrature as last resort.
+ */
+function numericDefiniteIntegral(
+  json: unknown,
+  v: string,
+  lo: number,
+  hi: number,
+): number {
+  // 5-point Gauss-Legendre nodes/weights on [-1, 1]
+  const nodes = [0, -0.538469310106, 0.538469310106, -0.90617984594, 0.90617984594];
+  const weights = [0.568888888889, 0.478628670499, 0.478628670499, 0.236926885056, 0.236926885056];
+
+  const mid = (hi + lo) / 2;
+  const half = (hi - lo) / 2;
+  let sum = 0;
+  for (let i = 0; i < nodes.length; i++) {
+    const x = mid + half * nodes[i];
+    sum += weights[i] * evalNumeric(json, v, x);
+  }
+  return half * sum;
+}
+
+/**
  * Symbolic integration: ∫ expression d(var).
  * CortexJS 0.24 cannot integrate — falls back to manual rule-based integration.
+ * Also handles definite integrals via \int_{a}^{b} notation.
  */
-export function integrate(
+export async function integrate(
   latex: string,
   variable?: string,
-): Result<EvalResult> {
+): Promise<Result<EvalResult>> {
   // Try Giac first
-  const giacResult = giacIntegrate(latex, variable);
+  const giacResult = await giacIntegrate(latex, variable);
   if (giacResult) return giacResult;
 
   const diagnostics: Diagnostic[] = [];
   const ce = getCE();
+
+  // ── Definite integral detection ──────────────────────────────────────────
+  const defInt = parseDefiniteIntegralCas(latex);
+  if (defInt) {
+    // Strip trailing \, dx / \, dt etc.
+    let integrand = defInt.integrand
+      .replace(/\\,\s*d[a-zA-Z]$/, "")
+      .replace(/\bd[a-zA-Z]$/, "")
+      .trim();
+    const v = resolveVariable(integrand, variable);
+
+    // Check if CortexJS parses this as ["Integrate", expr, ["Triple", var, lo, hi]]
+    try {
+      const fullExpr = parseLatex(latex);
+      const json = fullExpr.json;
+      if (
+        Array.isArray(json) && json[0] === "Integrate" &&
+        Array.isArray(json[2]) && json[2][0] === "Triple" &&
+        json[2].length === 4
+      ) {
+        // CortexJS already parsed the full definite integral
+        const innerVar = String(json[2][1]);
+        const loJson = json[2][2];
+        const hiJson = json[2][3];
+        const innerExpr = json[1];
+        const antideriv = manualIntegrate(innerExpr, innerVar);
+        if (antideriv !== null) {
+          const loVal = evalNumeric(loJson, innerVar, 0);
+          const hiVal = evalNumeric(hiJson, innerVar, 0);
+          if (!isNaN(loVal) && !isNaN(hiVal)) {
+            const fHi = evalNumeric(antideriv, innerVar, hiVal);
+            const fLo = evalNumeric(antideriv, innerVar, loVal);
+            if (!isNaN(fHi) && !isNaN(fLo)) {
+              const numResult = fHi - fLo;
+              const latex_ = fmtNumLatex(numResult);
+              diagnostics.push({ level: "info", message: `Definite integral (CortexJS parse + manual antiderivative)` });
+              return ok({ latex: latex_, text: fmtNum(numResult) }, diagnostics);
+            }
+          }
+        }
+      }
+    } catch { /* fall through to manual path */ }
+
+    // Manual fallback: parse integrand, find antiderivative, evaluate at bounds
+    try {
+      const integrandExpr = parseLatex(integrand);
+      if (integrandExpr.isValid !== false) {
+        const antideriv = manualIntegrate(integrandExpr.json, v);
+        if (antideriv !== null) {
+          // Parse bounds
+          const loExpr = parseLatex(defInt.lo);
+          const hiExpr = parseLatex(defInt.hi);
+          const loVal = evalNumeric(loExpr.json, v, 0);
+          const hiVal = evalNumeric(hiExpr.json, v, 0);
+          if (!isNaN(loVal) && !isNaN(hiVal)) {
+            const fHi = evalNumeric(antideriv, v, hiVal);
+            const fLo = evalNumeric(antideriv, v, loVal);
+            if (!isNaN(fHi) && !isNaN(fLo)) {
+              const numResult = fHi - fLo;
+              const latex_ = fmtNumLatex(numResult);
+              diagnostics.push({ level: "info", message: `Definite integral from ${defInt.lo} to ${defInt.hi} w.r.t. ${v}` });
+              return ok({ latex: latex_, text: fmtNum(numResult) }, diagnostics);
+            }
+          }
+        }
+
+        // Last resort: numeric quadrature
+        try {
+          const loExpr = parseLatex(defInt.lo);
+          const hiExpr = parseLatex(defInt.hi);
+          const loVal = evalNumeric(loExpr.json, v, 0);
+          const hiVal = evalNumeric(hiExpr.json, v, 0);
+          if (!isNaN(loVal) && !isNaN(hiVal)) {
+            const numResult = numericDefiniteIntegral(integrandExpr.json, v, loVal, hiVal);
+            if (!isNaN(numResult)) {
+              const latex_ = parseFloat(numResult.toPrecision(8)).toString();
+              diagnostics.push({ level: "info", message: `Definite integral (numeric quadrature)` });
+              return ok({ latex: latex_, text: latex_ }, diagnostics);
+            }
+          }
+        } catch { /* fall through */ }
+      }
+    } catch { /* fall through to error */ }
+
+    return err(
+      `Cannot evaluate definite integral. Giac is not available and manual antiderivative failed.`,
+      diagnostics,
+    );
+  }
+
+  // ── Indefinite integration ────────────────────────────────────────────────
   const v = resolveVariable(latex, variable);
 
   try {
@@ -652,13 +802,155 @@ export function integrate(
 }
 
 /**
+ * Manual 2x2 linear system solver using Cramer's rule.
+ * Equations must be in the form: ax + by = c, dx + ey = f
+ * Returns { latex, text } or null.
+ */
+function manualSolveSystem2x2(
+  eq1Json: unknown,
+  eq2Json: unknown,
+  v1: string,
+  v2: string,
+): { latex: string; text: string } | null {
+  /**
+   * Extract { a, b, c } from an equation json such that a*v1 + b*v2 = c.
+   * Strategy:
+   *   1. Normalise equation to LHS - RHS = 0 (if it has an equals head).
+   *   2. Use extractPolyCoeffs treating the full expression as polynomial in v1;
+   *      the coefficient of v1^1 gives `a`.
+   *   3. Build the remainder (expression minus a*v1) via CortexJS, then extract
+   *      the coefficient of v2^1 from that to get `b`.
+   *   4. The remaining constant gives `-c`.
+   */
+  function getLinearCoeffs(
+    json: unknown,
+    x: string,
+    y: string,
+  ): { a: number; b: number; c: number } | null {
+    // Normalise: equation head → LHS - RHS
+    let target: unknown = json;
+    if (
+      Array.isArray(json) &&
+      (json[0] === "Equal" || json[0] === "Assign" || json[0] === "Equation") &&
+      json.length === 3
+    ) {
+      target = ["Subtract", json[1], json[2]];
+    }
+
+    // Extract coefficient of x from the full expression
+    const coeffsX = extractPolyCoeffs(target, x);
+    if (!coeffsX) return null;
+    const a = coeffsX.get(1) || 0;
+
+    // Build remainder = target - a*x, then extract coefficient of y
+    const ce = getCE();
+    let remainder: unknown;
+    try {
+      const remainderExpr = ce.box(["Subtract", target, ["Multiply", a, x]] as any).evaluate();
+      remainder = remainderExpr.json;
+    } catch {
+      return null;
+    }
+
+    const coeffsY = extractPolyCoeffs(remainder, y);
+    if (!coeffsY) return null;
+
+    const b = coeffsY.get(1) || 0;
+    // ax + by + free_const = 0, so ax + by = -free_const = c
+    const c = -(coeffsY.get(0) || 0);
+
+    return { a, b, c };
+  }
+
+  const r1 = getLinearCoeffs(eq1Json, v1, v2);
+  const r2 = getLinearCoeffs(eq2Json, v1, v2);
+  if (!r1 || !r2) return null;
+
+  const { a, b, c } = r1;
+  const { a: d, b: e, c: f } = r2;
+
+  const det = a * e - b * d;
+  if (Math.abs(det) < 1e-12) return null; // singular or dependent
+
+  const x1 = (c * e - b * f) / det;
+  const x2 = (a * f - c * d) / det;
+
+  return {
+    latex: `${v1} = ${fmtNumLatex(x1)},\\; ${v2} = ${fmtNumLatex(x2)}`,
+    text: `${v1} = ${fmtNum(x1)}, ${v2} = ${fmtNum(x2)}`,
+  };
+}
+
+/**
  * Solve an equation for the target variable.
  * CortexJS 0.24 cannot solve — falls back to manual polynomial solver.
+ * Also supports systems of equations separated by semicolons.
  */
-export function solveEquation(latex: string): Result<EvalResult> {
+export async function solveEquation(latex: string): Promise<Result<EvalResult>> {
   // Try Giac first
-  const giacResult = giacSolve(latex);
+  const giacResult = await giacSolve(latex);
   if (giacResult) return giacResult;
+
+  // ── System of equations detection ────────────────────────────────────────
+  const eqParts = latex.split(";").map(p => p.trim()).filter(p => p.length > 0);
+  if (eqParts.length > 1) {
+    const diagnostics: Diagnostic[] = [];
+    const ce = getCE();
+
+    try {
+      // Collect all free variables across equations
+      const allVars = new Set<string>();
+      const parsedEqs: unknown[] = [];
+      for (const p of eqParts) {
+        const expr = parseLatex(p);
+        parsedEqs.push(expr.json);
+        for (const v of (expr.freeVariables || [])) allVars.add(v);
+      }
+
+      // Build ordered variable list
+      const orderedVars: string[] = [];
+      for (const preferred of ["x", "y", "z", "t", "u", "v", "w"]) {
+        if (allVars.has(preferred)) orderedVars.push(preferred);
+      }
+      for (const v of allVars) {
+        if (!orderedVars.includes(v)) orderedVars.push(v);
+      }
+
+      // Try CortexJS Solve with multiple equations
+      try {
+        const eqList = ce.box(["List", ...parsedEqs] as any);
+        const varList = ce.box(["List", ...orderedVars] as any);
+        const solveExpr = ce.box(["Solve", eqList.json, varList.json] as any);
+        const result = solveExpr.evaluate();
+        const resultStr = String(result);
+        if (!resultStr.includes("Solve") && resultStr !== "Nothing" && resultStr !== "EmptySet") {
+          diagnostics.push({ level: "info", message: `Solved system for (${orderedVars.join(", ")})` });
+          return ok(toEvalResult(result), diagnostics);
+        }
+      } catch { /* try manual */ }
+
+      // Manual 2×2 linear system solver (Cramer's rule)
+      if (parsedEqs.length === 2 && orderedVars.length === 2) {
+        const solution = manualSolveSystem2x2(
+          parsedEqs[0],
+          parsedEqs[1],
+          orderedVars[0],
+          orderedVars[1],
+        );
+        if (solution) {
+          diagnostics.push({ level: "info", message: `Solved 2×2 linear system` });
+          return ok(solution, diagnostics);
+        }
+      }
+
+      return err(
+        `Cannot solve this system. Supported: 2×2 linear systems (manual) when Giac is unavailable.`,
+        diagnostics,
+      );
+    } catch (e) {
+      return err(`System solve failed: ${e instanceof Error ? e.message : String(e)}`, diagnostics);
+    }
+  }
 
   const diagnostics: Diagnostic[] = [];
   const ce = getCE();
@@ -732,13 +1024,12 @@ export function solveEquation(latex: string): Result<EvalResult> {
 /**
  * Factor a polynomial expression.
  */
-export function factorExpression(latex: string): Result<EvalResult> {
+export async function factorExpression(latex: string): Promise<Result<EvalResult>> {
   // Try Giac first
-  const giacResult = giacFactor(latex);
+  const giacResult = await giacFactor(latex);
   if (giacResult) return giacResult;
 
   const diagnostics: Diagnostic[] = [];
-  const ce = getCE();
 
   try {
     const expr = parseLatex(latex);
@@ -746,19 +1037,9 @@ export function factorExpression(latex: string): Result<EvalResult> {
       return err("Failed to parse expression for factoring", diagnostics);
     }
 
-    // Try CortexJS first
-    try {
-      const factored = ce.box(["Factor", expr.json]);
-      const result = factored.evaluate();
-      const resultStr = String(result);
-      // Reject if CortexJS returned unevaluated "Factor", trivial "1", or just a number
-      const isTrivial = resultStr === "1" || resultStr === "0" ||
-        (!isNaN(Number(resultStr)) && !resultStr.includes("("));
-      if (!resultStr.includes("Factor") && !isTrivial) {
-        diagnostics.push({ level: "info", message: "Factored expression" });
-        return ok(toEvalResult(result), diagnostics);
-      }
-    } catch { /* try manual */ }
+    // CortexJS 0.24 does not implement Factor — skip directly to manual/Giac.
+    // (Attempting ce.box(["Factor", ...]).evaluate() returns the original
+    //  simplified polynomial, which would be incorrectly treated as factored.)
 
     // Find variable
     let variable = "x";
@@ -788,12 +1069,12 @@ export function factorExpression(latex: string): Result<EvalResult> {
 /**
  * Partial derivative: ∂f/∂(variable).
  */
-export function partialDerivative(
+export async function partialDerivative(
   latex: string,
   variable: string,
-): Result<EvalResult> {
+): Promise<Result<EvalResult>> {
   // Try Giac first
-  const giacResult = giacPartialDerivative(latex, variable);
+  const giacResult = await giacPartialDerivative(latex, variable);
   if (giacResult) return giacResult;
 
   const diagnostics: Diagnostic[] = [];
@@ -833,9 +1114,9 @@ export function partialDerivative(
 /**
  * Gradient vector: ∇f = (∂f/∂x, ∂f/∂y) or (∂f/∂x, ∂f/∂y, ∂f/∂z).
  */
-export function computeGradient(latex: string): Result<EvalResult> {
+export async function computeGradient(latex: string): Promise<Result<EvalResult>> {
   // Try Giac first
-  const giacResult = giacGradient(latex);
+  const giacResult = await giacGradient(latex);
   if (giacResult) return giacResult;
 
   const diagnostics: Diagnostic[] = [];
@@ -903,7 +1184,7 @@ export function computeGradient(latex: string): Result<EvalResult> {
 /**
  * Surface normal vector.
  */
-export function computeNormal(latex: string): Result<EvalResult> {
+export async function computeNormal(latex: string): Promise<Result<EvalResult>> {
   const diagnostics: Diagnostic[] = [];
   const ce = getCE();
 

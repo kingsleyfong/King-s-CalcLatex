@@ -204,6 +204,118 @@ function rangeExplicit3D(
   };
 }
 
+/**
+ * Estimate ranges for an implicit 3D function f(x,y,z)=0 via coarse sign-change scan.
+ */
+function rangeImplicit3D(pd: PlotData, defaults: AxisRanges): AxisRanges {
+  const fn = pd.compiledFns[0];
+  if (!fn) return defaults;
+
+  const [xMin, xMax] = defaults.x;
+  const [yMin, yMax] = defaults.y;
+  const zDef = defaults.z || defaults.y;
+  const [zMin, zMax] = zDef;
+  const n = 12; // coarser grid for 3D (n^3 = 1728 samples)
+  const dx = (xMax - xMin) / n;
+  const dy = (yMax - yMin) / n;
+  const dz = (zMax - zMin) / n;
+
+  let xLo = Infinity, xHi = -Infinity;
+  let yLo = Infinity, yHi = -Infinity;
+  let zLo = Infinity, zHi = -Infinity;
+  let found = false;
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      for (let k = 0; k < n; k++) {
+        const x = xMin + i * dx;
+        const y = yMin + j * dy;
+        const z = zMin + k * dz;
+        try {
+          const v = fn(x, y, z);
+          const vx = fn(x + dx, y, z);
+          const vy = fn(x, y + dy, z);
+          const vz = fn(x, y, z + dz);
+
+          if ((isFinite(v) && isFinite(vx) && v * vx < 0) ||
+              (isFinite(v) && isFinite(vy) && v * vy < 0) ||
+              (isFinite(v) && isFinite(vz) && v * vz < 0)) {
+            found = true;
+            xLo = Math.min(xLo, x); xHi = Math.max(xHi, x + dx);
+            yLo = Math.min(yLo, y); yHi = Math.max(yHi, y + dy);
+            zLo = Math.min(zLo, z); zHi = Math.max(zHi, z + dz);
+          }
+        } catch { /* skip */ }
+      }
+    }
+  }
+
+  if (!found) return defaults;
+  return {
+    x: padRange(xLo, xHi, defaults.x),
+    y: padRange(yLo, yHi, defaults.y),
+    z: padRange(zLo, zHi, zDef),
+  };
+}
+
+/**
+ * Estimate ranges for a parametric 3D curve [x(t), y(t), z(t)] by sampling.
+ */
+function rangeParametric3D(pd: PlotData, defaults: AxisRanges): AxisRanges {
+  if (pd.compiledFns.length < 3) return defaults;
+
+  const tRange: [number, number] = defaults.t || [-2 * Math.PI, 2 * Math.PI];
+  const [tMin, tMax] = tRange;
+  const dt = (tMax - tMin) / (SAMPLES_1D - 1);
+
+  let xLo = Infinity, xHi = -Infinity;
+  let yLo = Infinity, yHi = -Infinity;
+  let zLo = Infinity, zHi = -Infinity;
+
+  for (let i = 0; i < SAMPLES_1D; i++) {
+    const t = tMin + i * dt;
+    try {
+      const x = pd.compiledFns[0](t);
+      const y = pd.compiledFns[1](t);
+      const z = pd.compiledFns[2](t);
+      if (isFinite(x) && isFinite(y) && isFinite(z)) {
+        xLo = Math.min(xLo, x); xHi = Math.max(xHi, x);
+        yLo = Math.min(yLo, y); yHi = Math.max(yHi, y);
+        zLo = Math.min(zLo, z); zHi = Math.max(zHi, z);
+      }
+    } catch { /* skip */ }
+  }
+
+  return {
+    x: padRange(xLo, xHi, defaults.x),
+    y: padRange(yLo, yHi, defaults.y),
+    z: padRange(zLo, zHi, defaults.z || defaults.y),
+    t: tRange,
+  };
+}
+
+/**
+ * Estimate ranges for a 3D vector [vx, vy, vz] (constant components).
+ * Expands the viewport to include both the origin and the vector tip.
+ */
+function rangeVector3D(pd: PlotData, defaults: AxisRanges): AxisRanges {
+  if (pd.compiledFns.length < 3) return defaults;
+
+  const vx = pd.compiledFns[0]();
+  const vy = pd.compiledFns[1]();
+  const vz = pd.compiledFns[2]();
+
+  if (!isFinite(vx) || !isFinite(vy) || !isFinite(vz)) return defaults;
+
+  // Include both origin (0,0,0) and vector tip with padding
+  const pad = Math.max(Math.abs(vx), Math.abs(vy), Math.abs(vz), 1) * 0.3;
+  return {
+    x: padRange(Math.min(0, vx) - pad, Math.max(0, vx) + pad, defaults.x),
+    y: padRange(Math.min(0, vy) - pad, Math.max(0, vy) + pad, defaults.y),
+    z: padRange(Math.min(0, vz) - pad, Math.max(0, vz) + pad, defaults.z || defaults.y),
+  };
+}
+
 // ── Main Entry ───────────────────────────────────────────────────────
 
 /**
@@ -254,9 +366,18 @@ export function computeAutoRange(
         break;
 
       case "implicit_3d":
+        itemRange = rangeImplicit3D(pd, defaults);
+        result = mergeRanges(result, itemRange);
+        break;
+
       case "parametric_3d":
+        itemRange = rangeParametric3D(pd, defaults);
+        result = mergeRanges(result, itemRange);
+        break;
+
       case "vector_3d":
-        // Use defaults for these types (hard to auto-range without heavy sampling)
+        itemRange = rangeVector3D(pd, defaults);
+        result = mergeRanges(result, itemRange);
         break;
 
       case "point_2d":
