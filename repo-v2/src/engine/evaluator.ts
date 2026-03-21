@@ -23,9 +23,11 @@ import {
   giacTaylor,
   giacPartfrac,
   giacExpand,
+  giacSteps,
 } from "./giac";
 import type { EvalMode, EvalResult, Result, Diagnostic } from "../types";
 import { ok, err } from "../types";
+import { convertUnits as convertUnitsFromEngine, formatUnitResultAsLatex } from "./units";
 
 /**
  * Extract a standard LaTeX string from a BoxedExpression.
@@ -66,13 +68,13 @@ function toEvalResult(expr: BoxedExpression): EvalResult {
  * - "factor": attempt to factor the expression
  *
  * @param precision - Decimal places for approximate mode (optional)
- * @returns Result<EvalResult> — never throws
+ * @returns Promise<Result<EvalResult>> — never throws
  */
-export function evaluate(
+export async function evaluate(
   latex: string,
   mode: EvalMode,
   precision?: number,
-): Result<EvalResult> {
+): Promise<Result<EvalResult>> {
   const diagnostics: Diagnostic[] = [];
 
   let expr: BoxedExpression;
@@ -91,6 +93,13 @@ export function evaluate(
       message: "Expression may not have parsed correctly",
     });
   }
+
+  // ── Raw-LaTeX linear algebra pre-processing ───────────────────────
+  // CortexJS v0.24 does NOT recognise \det as a built-in command — it
+  // emits an "unexpected-command" Error node and the matrix is lost.
+  // Intercept \det before calling ce.parse() by inspecting the raw string.
+  const rawLinalgResult = tryLinearAlgebraFromLatex(latex, diagnostics);
+  if (rawLinalgResult) return rawLinalgResult;
 
   // ── Cross product detection ────────────────────────────────────────
   // CortexJS does not natively support cross product. \times between
@@ -112,40 +121,95 @@ export function evaluate(
       case "approximate":
         return evaluateApproximate(expr, diagnostics, precision);
       case "simplify": {
-        const giacSimp = giacSimplify(latex);
+        const giacSimp = await giacSimplify(latex);
         if (giacSimp) return giacSimp;
         return evaluateSimplify(expr, diagnostics);
       }
       case "solve":
-        return casSolve(latex);
+        return await casSolve(latex);
       case "factor":
-        return casFactor(latex);
+        return await casFactor(latex);
 
       // CAS operations — delegate to cas.ts
       case "differentiate":
-        return casDifferentiate(latex);
+        return await casDifferentiate(latex);
       case "integrate":
-        return casIntegrate(latex);
+        return await casIntegrate(latex);
       case "partial_x":
-        return partialDerivative(latex, "x");
+        return await partialDerivative(latex, "x");
       case "partial_y":
-        return partialDerivative(latex, "y");
+        return await partialDerivative(latex, "y");
       case "partial_z":
-        return partialDerivative(latex, "z");
+        return await partialDerivative(latex, "z");
       case "gradient":
-        return computeGradient(latex);
+        return await computeGradient(latex);
       case "normal":
-        return computeNormal(latex);
+        return await computeNormal(latex);
 
       // Giac-only operations
       case "limit":
-        return giacLimit(latex) ?? err("Limit requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacLimit(latex)) ?? err("Limit requires Giac CAS. Place giacwasm.js in the plugin folder.");
       case "taylor":
-        return giacTaylor(latex) ?? err("Taylor series requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacTaylor(latex)) ?? err("Taylor series requires Giac CAS. Place giacwasm.js in the plugin folder.");
       case "partfrac":
-        return giacPartfrac(latex) ?? err("Partial fractions requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacPartfrac(latex)) ?? err("Partial fractions requires Giac CAS. Place giacwasm.js in the plugin folder.");
       case "expand":
-        return giacExpand(latex) ?? err("Expand requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacExpand(latex)) ?? err("Expand requires Giac CAS. Place giacwasm.js in the plugin folder.");
+      case "steps":
+        return (await giacSteps(latex)) ?? err("Step-by-step requires Giac CAS. Place giacwasm.js in the plugin folder.");
+
+      case "convert": {
+        // Expected syntax: `5 \text{ft} \to \text{m}` or `5\,\text{ft} \to \text{m}` or `5 ft \to m`
+        // \to and \rightarrow are both accepted as the separator.
+        const arrowMatch = latex.match(/(.*?)\\(?:to|rightarrow)\s*(.*)/);
+        if (!arrowMatch) {
+          return err(
+            "Use format: value unit \\to unit (e.g., 5\\text{ft} \\to \\text{m})",
+          );
+        }
+
+        const sourcePart = arrowMatch[1].trim();
+        const targetPart = arrowMatch[2].trim();
+
+        // Strip LaTeX formatting from unit strings so math.js can parse them.
+        const cleanUnit = (s: string) =>
+          s
+            .replace(/\\text\{([^{}]+)\}/g, "$1")
+            .replace(/\\mathrm\{([^{}]+)\}/g, "$1")
+            .replace(/\\,/g, "")
+            .replace(/\\ /g, " ")
+            .replace(/\{/g, "")
+            .replace(/\}/g, "")
+            .trim();
+
+        // Extract leading number and the rest (unit) from the source part.
+        const numMatch = sourcePart.match(
+          /^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s*(.*)/,
+        );
+        if (!numMatch) {
+          return err(
+            "Could not parse value. Use format: 5\\text{ft} \\to \\text{m}",
+          );
+        }
+
+        const value = parseFloat(numMatch[1]);
+        const fromUnit = cleanUnit(numMatch[2]);
+        const toUnit = cleanUnit(targetPart);
+
+        const convResult = convertUnitsFromEngine(value, fromUnit, toUnit);
+        if (!convResult.ok) {
+          // Pass diagnostics from units.ts through alongside the error.
+          return err(convResult.error, convResult.diagnostics);
+        }
+
+        const rawText = convResult.value;
+        const resultLatex = formatUnitResultAsLatex(rawText);
+
+        return ok(
+          { latex: resultLatex, text: rawText },
+          convResult.diagnostics,
+        );
+      }
 
       default:
         return err(`Unknown evaluation mode: ${mode as string}`);
@@ -541,15 +605,102 @@ function formatNum(n: number): string {
   return rounded.toString();
 }
 
+// ── Raw-LaTeX Linear Algebra Pre-Processing ──────────────────────
+
+/**
+ * Extract a numeric matrix directly from a LaTeX pmatrix/bmatrix/vmatrix string.
+ *
+ * CortexJS correctly parses \begin{pmatrix}…\end{pmatrix} when given it
+ * as a standalone expression, so we strip the surrounding operation keyword,
+ * re-parse just the matrix block, and then call extractMatrix() on the result.
+ *
+ * Returns a 2D number array or null if the string doesn't contain a parseable
+ * matrix environment.
+ */
+function extractMatrixFromLatex(matrixLatex: string): number[][] | null {
+  try {
+    const expr = parseLatex(matrixLatex.trim());
+    return extractMatrix(expr.json);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Intercept linear algebra operations that CortexJS cannot parse correctly
+ * due to missing command definitions (e.g. \det in v0.24).
+ *
+ * Currently handles:
+ *   \det\begin{pmatrix}…\end{pmatrix}  →  determinant computation
+ *
+ * Must be called with the STRIPPED (no $ delimiters) LaTeX string BEFORE
+ * passing the expression to tryLinearAlgebra().
+ *
+ * Returns a Result<EvalResult> if it handled the expression, or null if the
+ * expression is not a recognised raw-LaTeX linear algebra operation.
+ */
+function tryLinearAlgebraFromLatex(
+  rawLatex: string,
+  diagnostics: Diagnostic[],
+): Result<EvalResult> | null {
+  // Strip outer $ or $$ delimiters (same as parser.ts stripDelimiters)
+  let latex = rawLatex.trim();
+  if (latex.startsWith("$$") && latex.endsWith("$$")) latex = latex.slice(2, -2).trim();
+  else if (latex.startsWith("$") && latex.endsWith("$")) latex = latex.slice(1, -1).trim();
+  else if (latex.startsWith("\\[") && latex.endsWith("\\]")) latex = latex.slice(2, -2).trim();
+  else if (latex.startsWith("\\(") && latex.endsWith("\\)")) latex = latex.slice(2, -2).trim();
+
+  // ── \det\begin{...} ────────────────────────────────────────────────
+  // Match: \det followed by optional whitespace and a matrix environment.
+  // Supported environments: pmatrix, bmatrix, vmatrix, Bmatrix, Vmatrix, matrix
+  const detMatch = latex.match(
+    /^\\det\s*(\\.+)$/s,
+  );
+  if (detMatch) {
+    const matLatex = detMatch[1].trim();
+    // Verify it's actually a matrix environment
+    if (/^\\begin\{[pPbBvV]?matrix\}/.test(matLatex)) {
+      const mat = extractMatrixFromLatex(matLatex);
+      if (mat) {
+        if (mat.length !== mat[0].length) {
+          return err("Determinant requires a square matrix", diagnostics);
+        }
+        const det = determinant(mat);
+        diagnostics.push({
+          level: "info",
+          message: `Computed determinant of ${mat.length}×${mat.length} matrix (raw-LaTeX path)`,
+        });
+        const s = formatNum(det);
+        return ok({ latex: s, text: s }, diagnostics);
+      }
+    }
+  }
+
+  return null;
+}
+
 // ── Linear Algebra Detection ──────────────────────────────────────
 
 /**
  * Detect and compute linear algebra operations:
  * - Determinant: ["Determinant", matrix]
- * - Transpose: ["Transpose", matrix]
+ *   NOTE: CortexJS 0.24 does NOT recognise \det as a built-in command.
+ *   \det\begin{pmatrix}…\end{pmatrix} parses to:
+ *     ["Error", ["ErrorCode", "'unexpected-command'", "'\\det'"], ["LatexString", "'\\det'"]]
+ *   The matrix is NOT inside that error node; it is absent from the JSON.
+ *   We must pre-process the raw LaTeX string and extract the matrix manually.
+ *   See tryLinearAlgebraFromLatex() which is called BEFORE this function.
+ *
+ * - Transpose: ["Transpose", matrix]   ← CortexJS does emit this for ^T
  * - Inverse: ["Inverse", matrix] or ["Power", matrix, -1]
+ *   NOTE: CortexJS wraps the matrix in an Error for ^{-1}:
+ *     ["Power", ["Error", ["ErrorCode", "'incompatible-domain'", …], matrix], -1]
+ *   extractMatrix() unwraps Error nodes, so this still works.
+ *
  * - Dot product: ["Dot", vec1, vec2]
- * - Matrix multiplication: ["Multiply", mat1, mat2] where both are NxM matrices
+ * - Matrix multiplication: CortexJS parses two adjacent matrices as
+ *   ["Pair", matrix1, matrix2] (NOT ["Multiply", …]).
+ *   We handle "Pair" here.
  *
  * Returns null if the expression is not a recognized linear algebra operation.
  */
@@ -564,6 +715,9 @@ function tryLinearAlgebra(
   const args = json.slice(1) as unknown[];
 
   // ── Determinant ────────────────────────────────────────────────────
+  // CortexJS emits ["Determinant", matrix] if the symbol is defined;
+  // in practice (v0.24) \det is an unexpected-command — handled by
+  // tryLinearAlgebraFromLatex() via raw-LaTeX pre-processing instead.
   if (head === "Determinant" && args.length === 1) {
     const mat = extractMatrix(args[0]);
     if (!mat) return null;
@@ -577,6 +731,7 @@ function tryLinearAlgebra(
   }
 
   // ── Transpose ──────────────────────────────────────────────────────
+  // CortexJS correctly emits ["Transpose", matrix] for M^T.
   if (head === "Transpose" && args.length === 1) {
     const mat = extractMatrix(args[0]);
     if (!mat) return null;
@@ -600,7 +755,10 @@ function tryLinearAlgebra(
     return ok({ latex: matrixToLatex(inv), text: matrixToText(inv) }, diagnostics);
   }
 
-  // ── Inverse: ["Power", matrix, -1] ────────────────────────────────
+  // ── Inverse: ["Power", matrix_or_Error(matrix), -1] ───────────────
+  // CortexJS v0.24 wraps the matrix in an incompatible-domain Error:
+  //   ["Power", ["Error", ["ErrorCode","'incompatible-domain'","Numbers","Lists"], matrix], -1]
+  // extractMatrix() already unwraps Error nodes, so no special casing needed.
   if (head === "Power" && args.length === 2 && args[1] === -1) {
     const mat = extractMatrix(args[0]);
     if (!mat) return null;
@@ -635,15 +793,20 @@ function tryLinearAlgebra(
     return ok({ latex: s, text: s }, diagnostics);
   }
 
-  // ── Matrix multiplication: ["Multiply", mat1, mat2] ───────────────
-  // Only intercept when both operands are matrices (not vectors).
-  // Vectors with 3 elements under Multiply are handled by tryCrossProduct.
-  if ((head === "Multiply" || head === "Error") && args.length >= 2) {
-    // For Error-wrapped Multiply, dig into the inner node
+  // ── Matrix multiplication ──────────────────────────────────────────
+  // CortexJS v0.24 parses two adjacent matrices (AB written in LaTeX as
+  // \begin{pmatrix}…\end{pmatrix}\begin{pmatrix}…\end{pmatrix}) as:
+  //   ["Pair", matrix1, matrix2]
+  // NOT as ["Multiply", …]. Handle "Pair" in addition to "Multiply".
+  //
+  // Also handle Error-wrapped Multiply for edge cases where CortexJS
+  // does produce Multiply but wraps one or both args in an Error node.
+  if ((head === "Pair" || head === "Multiply" || head === "Error") && args.length >= 2) {
     let mulArgs: unknown[] | null = null;
 
-    if (head === "Multiply") {
-      mulArgs = args;
+    if (head === "Pair" || head === "Multiply") {
+      // Pair and Multiply both carry the two matrix operands as direct args
+      mulArgs = args.length === 2 ? args : null;
     } else if (head === "Error") {
       // ["Error", ["Multiply", m1, m2], ...] or ["Error", errCode, ["Multiply", m1, m2]]
       for (const arg of args) {
@@ -658,10 +821,10 @@ function tryLinearAlgebra(
       const matA = extractMatrix(mulArgs[0]);
       const matB = extractMatrix(mulArgs[1]);
 
-      // Only proceed if both are genuine matrices (at least one dimension > 1),
-      // not simple vectors (which are Nx1 or 1xN and handled elsewhere).
+      // Only proceed if both are genuine 2D matrices (at least one of rows or
+      // cols > 1 for each operand). Pure 1×1 scalars fall through to normal eval.
       if (matA && matB && (matA[0].length > 1 || matA.length > 1) && (matB[0].length > 1 || matB.length > 1)) {
-        // Check that at least one operand is truly a multi-row AND multi-column matrix
+        // Require at least one true NxM (N>1 AND M>1) matrix — reject Nx1 ⊗ Nx1
         const aIsMatrix = matA.length > 1 && matA[0].length > 1;
         const bIsMatrix = matB.length > 1 && matB[0].length > 1;
 
@@ -853,7 +1016,9 @@ function evaluateSimplify(
   diagnostics: Diagnostic[],
 ): Result<EvalResult> {
   try {
-    const result = expr.simplify();
+    let result = expr.simplify();
+    // Post-process: apply common trig identities that CortexJS 0.24 misses
+    result = applyTrigIdentities(result);
     return ok(toEvalResult(result), diagnostics);
   } catch (e) {
     return err(
@@ -861,6 +1026,74 @@ function evaluateSimplify(
       diagnostics,
     );
   }
+}
+
+/**
+ * Apply common trig identities that CortexJS 0.24 does not handle.
+ * Checks the MathJSON structure for patterns like sin²(a)+cos²(a) → 1.
+ */
+function applyTrigIdentities(expr: BoxedExpression): BoxedExpression {
+  const json = expr.json;
+  if (!Array.isArray(json)) return expr;
+  const [head, ...args] = json as [string, ...unknown[]];
+
+  // sin²(a) + cos²(a) → 1
+  if (head === "Add" && args.length === 2) {
+    const pair = identifyPythagoreanPair(args[0], args[1]);
+    if (pair) return getCE().box(1);
+  }
+
+  return expr;
+}
+
+/**
+ * Check if two MathJSON nodes form a sin²(a)+cos²(a) pair (in either order).
+ * Returns the argument `a` if matched, null otherwise.
+ */
+function identifyPythagoreanPair(a: unknown, b: unknown): unknown | null {
+  const sinArg = extractSquaredTrig(a, "Sin");
+  const cosArg = extractSquaredTrig(b, "Cos");
+  if (sinArg !== null && cosArg !== null && jsonEqual(sinArg, cosArg)) return sinArg;
+
+  const sinArg2 = extractSquaredTrig(b, "Sin");
+  const cosArg2 = extractSquaredTrig(a, "Cos");
+  if (sinArg2 !== null && cosArg2 !== null && jsonEqual(sinArg2, cosArg2)) return sinArg2;
+
+  return null;
+}
+
+/**
+ * If `node` is ["Square", ["Sin", arg]] or ["Power", ["Sin", arg], 2],
+ * return `arg`. Otherwise null.
+ */
+function extractSquaredTrig(node: unknown, fnName: string): unknown | null {
+  if (!Array.isArray(node)) return null;
+  const [h, ...a] = node as [string, ...unknown[]];
+
+  // ["Square", ["Sin", arg]]
+  if (h === "Square" && a.length === 1 && Array.isArray(a[0])) {
+    const inner = a[0] as [string, ...unknown[]];
+    if (inner[0] === fnName && inner.length === 2) return inner[1];
+  }
+
+  // ["Power", ["Sin", arg], 2]
+  if (h === "Power" && a.length === 2 && a[1] === 2 && Array.isArray(a[0])) {
+    const inner = a[0] as [string, ...unknown[]];
+    if (inner[0] === fnName && inner.length === 2) return inner[1];
+  }
+
+  return null;
+}
+
+/** Deep-equal check for MathJSON nodes. */
+function jsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => jsonEqual(v, b[i]));
+  }
+  return false;
 }
 
 /**

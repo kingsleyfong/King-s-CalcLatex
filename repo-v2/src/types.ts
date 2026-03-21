@@ -55,7 +55,8 @@ export type EvalMode = "exact" | "approximate" | "simplify" | "solve" | "factor"
   | "differentiate" | "integrate"
   | "partial_x" | "partial_y" | "partial_z"
   | "gradient" | "normal"
-  | "limit" | "taylor" | "partfrac" | "expand";
+  | "limit" | "taylor" | "partfrac" | "expand"
+  | "convert" | "steps";
 export type PlotMode = "plot2d" | "plot3d" | "geometry"
   | "contour" | "vecfield" | "gradient" | "tangent" | "region";
 

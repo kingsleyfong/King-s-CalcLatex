@@ -90,6 +90,32 @@ export function convertUnits(
 }
 
 /**
+ * Format a math.js unit result string (e.g. "0.3048 m") as LaTeX.
+ * Produces e.g. `0.3048\,\text{m}` for inline rendering.
+ *
+ * If the string does not follow the "<number> <unit>" pattern it is
+ * returned unchanged so the caller always gets something displayable.
+ */
+export function formatUnitResultAsLatex(raw: string): string {
+  // math.js format() output is typically "<number> <unit>" with a single space.
+  // Unit strings may contain /, ^, digits (e.g. "m / s^2", "kg m^-1"), so we
+  // split only on the FIRST space.
+  const spaceIdx = raw.indexOf(" ");
+  if (spaceIdx === -1) return raw; // no unit part — just return as-is
+
+  const numPart = raw.slice(0, spaceIdx).trim();
+  const unitPart = raw.slice(spaceIdx + 1).trim();
+
+  if (!unitPart) return numPart;
+
+  // Wrap unit in \text{} for upright rendering.
+  // Spaces inside compound units (e.g. "m / s") become thin spaces.
+  const latexUnit = `\\text{${unitPart}}`;
+
+  return `${numPart}\\,${latexUnit}`;
+}
+
+/**
  * Normalize common unit aliases to math.js-compatible names.
  */
 function normalizeUnit(u: string): string {

@@ -52,25 +52,26 @@ export class ExpressionEngine {
   /**
    * Evaluate a LaTeX expression in the given mode.
    * Delegates to the evaluator module, passing numericPrecision from settings.
+   * Returns a Promise because Giac CAS operations run in a Web Worker.
    */
-  evaluate(latex: string, mode: EvalMode): Result<EvalResult> {
+  async evaluate(latex: string, mode: EvalMode): Promise<Result<EvalResult>> {
     return evaluate(latex, mode, this.settings?.numericPrecision);
   }
 
   // ── CAS Operations ─────────────────────────────────────────────
 
   /** Symbolic differentiation. */
-  differentiate(latex: string, variable?: string): Result<EvalResult> {
+  async differentiate(latex: string, variable?: string): Promise<Result<EvalResult>> {
     return differentiate(latex, variable);
   }
 
   /** Symbolic integration. */
-  integrate(latex: string, variable?: string): Result<EvalResult> {
+  async integrate(latex: string, variable?: string): Promise<Result<EvalResult>> {
     return integrate(latex, variable);
   }
 
   /** Solve an equation. */
-  solve(latex: string): Result<EvalResult> {
+  async solve(latex: string): Promise<Result<EvalResult>> {
     return solveEquation(latex);
   }
 
@@ -1172,5 +1173,5 @@ function buildGeomSpec(
 // Re-export submodules for direct access if needed
 export { parseLatex, toFnString, compileToFunction, classifyExpression, detectFreeVars } from "./parser";
 export { evaluate } from "./evaluator";
-export { differentiate, integrate, solveEquation } from "./cas";
+export { differentiate, integrate, solveEquation, factorExpression } from "./cas";
 export { convertUnits } from "./units";

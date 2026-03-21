@@ -166,8 +166,9 @@ function buildExplicit3DMesh(
       const y = yMin + j * dy;
       let z: number;
       try { z = fn(x, y); } catch { z = NaN; }
-      // Clamp to z range so geometry stays within the bounding cube
-      zValues[i][j] = isFinite(z) ? Math.max(zLo, Math.min(zHi, z)) : NaN;
+      // Clip: discard vertices outside z range (NaN → triangle skipped)
+      // instead of clamping (which creates flat caps at cube boundaries).
+      zValues[i][j] = (isFinite(z) && z >= zLo && z <= zHi) ? z : NaN;
     }
   }
 
@@ -1199,9 +1200,9 @@ export function create3DGraph(
     const yRange = currentRanges.y;
     const zRange = currentRanges.z || currentRanges.y;
 
-    // Per-axis scaling: each axis independently fills [-1,1] in the cube.
-    // This ensures surfaces always span the full cube regardless of axis
-    // range differences (e.g. z=x²+y² where z>>x,y).
+    // Uniform scaling: all axes use the same scale factor so proportions
+    // are preserved (1:1:1 axes). The largest axis fills [-1,1] in the
+    // cube; shorter axes occupy a proportionally smaller fraction.
     // Three.js Y-up: math (x,y,z) → Three.js (x,z,y)
 
     if (zoomMode === "origin") {
@@ -1209,23 +1210,21 @@ export function create3DGraph(
       const halfY = Math.max(Math.abs(yRange[0]), Math.abs(yRange[1]));
       const halfZ = Math.max(Math.abs(zRange[0]), Math.abs(zRange[1]));
 
-      const sX = halfX > 0 ? 1 / halfX : 1;
-      const sY = halfY > 0 ? 1 / halfY : 1;
-      const sZ = halfZ > 0 ? 1 / halfZ : 1;
+      const maxHalf = Math.max(halfX, halfY, halfZ, 1e-6);
+      const s = 1 / maxHalf;
 
-      worldGroup.scale.set(sX, sZ, sY);
+      worldGroup.scale.set(s, s, s);
       worldGroup.position.set(0, 0, 0);
     } else {
       const xCen = rangeCenter(xRange);
       const yCen = rangeCenter(yRange);
       const zCen = rangeCenter(zRange);
 
-      const sX = rangeSpan(xRange) > 0 ? 2 / rangeSpan(xRange) : 1;
-      const sY = rangeSpan(yRange) > 0 ? 2 / rangeSpan(yRange) : 1;
-      const sZ = rangeSpan(zRange) > 0 ? 2 / rangeSpan(zRange) : 1;
+      const maxSpan = Math.max(rangeSpan(xRange), rangeSpan(yRange), rangeSpan(zRange), 1e-6);
+      const s = 2 / maxSpan;
 
-      worldGroup.scale.set(sX, sZ, sY);
-      worldGroup.position.set(-xCen * sX, -zCen * sZ, -yCen * sY);
+      worldGroup.scale.set(s, s, s);
+      worldGroup.position.set(-xCen * s, -zCen * s, -yCen * s);
     }
   }
 

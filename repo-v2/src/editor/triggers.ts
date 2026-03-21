@@ -42,6 +42,7 @@ const TRIGGER_DEFS: TriggerDef[] = [
   { pattern: /@taylor\s*$/,   kind: "evaluate", mode: "taylor" },
   { pattern: /@partfrac\s*$/, kind: "evaluate", mode: "partfrac" },
   { pattern: /@expand\s*$/,   kind: "evaluate", mode: "expand" },
+  { pattern: /@steps\s*$/,    kind: "evaluate", mode: "steps" },
 
   // Plot triggers
   { pattern: /@plot3d\s*$/,    kind: "plot", mode: "plot3d" },
@@ -56,8 +57,8 @@ const TRIGGER_DEFS: TriggerDef[] = [
   // Persist trigger
   { pattern: /@persist\s*$/, kind: "persist", mode: "persist" },
 
-  // Convert trigger — captures the target unit after @convert
-  { pattern: /@convert\s+(\S+)\s*$/, kind: "convert", mode: "convert", captureArg: true },
+  // Convert trigger — full arrow expression: 5\text{ft} \to \text{m} @convert
+  { pattern: /@convert\s*$/, kind: "evaluate", mode: "convert" },
 ];
 
 // ══════════════════════════════════════════════════════════════
