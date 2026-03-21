@@ -24,10 +24,20 @@ import {
   giacPartfrac,
   giacExpand,
   giacSteps,
+  giacIntegrate,
+  latexToGiac,
+  isGiacReady,
 } from "./giac";
 import type { EvalMode, EvalResult, Result, Diagnostic } from "../types";
 import { ok, err } from "../types";
 import { convertUnits as convertUnitsFromEngine, formatUnitResultAsLatex } from "./units";
+
+function giacOnlyError(opName: string): string {
+  if (isGiacReady()) {
+    return `${opName} failed. The expression may not be supported.`;
+  }
+  return `${opName} requires Giac CAS engine. Enable in Settings and place giacwasm.js in the plugin folder.`;
+}
 
 /**
  * Extract a standard LaTeX string from a BoxedExpression.
@@ -55,6 +65,214 @@ function toEvalResult(expr: BoxedExpression): EvalResult {
     latex,
     text: latexToReadable(latex),
   };
+}
+
+// ── Definite Integral Detection & Evaluation ─────────────────────
+
+/**
+ * Parse a definite integral from stripped LaTeX.
+ * Returns { lo, hi, integrand, variable } or null if not a definite integral.
+ */
+function parseDefiniteIntegralEval(
+  latex: string,
+): { lo: string; hi: string; integrand: string; variable: string } | null {
+  // Braced form: \int_{lo}^{hi} f(x) \, dx
+  let m = latex.match(
+    /^\\int\s*_\{([^{}]+)\}\s*\^\{([^{}]+)\}\s*([\s\S]+?)\\?[,]?\s*d([a-z])\s*$/,
+  );
+  if (m) {
+    return {
+      lo: m[1].trim(),
+      hi: m[2].trim(),
+      integrand: m[3].trim(),
+      variable: m[4],
+    };
+  }
+
+  // Unbraced single-token form: \int_a^b f(x) \, dx
+  m = latex.match(
+    /^\\int\s*_([^\\{}\s])\s*\^([^\\{}\s])\s*([\s\S]+?)\\?[,]?\s*d([a-z])\s*$/,
+  );
+  if (m) {
+    return {
+      lo: m[1].trim(),
+      hi: m[2].trim(),
+      integrand: m[3].trim(),
+      variable: m[4],
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Numeric definite integral via composite Simpson's rule.
+ * Used as a fallback when symbolic antiderivative fails.
+ *
+ * @param fn - Compiled JS function f(x) for the integrand
+ * @param lo - Lower bound
+ * @param hi - Upper bound
+ * @param n  - Number of subdivisions (must be even; default 1000)
+ */
+function simpsonIntegrate(
+  fn: (x: number) => number,
+  lo: number,
+  hi: number,
+  n = 1000,
+): number {
+  if (n % 2 !== 0) n++;
+  const h = (hi - lo) / n;
+  let sum = fn(lo) + fn(hi);
+  for (let i = 1; i < n; i++) {
+    const x = lo + i * h;
+    sum += (i % 2 === 0 ? 2 : 4) * fn(x);
+  }
+  return (h / 3) * sum;
+}
+
+/**
+ * Attempt to evaluate a definite integral from the raw LaTeX.
+ *
+ * Strategy:
+ * 1. Try Giac CAS (full symbolic integration with bounds)
+ * 2. Try CortexJS: get antiderivative via casIntegrate, evaluate at bounds
+ * 3. Fall back to composite Simpson's rule (~1000 subdivisions)
+ *
+ * For exact mode: show \int_{a}^{b} f(x)\,dx = F(b) - F(a) = result
+ * For approximate mode: show numeric result only
+ *
+ * Returns null if the expression is not a definite integral.
+ */
+async function tryDefiniteIntegral(
+  rawLatex: string,
+  mode: EvalMode,
+  diagnostics: Diagnostic[],
+  precision?: number,
+): Promise<Result<EvalResult> | null> {
+  // Strip outer delimiters
+  let latex = rawLatex.trim();
+  if (latex.startsWith("$$") && latex.endsWith("$$")) latex = latex.slice(2, -2).trim();
+  else if (latex.startsWith("$") && latex.endsWith("$")) latex = latex.slice(1, -1).trim();
+  else if (latex.startsWith("\\[") && latex.endsWith("\\]")) latex = latex.slice(2, -2).trim();
+  else if (latex.startsWith("\\(") && latex.endsWith("\\)")) latex = latex.slice(2, -2).trim();
+
+  const parsed = parseDefiniteIntegralEval(latex);
+  if (!parsed) return null;
+
+  const { lo, hi, integrand, variable } = parsed;
+
+  // ── Strategy 1: Giac CAS (symbolic, handles most integrals) ──────
+  try {
+    const fullIntLatex = `\\int_{${lo}}^{${hi}} ${integrand} \\, d${variable}`;
+    const giacResult = await giacIntegrate(fullIntLatex, variable);
+    if (giacResult && giacResult.ok) {
+      if (mode === "exact") {
+        const enrichedLatex =
+          `\\int_{${lo}}^{${hi}} ${integrand}\\,d${variable} = ${giacResult.value.latex}`;
+        diagnostics.push({
+          level: "info",
+          message: `Definite integral evaluated symbolically (Giac)`,
+        });
+        return ok(
+          { latex: enrichedLatex, text: latexToReadable(enrichedLatex) },
+          diagnostics,
+        );
+      }
+      diagnostics.push({
+        level: "info",
+        message: `Definite integral evaluated (Giac)`,
+      });
+      return giacResult;
+    }
+  } catch { /* Giac not available or failed — continue */ }
+
+  // ── Strategy 2: CortexJS antiderivative + evaluate at bounds ─────
+  try {
+    const integrandExpr = parseLatex(integrand);
+    if (integrandExpr.isValid !== false) {
+      const antiderivResult = await casIntegrate(integrand, variable);
+      if (antiderivResult.ok) {
+        const antiderivLatex = antiderivResult.value.latex;
+        const loExpr = parseLatex(lo);
+        const hiExpr = parseLatex(hi);
+        const loNum = forceNumber(loExpr.N());
+        const hiNum = forceNumber(hiExpr.N());
+
+        if (loNum !== null && hiNum !== null && Number.isFinite(loNum) && Number.isFinite(hiNum)) {
+          const ce = getCE();
+          const antiderivParsed = parseLatex(antiderivLatex);
+          const fHi = forceNumber(
+            antiderivParsed.subs({ [variable]: ce.number(hiNum) } as any).evaluate(),
+          );
+          const fLo = forceNumber(
+            antiderivParsed.subs({ [variable]: ce.number(loNum) } as any).evaluate(),
+          );
+
+          if (fHi !== null && fLo !== null && Number.isFinite(fHi) && Number.isFinite(fLo)) {
+            const result = fHi - fLo;
+            const p = (precision !== undefined && precision > 0) ? precision : 12;
+            const rounded = parseFloat(result.toFixed(p));
+            const numStr = rounded.toString();
+
+            if (mode === "exact") {
+              const resultLatex =
+                `\\int_{${lo}}^{${hi}} ${integrand}\\,d${variable} = \\left[${antiderivLatex}\\right]_{${lo}}^{${hi}} = ${numStr}`;
+              diagnostics.push({
+                level: "info",
+                message: `Definite integral: F(${hi}) - F(${lo}) = ${numStr}`,
+              });
+              return ok(
+                { latex: resultLatex, text: latexToReadable(resultLatex) },
+                diagnostics,
+              );
+            }
+            diagnostics.push({
+              level: "info",
+              message: `Definite integral evaluated numerically`,
+            });
+            return ok({ latex: numStr, text: numStr }, diagnostics);
+          }
+        }
+      }
+    }
+  } catch { /* fall through to numeric */ }
+
+  // ── Strategy 3: Simpson's rule numeric fallback ──────────────────
+  try {
+    const integrandExpr = parseLatex(integrand);
+    const fn = compileToFunction(integrandExpr, [variable]);
+
+    const loExpr = parseLatex(lo);
+    const hiExpr = parseLatex(hi);
+    const loNum = forceNumber(loExpr.N());
+    const hiNum = forceNumber(hiExpr.N());
+
+    if (loNum !== null && hiNum !== null && Number.isFinite(loNum) && Number.isFinite(hiNum)) {
+      const result = simpsonIntegrate(fn, loNum, hiNum, 1000);
+      if (Number.isFinite(result)) {
+        const p = (precision !== undefined && precision > 0) ? precision : 8;
+        const rounded = parseFloat(result.toPrecision(p));
+        const numStr = rounded.toString();
+
+        diagnostics.push({
+          level: "info",
+          message: `Definite integral evaluated via numeric quadrature (Simpson's rule, n=1000)`,
+        });
+
+        if (mode === "exact") {
+          const resultLatex =
+            `\\int_{${lo}}^{${hi}} ${integrand}\\,d${variable} \\approx ${numStr}`;
+          return ok(
+            { latex: resultLatex, text: latexToReadable(resultLatex) },
+            diagnostics,
+          );
+        }
+        return ok({ latex: numStr, text: numStr }, diagnostics);
+      }
+    }
+  } catch { /* numeric quadrature failed */ }
+
+  return null;
 }
 
 /**
@@ -92,6 +310,15 @@ export async function evaluate(
       level: "warning",
       message: "Expression may not have parsed correctly",
     });
+  }
+
+  // ── Definite integral detection ──────────────────────────────────
+  // Detect \int_{a}^{b} f(x)\,dx before the mode switch. This handles
+  // definite integrals in both exact and approximate modes, using Giac
+  // CAS, CortexJS antiderivative, or Simpson's rule as fallback.
+  if (mode === "exact" || mode === "approximate") {
+    const defIntResult = await tryDefiniteIntegral(latex, mode, diagnostics, precision);
+    if (defIntResult) return defIntResult;
   }
 
   // ── Raw-LaTeX linear algebra pre-processing ───────────────────────
@@ -148,15 +375,15 @@ export async function evaluate(
 
       // Giac-only operations
       case "limit":
-        return (await giacLimit(latex)) ?? err("Limit requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacLimit(latex)) ?? err(giacOnlyError("Limit"));
       case "taylor":
-        return (await giacTaylor(latex)) ?? err("Taylor series requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacTaylor(latex)) ?? err(giacOnlyError("Taylor series"));
       case "partfrac":
-        return (await giacPartfrac(latex)) ?? err("Partial fractions requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacPartfrac(latex)) ?? err(giacOnlyError("Partial fractions"));
       case "expand":
-        return (await giacExpand(latex)) ?? err("Expand requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacExpand(latex)) ?? err(giacOnlyError("Expand"));
       case "steps":
-        return (await giacSteps(latex)) ?? err("Step-by-step requires Giac CAS. Place giacwasm.js in the plugin folder.");
+        return (await giacSteps(latex)) ?? err(giacOnlyError("Step-by-step"));
 
       case "convert": {
         // Expected syntax: `5 \text{ft} \to \text{m}` or `5\,\text{ft} \to \text{m}` or `5 ft \to m`
@@ -1036,14 +1263,61 @@ function applyTrigIdentities(expr: BoxedExpression): BoxedExpression {
   const json = expr.json;
   if (!Array.isArray(json)) return expr;
   const [head, ...args] = json as [string, ...unknown[]];
+  const ce = getCE();
 
-  // sin²(a) + cos²(a) → 1
   if (head === "Add" && args.length === 2) {
     const pair = identifyPythagoreanPair(args[0], args[1]);
-    if (pair) return getCE().box(1);
+    if (pair) return ce.box(1);
+  }
+
+  // cos²(a) - sin²(a) → cos(2a)
+  if (head === "Subtract" && args.length === 2) {
+    const cosArg = extractSquaredTrig(args[0], "Cos");
+    const sinArg = extractSquaredTrig(args[1], "Sin");
+    if (cosArg !== null && sinArg !== null && jsonEqual(cosArg, sinArg)) {
+      return ce.box(["Cos", ["Multiply", 2, cosArg]]);
+    }
+  }
+
+  // 2·sin(a)·cos(a) → sin(2a)
+  if (head === "Multiply") {
+    const sinCosArg = extractDoubleAngleSine(args);
+    if (sinCosArg !== null) {
+      return ce.box(["Sin", ["Multiply", 2, sinCosArg]]);
+    }
   }
 
   return expr;
+}
+
+function extractDoubleAngleSine(factors: unknown[]): unknown | null {
+  let hasCoeff2 = false;
+  let sinArg: unknown | null = null;
+  let cosArg: unknown | null = null;
+
+  for (const f of factors) {
+    if (f === 2) {
+      hasCoeff2 = true;
+      continue;
+    }
+    if (Array.isArray(f)) {
+      const [h, ...a] = f as [string, ...unknown[]];
+      if (h === "Sin" && a.length === 1 && sinArg === null) {
+        sinArg = a[0];
+        continue;
+      }
+      if (h === "Cos" && a.length === 1 && cosArg === null) {
+        cosArg = a[0];
+        continue;
+      }
+    }
+    return null;
+  }
+
+  if (hasCoeff2 && sinArg !== null && cosArg !== null && jsonEqual(sinArg, cosArg)) {
+    return sinArg;
+  }
+  return null;
 }
 
 /**

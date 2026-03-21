@@ -72,6 +72,34 @@ function addGraphToolbar(
   const toolbar = document.createElement("div");
   toolbar.className = "kcl-graph-toolbar";
 
+  const downloadBtn = document.createElement("button");
+  downloadBtn.textContent = "\u2913"; // ⤓
+  downloadBtn.title = "Save as PNG";
+  downloadBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const canvas = getCanvas();
+    if (!canvas) return;
+    try {
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/png")
+      );
+      if (!blob) throw new Error("Canvas toBlob returned null");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "kcl-graph.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(container, "Saved!", "kcl-graph-copied-toast");
+    } catch (err) {
+      showToast(container, "Save failed", "kcl-graph-copied-toast");
+      console.warn("[KCL] Graph download failed:", err);
+    }
+  });
+  toolbar.appendChild(downloadBtn);
+
   const screenshotBtn = document.createElement("button");
   screenshotBtn.textContent = "\uD83D\uDCF7";
   screenshotBtn.title = "Copy screenshot to clipboard";

@@ -19,8 +19,14 @@ jobs:
 
       - name: Build plugin
         run: |
+          cd repo-v2
           npm install
           npm run build
+
+      - name: Copy build artifacts to repo root
+        run: |
+          cp repo-v2/main.js main.js
+          cp repo-v2/styles/main.css styles.css
 
       - name: Create release
         env:
