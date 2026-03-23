@@ -341,6 +341,184 @@ function buildImplicit3DMesh(
 }
 
 /**
+ * Detect if an implicit function f(x,y,z) is a plane (linear: ax+by+cz+d=0).
+ * Returns {a, b, c, d} coefficients if linear, or null if not.
+ */
+function detectPlane(
+  fn: (x: number, y: number, z: number) => number,
+): { a: number; b: number; c: number; d: number } | null {
+  try {
+    // Evaluate at origin to get d
+    const d = fn(0, 0, 0);
+    if (!isFinite(d)) return null;
+
+    // Compute partial derivatives via finite differences at origin
+    const a = fn(1, 0, 0) - d;
+    const b = fn(0, 1, 0) - d;
+    const c = fn(0, 0, 1) - d;
+
+    if (!isFinite(a) || !isFinite(b) || !isFinite(c)) return null;
+
+    // If truly linear, f(x,y,z) = ax + by + cz + d for ALL (x,y,z).
+    // Verify at several test points to rule out nonlinear functions.
+    const testPts: [number, number, number][] = [
+      [2, 0, 0], [0, 2, 0], [0, 0, 2],
+      [1, 1, 0], [1, 0, 1], [0, 1, 1],
+      [1, 1, 1], [-1, 2, -3], [3, -2, 1],
+    ];
+
+    for (const [tx, ty, tz] of testPts) {
+      const expected = a * tx + b * ty + c * tz + d;
+      const actual = fn(tx, ty, tz);
+      if (!isFinite(actual) || Math.abs(actual - expected) > 1e-6 * (Math.abs(expected) + 1)) {
+        return null;
+      }
+    }
+
+    // It's a plane: f = ax + by + cz + d = 0
+    // Normalize so the plane equation is ax + by + cz + d = 0
+    return { a, b, c, d };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build geometry for a plane ax+by+cz+d=0 clipped to the bounding box.
+ * Computes the plane-AABB intersection polygon analytically (3-6 vertices),
+ * then triangulates it as a fan.
+ */
+function buildPlane3DMesh(
+  plane: { a: number; b: number; c: number; d: number },
+  ranges: AxisRanges,
+): BufferGeometry | null {
+  const xMin = ranges.x[0], xMax = ranges.x[1];
+  const yMin = ranges.y[0], yMax = ranges.y[1];
+  const zRange = ranges.z || [Math.min(xMin, yMin), Math.max(xMax, yMax)];
+  const zMin = zRange[0], zMax = zRange[1];
+
+  const { a, b, c, d } = plane;
+
+  // The 8 corners of the AABB
+  const corners: [number, number, number][] = [
+    [xMin, yMin, zMin], [xMax, yMin, zMin], [xMin, yMax, zMin], [xMax, yMax, zMin],
+    [xMin, yMin, zMax], [xMax, yMin, zMax], [xMin, yMax, zMax], [xMax, yMax, zMax],
+  ];
+
+  // 12 edges of the box, as index pairs
+  const edges: [number, number][] = [
+    // Bottom face (z=zMin)
+    [0, 1], [1, 3], [3, 2], [2, 0],
+    // Top face (z=zMax)
+    [4, 5], [5, 7], [7, 6], [6, 4],
+    // Vertical edges
+    [0, 4], [1, 5], [2, 6], [3, 7],
+  ];
+
+  // Find intersection of plane with each edge
+  const intersections: [number, number, number][] = [];
+  for (const [i0, i1] of edges) {
+    const [x0, y0, z0] = corners[i0];
+    const [x1, y1, z1] = corners[i1];
+    const v0 = a * x0 + b * y0 + c * z0 + d;
+    const v1 = a * x1 + b * y1 + c * z1 + d;
+
+    // Check if the plane crosses this edge (sign change) or touches endpoint exactly
+    if ((v0 > 0) === (v1 > 0) && v0 !== 0 && v1 !== 0) continue;
+    if (v0 === v1) {
+      // Edge lies in the plane — add both endpoints
+      intersections.push([x0, y0, z0], [x1, y1, z1]);
+      continue;
+    }
+
+    const t = v0 / (v0 - v1);
+    if (t < -1e-10 || t > 1 + 1e-10) continue;
+    const tc = Math.max(0, Math.min(1, t));
+    intersections.push([
+      x0 + tc * (x1 - x0),
+      y0 + tc * (y1 - y0),
+      z0 + tc * (z1 - z0),
+    ]);
+  }
+
+  if (intersections.length < 3) return null;
+
+  // Remove near-duplicate points
+  const EPS = 1e-8;
+  const unique: [number, number, number][] = [];
+  for (const pt of intersections) {
+    let dup = false;
+    for (const u of unique) {
+      if (Math.abs(pt[0] - u[0]) < EPS &&
+          Math.abs(pt[1] - u[1]) < EPS &&
+          Math.abs(pt[2] - u[2]) < EPS) {
+        dup = true;
+        break;
+      }
+    }
+    if (!dup) unique.push(pt);
+  }
+
+  if (unique.length < 3) return null;
+
+  // Compute centroid
+  let cx = 0, cy = 0, cz = 0;
+  for (const [px, py, pz] of unique) { cx += px; cy += py; cz += pz; }
+  cx /= unique.length; cy /= unique.length; cz /= unique.length;
+
+  // Sort vertices by angle around centroid in the plane.
+  // Build a local 2D coordinate system on the plane:
+  const nLen = Math.sqrt(a * a + b * b + c * c);
+  if (nLen < 1e-12) return null;
+  const nx = a / nLen, ny = b / nLen, nz = c / nLen;
+
+  // Pick a reference direction (u) perpendicular to normal
+  let ux: number, uy: number, uz: number;
+  if (Math.abs(nx) < 0.9) {
+    // Cross normal with x-axis
+    ux = 0; uy = nz; uz = -ny;
+  } else {
+    // Cross normal with y-axis
+    ux = -nz; uy = 0; uz = nx;
+  }
+  const uLen = Math.sqrt(ux * ux + uy * uy + uz * uz);
+  ux /= uLen; uy /= uLen; uz /= uLen;
+
+  // v = n × u
+  const vx = ny * uz - nz * uy;
+  const vy = nz * ux - nx * uz;
+  const vz = nx * uy - ny * ux;
+
+  // Compute angle of each vertex relative to centroid in (u, v) plane coords
+  const angles: { pt: [number, number, number]; angle: number }[] = unique.map(pt => {
+    const dx = pt[0] - cx, dy = pt[1] - cy, dz = pt[2] - cz;
+    const projU = dx * ux + dy * uy + dz * uz;
+    const projV = dx * vx + dy * vy + dz * vz;
+    return { pt, angle: Math.atan2(projV, projU) };
+  });
+  angles.sort((a2, b2) => a2.angle - b2.angle);
+
+  // Triangulate as fan from centroid, converting to Three.js coords (Y-up: swap y↔z)
+  const vertices: number[] = [];
+  for (let i = 0; i < angles.length; i++) {
+    const next = (i + 1) % angles.length;
+    const p0 = angles[i].pt;
+    const p1 = angles[next].pt;
+    // Center
+    vertices.push(cx, cz, cy);  // Three.js: (x, z, y)
+    vertices.push(p0[0], p0[2], p0[1]);
+    vertices.push(p1[0], p1[2], p1[1]);
+  }
+
+  if (vertices.length === 0) return null;
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
  * Build a line geometry for a parametric 3D curve (x(t), y(t), z(t)).
  */
 function buildParametric3DLine(
@@ -706,6 +884,27 @@ function buildImplicit3D(
   const fn = pd.compiledFns[0];
   if (!fn) return;
 
+  // Try analytical plane detection first — produces clean full-box polygon
+  const plane = detectPlane(fn);
+  if (plane) {
+    const geometry = buildPlane3DMesh(plane, ranges);
+    if (geometry) {
+      const material = new MeshPhongMaterial({
+        color,
+        side: DoubleSide,
+        transparent: true,
+        opacity: 0.75,
+        shininess: 30,
+        specular: 0x333333,
+      });
+      const mesh = new Mesh(geometry, material);
+      parent.add(mesh);
+      disposables.push(geometry, material, { dispose: () => parent.remove(mesh) });
+      return;
+    }
+  }
+
+  // Fallback: marching cubes for nonlinear implicit surfaces
   const geometry = buildImplicit3DMesh(fn, ranges, MC_RESOLUTION);
   if (!geometry) {
     console.warn("[KCL] Implicit 3D: no isosurface found in the given range.");

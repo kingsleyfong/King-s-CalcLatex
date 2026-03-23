@@ -213,6 +213,22 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
+    // ── Auto-Scale Z (3D) ──────────────────────────────────────────
+    new Setting(containerEl)
+      .setName("Auto-scale Z axis (3D)")
+      .setDesc(
+        "Automatically fit the Z axis to the surface range for 3D explicit graphs (z=f(x,y)). " +
+        "When off, all three axes use the same range for 1:1:1 proportional scaling (like Desmos/GeoGebra).",
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoScaleZ3d)
+          .onChange(async (value) => {
+            this.plugin.settings.autoScaleZ3d = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
     // ── Giac CAS Engine ────────────────────────────────────────────
     containerEl.createEl("h3", { text: "CAS Engine" });
 

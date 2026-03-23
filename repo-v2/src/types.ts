@@ -197,6 +197,8 @@ export interface KCLSettings {
   show3DAxisTicks: boolean;
   /** Enable Giac WASM CAS engine (requires giacwasm.js in plugin folder) */
   enableGiac: boolean;
+  /** Auto-scale Z axis for 3D explicit surfaces (breaks 1:1:1 aspect ratio) */
+  autoScaleZ3d: boolean;
 }
 
 export const DEFAULT_SETTINGS: KCLSettings = {
@@ -211,4 +213,5 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   vecfieldArrowScale: 1.0,
   show3DAxisTicks: true,
   enableGiac: true,
+  autoScaleZ3d: false,
 };
