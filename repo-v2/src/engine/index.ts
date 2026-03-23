@@ -171,7 +171,7 @@ export class ExpressionEngine {
         } catch { /* Non-critical */ }
 
         // Compute and merge ranges
-        const subRanges = computeRanges(finalType, plotData, anyIs3d);
+        const subRanges = computeRanges(finalType, plotData, anyIs3d, this.settings?.autoScaleZ3d ?? false);
         mergedRanges = mergedRanges ? mergeRanges(mergedRanges, subRanges) : subRanges;
       }
 
@@ -852,6 +852,7 @@ function computeRanges(
   exprType: ExprType,
   plotData: PlotData,
   is3d: boolean,
+  autoScaleZ: boolean = false,
 ): AxisRanges {
   // Default ranges
   const range2d: [number, number] = [-10, 10];
@@ -867,7 +868,8 @@ function computeRanges(
     };
 
     // Auto-compute z range for explicit_3d surfaces (z = f(x,y)).
-    if (exprType === "explicit_3d" && plotData.compiledFns.length > 0) {
+    // Only when autoScaleZ is enabled; otherwise keep 1:1:1 proportional axes.
+    if (autoScaleZ && exprType === "explicit_3d" && plotData.compiledFns.length > 0) {
       try {
         const fn = plotData.compiledFns[0];
         let zMin = Infinity;
@@ -899,7 +901,8 @@ function computeRanges(
     }
 
     // Auto-range for implicit_3d: estimate z extent by solving f(x,y,z)=0 along sample lines
-    if (exprType === "implicit_3d" && plotData.compiledFns.length > 0) {
+    // Only when autoScaleZ is enabled; otherwise keep 1:1:1 proportional axes.
+    if (autoScaleZ && exprType === "implicit_3d" && plotData.compiledFns.length > 0) {
       try {
         const fn = plotData.compiledFns[0];
         let zMin = Infinity;

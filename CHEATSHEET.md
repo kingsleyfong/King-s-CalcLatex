@@ -1,1017 +1,708 @@
 # King's CalcLatex v2 — Cheat Sheet
 
-## Overview
-
-King's CalcLatex v2 is a **100% browser-native** Obsidian plugin for inline math evaluation and high-fidelity 2D/3D graphing. No backend server — all computation happens in-browser via CortexJS + math.js + Three.js.
-
-Type LaTeX inside `$...$` or `$$...$$`, add a trigger suffix, and results/graphs appear inline.
+> **100% browser-native.** Type LaTeX inside `$...$`, add a trigger suffix, and results or graphs appear inline. Press **Tab** to insert the result into your note. No backend, no server.
 
 ---
 
-## Evaluation Triggers
+## Quick Reference Table
 
-Press **Tab** after the result appears to insert it into your note.
+| Trigger | Category | What it does |
+|:--------|:---------|:-------------|
+| `=` | Evaluation | Exact symbolic result |
+| `\approx` | Evaluation | Decimal approximation |
+| `\equiv` | Evaluation | Algebraic simplification |
+| `@diff` / `@differentiate` | CAS | Symbolic derivative |
+| `@int` / `@integrate` | CAS | Indefinite integral |
+| `@solve` | CAS | Solve equation for a variable |
+| `@factor` | CAS | Factor a polynomial |
+| `@expand` | CAS (Giac) | Expand an expression |
+| `@limit` | CAS (Giac) | Limit as x → 0 |
+| `@taylor` | CAS (Giac) | Taylor series expansion |
+| `@partfrac` | CAS (Giac) | Partial fraction decomposition |
+| `@steps` | CAS (Giac) | Step-by-step solution walkthrough |
+| `@partial_x` / `@px` | CAS | Partial derivative ∂/∂x |
+| `@partial_y` / `@py` | CAS | Partial derivative ∂/∂y |
+| `@partial_z` / `@pz` | CAS | Partial derivative ∂/∂z |
+| `@gradient` | CAS + Viz | Gradient vector + contour overlay |
+| `@normal` | CAS | Surface normal vector |
+| `@tangent` | CAS + Viz | Tangent plane at a point |
+| `@plot2d` | Graphing | 2D plot (explicit, implicit, parametric, polar) |
+| `@plot3d` | Graphing | 3D plot (surface, implicit, parametric, vector) |
+| `@contour` | Graphing | Contour / level curve map |
+| `@vecfield` | Graphing | 2D or 3D vector field |
+| `@geom` | Graphing | Geometry mode (vectors, points) |
+| `@region` | Graphing | Shaded region between curves |
 
-| Trigger | Mode | Example | Result |
-|:--------|:-----|:--------|:-------|
-| `=` | Exact | `$\frac{1}{2} + \frac{1}{3} =$` | `5/6` |
-| `\approx` | Approximate | `$\sqrt{2} \approx$` | `1.41421356237` |
-| `\equiv` | Simplify | `$x^2 + 2x + 1 \equiv$` | `(x+1)^2` |
-| `@persist` | Persist variable | `$a = 5 @persist$` | Stores `a=5` for later use |
-| `@convert <unit>` | Unit conversion | `$50 \text{ kg} @convert lb$` | `110.23 lb` |
+> **Giac WASM** — Triggers marked "(Giac)" require `giacwasm.js` (19 MB) to be present in the plugin folder. Without it, those triggers return an unsupported message. All other triggers run on CortexJS + math.js.
 
 ---
 
-## Symbolic CAS Operations
+## 1. Evaluation Triggers
 
-These triggers perform symbolic computation and display the result inline — just like `=` or `\approx`, but for calculus and algebra operations.
+### `=` — Exact Evaluation
 
-### Differentiation (`@diff`)
-
-Computes the full derivative. Auto-detects the variable (prefers `x`, then `t`, then first available).
+Returns an exact symbolic result: integers, fractions, radicals.
 
 ```
-$x^3 + 2x @diff$           → 3x² + 2
-$\sin(x)\cos(x) @diff$     → cos(2x)    (or equivalent)
-$e^{3t} @diff$              → 3e^{3t}    (auto-detects t)
+$2 + 3 =$                          → 5
+$\frac{1}{2} + \frac{1}{3} =$      → 5/6
+$\sqrt{8} =$                       → 2√2
+$2^{10} =$                         → 1024
 ```
 
-### Integration (`@int`)
+### `\approx` — Decimal Approximation
 
-Computes the indefinite integral (antiderivative). Same auto-detection logic for the variable.
-
-```
-$3x^2 + 2 @int$            → x³ + 2x
-$\cos(x) @int$             → sin(x)
-$e^x @int$                 → eˣ
-```
-
-> **Note:** CortexJS has limited symbolic integration. Simple polynomials, trig, and exponentials work. For complex integrands, a "not supported" message appears. Giac WASM integration is planned for a future release.
-
-### Partial Derivatives (`@px`, `@py`, `@pz`)
-
-Computes ∂f/∂x, ∂f/∂y, or ∂f/∂z explicitly. Essential for multivariable calculus.
+Returns a floating-point result. Precision is configurable (default: 12 digits).
 
 ```
-$x^2 y + y^3 @px$          → 2xy           (∂f/∂x)
-$x^2 y + y^3 @py$          → x² + 3y²     (∂f/∂y)
-$x^2 + y^2 + z^2 @pz$     → 2z            (∂f/∂z)
-$\sin(xy) @px$             → y·cos(xy)
-$\sin(xy) @py$             → x·cos(xy)
+$\sqrt{2} \approx$                 → 1.41421356237
+$\sin(\pi/4) \approx$              → 0.707106781187
+$e^2 \approx$                      → 7.38905609893
+$\ln(10) \approx$                  → 2.30258509299
 ```
 
-For equations like `$z = x^2 + y^2 @px$`, the LHS is stripped — it differentiates the RHS `x^2 + y^2`.
+### `\equiv` — Algebraic Simplification
 
-**Engineering applications:**
-- **Heat equation:** $\frac{\partial T}{\partial t} = \alpha \nabla^2 T$ — use `@px` and `@py` to verify thermal gradients.
-- **Stress analysis:** $\sigma_{ij} = C_{ijkl} \epsilon_{kl}$ — partial derivatives of displacement give strain.
-- **Fluid mechanics:** Velocity components $u = \frac{\partial \psi}{\partial y}$, $v = -\frac{\partial \psi}{\partial x}$ from stream function.
-
-### Gradient Vector (`@grad`)
-
-Computes the symbolic gradient ∇f. Auto-detects dimensionality from the variables present.
+Simplifies or rewrites an expression in canonical form.
 
 ```
-$x^2 + y^2 @grad$          → ∇f = (2x, 2y)
-$x^2 + y^2 + z^2 @grad$   → ∇f = (2x, 2y, 2z)
-$xy + yz @grad$            → ∇f = (y, x + z, y)
-$3x + 2y @grad$            → ∇f = (3, 2)          (constant gradient)
-```
-
-The gradient is always perpendicular to contour lines and points in the direction of steepest ascent.
-
-**Engineering applications:**
-- **Fourier's Law:** $\mathbf{q} = -k \nabla T$. Compute $\nabla T$ symbolically to get the heat flux direction.
-- **Gradient descent:** Step direction $\mathbf{x}_{k+1} = \mathbf{x}_k - \alpha \nabla f(\mathbf{x}_k)$.
-- **Conservative force fields:** If $\mathbf{F} = -\nabla V$, compute $\nabla V$ to find the force.
-
-### Surface Normal Vector (`@normal`)
-
-Computes the normal vector to a surface.
-
-- **Explicit surface** `z = f(x,y)`: returns $\vec{n} = (\partial f/\partial x,\ \partial f/\partial y,\ -1)$.
-- **Implicit surface** `F(x,y,z) = 0`: returns $\vec{n} = \nabla F = (\partial F/\partial x,\ \partial F/\partial y,\ \partial F/\partial z)$.
-
-```
-$z = x^2 + y^2 @normal$        → n = (2x, 2y, -1)
-$x^2 + y^2 + z^2 = 9 @normal$  → n = (2x, 2y, 2z)
-$x^2 + y^2 - z^2 = 1 @normal$  → n = (2x, 2y, -2z)
-$xy + z @normal$                → n = (y, x, 1)
-```
-
-> The normal is **not** unit-normalized. To get $\hat{n}$, divide by $|\vec{n}|$ yourself: $\hat{n} = \frac{\vec{n}}{|\vec{n}|}$.
-
-**Engineering applications:**
-- **Aerodynamics:** Panel methods require outward-pointing unit normals for surface pressure integration.
-- **Contact mechanics:** Normal force direction at contact points on curved surfaces.
-- **Flux integrals:** $\iint_S \mathbf{F} \cdot \hat{n}\, dS$ requires surface normals.
-- **Radiative heat transfer:** View factor depends on angle between surface normal and line of sight.
-
-### Solve Equations (`@solve`)
-
-Solves equations for a variable. Auto-detects the variable (prefers `x`, then `y`).
-
-```
-$x^2 - 4 = 0 @solve$      → x = ±2
-$x^2 + 3x + 2 @solve$     → (expression = 0 implied)
-$2x + 5 = 0 @solve$        → x = -5/2
-```
-
-### Factor Expressions (`@factor`)
-
-Factors polynomial expressions.
-
-```
-$x^2 + 3x + 2 @factor$     → (x+1)(x+2)
-$x^2 - 1 @factor$          → (x-1)(x+1)
-```
-
-### Linear Algebra (via `=`)
-
-Matrix operations work with the standard `=` trigger:
-
-```
-$\begin{pmatrix}1 & 2\\3 & 4\end{pmatrix} \times \begin{pmatrix}5 & 6\\7 & 8\end{pmatrix} =$
-```
-Cross product of 3D vectors:
-```
-$\begin{pmatrix}1 & 0 & 0\end{pmatrix} \times \begin{pmatrix}0 & 1 & 0\end{pmatrix} =$   → (0, 0, 1)
+$x^2 + 2x + 1 \equiv$              → (x+1)²
+$(x+1)(x-1) \equiv$                → x² - 1
+$\frac{x^2 - 1}{x - 1} \equiv$    → x + 1
+$\sin^2(x) + \cos^2(x) \equiv$    → 1
 ```
 
 ---
 
-## 2D Graphing (`@plot2d`)
+## 2. Symbolic CAS — Core Operations
 
-### Basic Curves
+Auto-detects the variable (prefers `x`, then `t`, then first available).
+
+### `@diff` / `@differentiate` — Derivative
+
+```
+$x^3 + 2x @diff$                   → 3x² + 2
+$\sin(x)\cos(x) @diff$             → cos(2x)
+$e^{3t} @diff$                     → 3e^{3t}
+$\ln(x) @diff$                     → 1/x
+$x^2 e^x @diff$                   → 2xe^x + x²e^x
+```
+
+### `@int` / `@integrate` — Indefinite Integral
+
+```
+$3x^2 + 2 @int$                    → x³ + 2x
+$\cos(x) @int$                     → sin(x)
+$e^x @int$                         → eˣ
+$\frac{1}{x} @int$                 → ln|x|
+```
+
+> CortexJS handles polynomials, standard trig, and exponentials. For complex integrands, enable Giac WASM for enhanced coverage.
+
+### Definite Integrals
+
+Use standard notation with limits of integration:
+
+```
+$\int_0^{\pi} \sin(x)\,dx =$        → 2
+$\int_0^1 x^2\,dx =$               → 1/3
+$\int_1^e \frac{1}{x}\,dx =$       → 1
+```
+
+### `@solve` — Solve Equations
+
+Solves for the auto-detected variable. The `= 0` is implied if no equals sign is present.
+
+```
+$x^2 - 4 = 0 @solve$               → x = ±2
+$2x + 5 = 0 @solve$                → x = -5/2
+$x^2 + 3x + 2 @solve$              → x = -1, x = -2
+```
+
+### `@factor` — Factor Polynomials
+
+```
+$x^2 + 3x + 2 @factor$             → (x+1)(x+2)
+$x^2 - 1 @factor$                  → (x-1)(x+1)
+$x^2 - 5x + 6 @factor$             → (x-2)(x-3)
+$x^3 - 8 @factor$                  → (x-2)(x²+2x+4)    (difference of cubes)
+$x^3 + 27 @factor$                 → (x+3)(x²-3x+9)    (sum of cubes)
+```
+
+---
+
+## 3. Symbolic CAS — Giac Operations
+
+These require Giac WASM to be loaded.
+
+### `@expand` — Expand Expressions
+
+```
+$(x+1)^3 @expand$                  → x³ + 3x² + 3x + 1
+$(x+y)^2 @expand$                  → x² + 2xy + y²
+$(2x-1)(x+3) @expand$              → 2x² + 5x - 3
+```
+
+### `@limit` — Compute Limits
+
+Default: limit as x → 0. One-sided limits are handled automatically.
+
+```
+$\frac{\sin(x)}{x} @limit$         → 1
+$\frac{e^x - 1}{x} @limit$         → 1
+$\frac{1 - \cos(x)}{x^2} @limit$  → 1/2
+$(1 + x)^{1/x} @limit$             → e
+```
+
+### `@taylor` — Taylor Series
+
+Default: order 5 expansion around x = 0.
+
+```
+$e^x @taylor$                      → 1 + x + x²/2! + x³/3! + x⁴/4! + x⁵/5!
+$\sin(x) @taylor$                  → x - x³/6 + x⁵/120
+$\cos(x) @taylor$                  → 1 - x²/2 + x⁴/24
+$\ln(1+x) @taylor$                 → x - x²/2 + x³/3 - x⁴/4 + x⁵/5
+```
+
+### `@partfrac` — Partial Fraction Decomposition
+
+```
+$\frac{1}{x^2 - 1} @partfrac$      → 1/(2(x-1)) - 1/(2(x+1))
+$\frac{x}{(x+1)(x+2)} @partfrac$   → -1/(x+1) + 2/(x+2)
+$\frac{1}{x^2 + x} @partfrac$      → 1/x - 1/(x+1)
+```
+
+### `@steps` — Step-by-Step Solutions
+
+Shows intermediate steps for CAS operations. Requires Giac WASM.
+
+```
+$x^2 - 4 = 0 @steps$              → Step 1: ... Step 2: ... → x = ±2
+$\int x^2\,dx @steps$              → Step 1: Power rule... → x³/3
+```
+
+---
+
+## 4. Multivariable Calculus
+
+### `@partial_x` / `@px`, `@partial_y` / `@py`, `@partial_z` / `@pz` — Partial Derivatives
+
+```
+$x^2 y + y^3 @px$                  → 2xy           (∂f/∂x)
+$x^2 y + y^3 @py$                  → x² + 3y²      (∂f/∂y)
+$x^2 + y^2 + z^2 @pz$             → 2z             (∂f/∂z)
+$\sin(xy) @px$                     → y·cos(xy)
+$\sin(xy) @py$                     → x·cos(xy)
+$e^{xyz} @pz$                      → xye^{xyz}
+```
+
+When an `=` sign is present (e.g., `$z = x^2 + y^2 @px$`), the LHS is stripped and the RHS is differentiated.
+
+### `@gradient` — Gradient Vector Field
+
+Computes ∇f symbolically and renders contour lines overlaid with gradient arrows.
+
+```
+$x^2 + y^2 @gradient$              → ∇f = (2x, 2y) — arrows point radially outward
+$3x + 2y @gradient$                → ∇f = (3, 2) — constant direction everywhere
+$x^2 - y^2 @gradient$             → saddle point at origin; zero gradient there
+$\sin(x)\cos(y) @gradient$        → complex pattern; arrows perpendicular to contours
+```
+
+> Gradient arrows are always perpendicular to contour lines — this is the geometric definition of the gradient.
+
+### `@normal` — Surface Normal Vector
+
+- Explicit surface `z = f(x,y)`: returns $\vec{n} = (f_x,\ f_y,\ -1)$
+- Implicit surface `F(x,y,z) = c`: returns $\vec{n} = \nabla F$
+
+```
+$z = x^2 + y^2 @normal$            → n = (2x, 2y, -1)
+$x^2 + y^2 + z^2 = 9 @normal$     → n = (2x, 2y, 2z)
+$x^2 + y^2 - z^2 = 1 @normal$     → n = (2x, 2y, -2z)
+$xy + z @normal$                   → n = (y, x, 1)
+```
+
+> The result is not unit-normalized. To get $\hat{n}$, divide by $|\vec{n}|$ manually.
+
+### `@tangent` — Tangent Plane
+
+Format: `f(x,y); (a, b)`. Renders the surface (semi-transparent), the tangent plane, and a point marker.
+
+Tangent plane formula: $z = f(a,b) + f_x(a,b)(x-a) + f_y(a,b)(y-b)$
+
+```
+$x^2 + y^2; (1, 1) @tangent$       → plane: z = 2x + 2y - 2
+$\sin(x)\cos(y); (0, 0) @tangent$  → plane: z = x  (f_y(0,0) = 0)
+$x^2 - y^2; (1, 0) @tangent$      → saddle: tangent plane not horizontal
+$\sqrt{x^2 + y^2}; (3, 4) @tangent$
+```
+
+> At a critical point (local max/min/saddle), the tangent plane is horizontal — $f_x = f_y = 0$.
+
+---
+
+## 5. Linear Algebra
+
+Matrix operations use the standard `=` trigger.
+
+### Matrix Multiplication
+
+```
+$\begin{pmatrix}1 & 2\\3 & 4\end{pmatrix}\begin{pmatrix}5\\6\end{pmatrix} =$
+```
+→ Column vector result.
+
+```
+$\begin{pmatrix}1 & 2\\3 & 4\end{pmatrix}\begin{pmatrix}5 & 6\\7 & 8\end{pmatrix} =$
+```
+→ 2×2 matrix product.
+
+### Cross Product
+
+```
+$\begin{pmatrix}1 & 0 & 0\end{pmatrix}\times\begin{pmatrix}0 & 1 & 0\end{pmatrix} =$
+```
+→ (0, 0, 1)
+
+### Other Operations
+
+```
+$\det\begin{pmatrix}1 & 2\\3 & 4\end{pmatrix} =$      → -2
+$\begin{pmatrix}1 & 2\\3 & 4\end{pmatrix}^T =$         → transposed matrix
+$\begin{pmatrix}1 & 2\\3 & 4\end{pmatrix}^{-1} =$      → matrix inverse
+```
+
+---
+
+## 6. 2D Plotting (`@plot2d`)
+
+### Explicit Curves
 
 ```
 $y = \sin(x) @plot2d$
-```
-Smooth sine wave with auto-ranged axes.
-
-```
 $y = x^3 - 3x @plot2d$
+$y = e^{-x^2} @plot2d$
 ```
-Cubic with local extrema. Points of interest (roots, extrema) shown automatically.
 
 ### Implicit Curves
 
+Rendered via marching squares.
+
 ```
-$x^2 + y^2 = 25 @plot2d$
+$x^2 + y^2 = 25 @plot2d$           — circle, radius 5
+$\frac{x^2}{4} + \frac{y^2}{9} = 1 @plot2d$  — ellipse
+$x^2 - y^2 = 1 @plot2d$            — hyperbola
 ```
-Circle radius 5, rendered via marching squares.
 
 ### Parametric Curves
 
+Parameter `t` defaults to $[-2\pi, 2\pi]$.
+
 ```
-$(\cos(t), \sin(t)) @plot2d$
+$(\cos(t), \sin(t)) @plot2d$        — unit circle
+$(\cos(t), \sin(2t)) @plot2d$       — Lissajous figure (1:2)
+$(t - \sin(t), 1 - \cos(t)) @plot2d$  — cycloid
+$(e^{0.1t}\cos(t), e^{0.1t}\sin(t)) @plot2d$  — logarithmic spiral
 ```
-Unit circle via parametric equations. `t` range defaults to `[-2pi, 2pi]`.
 
 ### Polar Curves
 
 ```
-$r = 1 + \cos(\theta) @plot2d$
+$r = 1 + \cos(\theta) @plot2d$      — cardioid
+$r = \cos(2\theta) @plot2d$         — four-petal rose
+$r = \theta @plot2d$                — Archimedean spiral
 ```
-Cardioid in polar coordinates.
 
 ### Inequalities
 
 ```
-$y > \sin(x) @plot2d$
+$y > \sin(x) @plot2d$               — shaded region above sine
+$y \leq x^2 @plot2d$               — region below parabola
 ```
-Shaded region above sine curve. Supports `>`, `<`, `>=`, `<=`. Strict inequalities use dashed boundary.
+
+Strict inequalities use a dashed boundary line. Supports `>`, `<`, `>=`, `<=`.
 
 ### Points
 
 ```
-$(5, 5) @plot2d$
+$(5, 5) @plot2d$                    — filled dot with coordinate label
+$(0,0); (3,4) @plot2d$             — multiple points
 ```
-Renders as a filled dot with coordinate label. Points have no coordinate variables — just constants.
-
-```
-$(0,0); (3,4); y = x @plot2d$
-```
-Multiple points + curve together.
 
 ### Multi-Equation Overlay
 
-Separate expressions with semicolons:
+Separate expressions with semicolons. Each gets a distinct color.
 
 ```
 $y = \sin(x); y = \cos(x) @plot2d$
+$y = \sin(x); y = 0 @plot2d$        — sine and x-axis (useful with @region)
+$x^2 + y^2 = 1; x^2 + y^2 = 4 @plot2d$  — two concentric circles
 ```
-Both curves overlaid with distinct colors. Parameter sliders auto-appear for free variables.
+
+### Parameter Sliders
+
+Free variables (not `x`, `y`, `t`, `r`, `θ`) auto-generate interactive sliders.
 
 ```
-$y = a\sin(bx); (5,5) @plot2d$
+$y = a\sin(bx) @plot2d$             — sliders for a and b
+$y = A e^{-kx} @plot2d$            — sliders for A and k
 ```
-Sine curve with sliders for `a` and `b`, plus a point.
 
 ---
 
-## 3D Graphing (`@plot3d`)
+## 7. 3D Plotting (`@plot3d`)
 
 ### Explicit Surfaces
 
-```
-$z = x^2 + y^2 @plot3d$
-```
-Paraboloid. Click to interact (rotate via OrbitControls), scroll to zoom.
+Click to enter interactive mode, then drag to rotate, scroll to zoom.
 
 ```
-$z = \sin(x) \cos(y) @plot3d$
+$z = x^2 + y^2 @plot3d$            — paraboloid
+$z = \sin(x)\cos(y) @plot3d$       — egg-carton
+$z = x^2 - y^2 @plot3d$           — saddle (hyperbolic paraboloid)
+$z = e^{-(x^2+y^2)} @plot3d$       — Gaussian bell
 ```
-Egg-carton surface.
 
 ### Implicit Surfaces
 
-```
-$x^2 + y^2 + z^2 = 9 @plot3d$
-```
-Sphere radius 3, rendered via marching cubes.
+Rendered via marching cubes.
 
-See the [[#Implicit Surfaces in 3D|Implicit Surfaces]] section below for a full conceptual treatment.
+```
+$x^2 + y^2 + z^2 = 9 @plot3d$      — sphere, radius 3
+$x^2 + y^2 - z^2 = 1 @plot3d$     — hyperboloid of one sheet
+$z^2 - x^2 - y^2 = 1 @plot3d$     — hyperboloid of two sheets
+$x^2 + y^2 = 4 @plot3d$            — cylinder (no z term → infinite)
+$\frac{x^2}{4} + \frac{y^2}{9} + z^2 = 1 @plot3d$  — ellipsoid
+```
+
+> All three axes use 1:1:1 proportional scaling by default. Enable "Auto-Scale Z" in settings to fit Z range to the surface.
+
+### Quadric Surface Reference
+
+| Equation form | Surface |
+|:---|:---|
+| $x^2+y^2+z^2=r^2$ | Sphere |
+| $\frac{x^2}{a^2}+\frac{y^2}{b^2}+\frac{z^2}{c^2}=1$ | Ellipsoid |
+| $z=x^2+y^2$ | Elliptic paraboloid (bowl) |
+| $z=x^2-y^2$ | Hyperbolic paraboloid (saddle) |
+| $x^2+y^2-z^2=1$ | Hyperboloid of one sheet |
+| $z^2-x^2-y^2=1$ | Hyperboloid of two sheets |
+| $x^2+y^2=z^2$ | Elliptic cone |
+| $x^2+y^2=r^2$ | Cylinder |
 
 ### Parametric 3D Curves
 
 ```
-$(\cos(t), \sin(t), t/3) @plot3d$
+$(\cos(t), \sin(t), t/3) @plot3d$   — helix, pitch 1/3
+$(\cos(t), \sin(t), \sin(2t)) @plot3d$  — figure-8 z-oscillation
+$(t, t^2, t^3) @plot3d$             — twisted cubic (canonical space curve)
 ```
-Helix. Also works with fraction notation:
-
-```
-$\frac{\cos(t), \sin(t), t}{3} @plot3d$
-```
-Same helix via `\frac{numerator}{denominator}` — each component divided by 3.
 
 ### Vectors
 
 ```
-$\langle 1, 2, 3 \rangle @plot3d$
+$\langle 1, 2, 3 \rangle @plot3d$   — arrow from origin to (1,2,3)
+$\langle 1,1,0 \rangle; \langle 0,1,1 \rangle @plot3d$  — two vectors
 ```
-3D arrow from origin to (1,2,3). Also works with `<1,2,3>` syntax.
+
+Also accepts `<1,2,3>` notation.
+
+### Points
 
 ```
-$\langle 1,1,0 \rangle; \langle 0,1,1 \rangle @plot3d$
+$(1, 2, 3) @plot3d$                 — sphere marker in 3D space
+$(5, 5) @plot3d$                    — 2D point promoted to z=0
 ```
-Multiple vectors overlaid.
 
-### 3D Points
-
-```
-$(1, 2, 3) @plot3d$
-```
-Rendered as a sphere in 3D space. Axes are always 1:1:1 scale.
+### Multi-Equation 3D Overlay
 
 ```
-$(5,5) @plot3d$
+$z = x^2 + y^2; 2(x-1)+2(y-1)-(z-2)=0 @plot3d$   — surface + tangent plane
+$(1,1,2); z = x^2 + y^2 @plot3d$                   — point on surface
+$x^2+y^2+z^2=9; z=2 @plot3d$                       — sphere + cutting plane
 ```
-2D point promoted to 3D at z=0.
-
-### Multi-Equation 3D
-
-```
-$(1,1,1); z = x^2; 2(x-2) + 1(y-1) - 2(z-5) = 0 @plot3d$
-```
-Point + paraboloid + plane together. Each expression colored distinctly.
 
 ---
 
-## Geometry (`@geom`)
+## 8. Contour Plots (`@contour`)
+
+Shows level curves of $f(x,y)$ — the 2D "topographic map" of a surface. Closely spaced contours = steep terrain (large gradient). Widely spaced = shallow terrain.
 
 ```
-$\langle 1, 2, 3 \rangle @geom$
+$x^2 + y^2 @contour$               — paraboloid: concentric circles
+$x^2 - y^2 @contour$              — saddle: hyperbolas crossing at origin
+$\sin(x)\cos(y) @contour$         — egg-carton: grid of peaks and saddles
+$e^{-(x^2+y^2)} @contour$         — Gaussian hill: tight circles at peak
+$3x + 2y @contour$                 — linear: parallel straight lines
 ```
-Dedicated 3D geometry mode for vectors. Same rendering as `@plot3d` but optimized for geometric objects.
+
+> Gradient arrows ($\nabla f$) are always perpendicular to contour lines. Use `@gradient` to see both overlaid.
 
 ---
 
-## Contour Plots (`@contour`)
+## 9. Vector Fields (`@vecfield`)
 
-### What Is a Contour Plot?
-
-A contour plot shows a 2D cross-section of a 3D surface $z = f(x, y)$. Each contour line (iso-level curve) connects all points where $f$ takes the same value. The result looks exactly like a topographic map: the contour lines are the elevation lines, and the spacing between them tells you how fast you are climbing.
-
-**Reading the spacing:**
-- Closely spaced contours mean $f$ changes rapidly in that region — steep terrain, large gradient.
-- Widely spaced contours mean $f$ changes slowly — flat terrain, small gradient.
-- The gradient $\nabla f$ always points perpendicular to the contour lines and toward increasing $f$.
-
-**Engineering relevance:**
-- **Thermodynamics / Heat Transfer:** A temperature field $T(x,y)$ over a plate. Contours are isotherms. Heat flows perpendicular to isotherms (from hot to cold).
-- **Fluid Mechanics:** Pressure fields $P(x,y)$ over an airfoil cross-section. Contours are isobars.
-- **Structural Analysis:** Stress or strain energy distributions over a cross-section.
-- **Potential fields:** Electric or gravitational potential — equipotential surfaces.
-
-### Syntax
-
-```
-$x^2 + y^2 @contour$
-```
-Iso-level curves of $f(x,y) = x^2 + y^2$, a paraboloid viewed from above. Contours are concentric circles — spacing increases as you move out, reflecting the increasing slope.
-
-```
-$\sin(x) \cos(y) @contour$
-```
-Contour map of the egg-carton function. Shows alternating saddle points and extrema laid out in a grid pattern.
-
-```
-$x^2 - y^2 @contour$
-```
-Saddle surface. Contours are hyperbolas. The saddle point at the origin is where contours cross — not a maximum or minimum.
-
-```
-$e^{-(x^2 + y^2)} @contour$
-```
-Gaussian "hill". Contours are concentric ellipses (circles here). Useful analogy: probability density functions, heat pulse spreading from a point source.
-
-### Visualization Tips
-
-- Contour lines can never cross (unless the function is ill-defined there).
-- A closed contour that does not contain another contour encloses either a local maximum or minimum.
-- Overlay with `@gradient` to see the gradient arrows perpendicular to each contour — this immediately makes the concept visual.
-
----
-
-## Vector Fields (`@vecfield`)
-
-### What Is a Vector Field?
-
-A vector field assigns a vector to every point in space. At each grid point $(x, y)$ (or $(x, y, z)$), an arrow is drawn whose direction and length encode the field value $\mathbf{F}(x,y) = \langle P(x,y),\, Q(x,y) \rangle$.
-
-Think of it as a snapshot of wind velocities across a weather map, or the force exerted on a test charge at every point in an electric field.
-
-**Engineering relevance:**
-- **Fluid Mechanics:** Velocity fields $\mathbf{v}(x,y)$ show how fluid moves. Divergence $\nabla \cdot \mathbf{v} > 0$ means a source (fluid being injected); $< 0$ means a sink (fluid being removed).
-- **Electromagnetism:** Electric field $\mathbf{E}$ and magnetic field $\mathbf{B}$ are vector fields. Field lines are integral curves of the field.
-- **Thermodynamics:** Heat flux $\mathbf{q} = -k \nabla T$ is a vector field — it flows from hot to cold, magnitude proportional to temperature gradient.
-- **Structural Analysis:** Body forces (gravity, distributed loads) across a domain.
-
-**Pattern recognition — what to look for:**
-- **Rotation / Vortex:** Arrows curl around a central point. Curl $\nabla \times \mathbf{F} \neq 0$.
-- **Source / Sink:** Arrows radiate outward (source) or inward (sink). Divergence $\nabla \cdot \mathbf{F} \neq 0$.
-- **Uniform flow:** All arrows point the same direction with the same magnitude. Constant field.
-- **Conservative field:** Arrows have no net rotation. You can write $\mathbf{F} = \nabla f$ for some potential $f$.
-
-### Arrow Scale Suffix
-
-Control arrow size with a numeric suffix after `@vecfield`:
-
-```
-$-y; x @vecfield 0.5$
-```
-Arrows scaled to 50% of the default size. Useful when arrows overlap in dense regions.
-
-```
-$-y; x @vecfield 2.0$
-```
-Arrows scaled to 200% of default. Useful for sparse fields or small magnitude fields that are otherwise hard to read.
-
-The default arrow scale can also be set globally in plugin settings (King's CalcLatex → Default Vector Arrow Scale).
+Draws an arrow at each grid point showing the field's direction and magnitude. Separate components with semicolons or use tuple notation.
 
 ### 2D Vector Fields
 
 ```
-$-y; x @vecfield$
+$-y; x @vecfield$                   — rotation (vortex), ∇·F=0, curl≠0
+$x; y @vecfield$                    — radial source, ∇·F=2>0
+$-x; -y @vecfield$                  — radial sink, ∇·F<0
+$y; x @vecfield$                    — conservative field (F=∇(xy)), curl=0
+$(x, -y) @vecfield$                — saddle-type hyperbolic flow
 ```
-Semicolon-separated components $P(x,y);\, Q(x,y)$. This is a pure rotation field — arrows circulate counterclockwise. This is the classic vortex: $\mathbf{F} = \langle -y, x \rangle$. Divergence is zero, curl is nonzero.
-
-```
-$(x, -y) @vecfield$
-```
-Tuple notation. This field has arrows pointing away from the x-axis and toward the x-axis along y. It is a saddle-type flow — a hyperbolic fixed point at the origin.
-
-```
-$x; y @vecfield$
-```
-Pure radial source field. Every arrow points directly away from the origin. Divergence is positive everywhere ($\nabla \cdot \mathbf{F} = 2$). Analogous to a 2D point source in fluid mechanics or a positive point charge in electrostatics.
-
-```
-$-x; -y @vecfield$
-```
-Pure radial sink. Every arrow points toward the origin. Negative divergence everywhere.
-
-```
-$y; x @vecfield$
-```
-Conservative (irrotational) field. You can verify: $\frac{\partial Q}{\partial x} = \frac{\partial P}{\partial y} = 1$, so the curl is zero. A potential function exists: $f(x,y) = xy$.
 
 ### 3D Vector Fields
 
 ```
-$-y; x; z @vecfield$
+$-y; x; z @vecfield$               — rotation in xy-plane + upward drift
+$(y, -x, z) @vecfield$             — clockwise xy-rotation + expanding z
+$0; 0; -1 @vecfield$               — uniform downward field (gravity analogy)
 ```
-Three semicolon-separated components $P;\, Q;\, R$ for a 3D arrow grid. Rotation in the xy-plane plus upward/downward drift in z.
+
+### Arrow Scale Suffix
+
+Append a number after `@vecfield` to scale arrow size:
 
 ```
-$(y, -x, z) @vecfield$
+$-y; x @vecfield 0.5$              — 50% scale (avoid overlap in dense regions)
+$-y; x @vecfield 2.0$              — 200% scale (for sparse or low-magnitude fields)
 ```
-3D field in tuple notation. Clockwise rotation in xy, expanding in z.
 
-```
-$0; 0; -1 @vecfield$
-```
-Uniform downward field — analogous to a gravitational body force field $\mathbf{g} = -g\hat{k}$ acting uniformly throughout a volume.
+Default scale is set globally in plugin settings.
 
 ---
 
-## Gradient Visualization (`@gradient`)
+## 10. Special Modes
 
-### What Is the Gradient?
+### `@geom` — Geometry Mode
 
-The gradient $\nabla f = \left\langle \frac{\partial f}{\partial x},\, \frac{\partial f}{\partial y} \right\rangle$ is a vector field derived from a scalar field $f(x,y)$. It tells you two things simultaneously:
-1. **Direction:** The gradient points in the direction of steepest increase of $f$.
-2. **Magnitude:** $|\nabla f|$ is the rate of change in that direction (the steepness).
-
-The gradient is always perpendicular to the contour lines of $f$. This is a theorem, not an approximation.
-
-**Engineering relevance:**
-- **Heat Transfer:** Fourier's Law: heat flux $\mathbf{q} = -k \nabla T$. Heat flows opposite to the temperature gradient (from hot to cold). The gradient tells you where heat flows fastest.
-- **Fluid Mechanics:** Pressure-driven flow: $\mathbf{F} = -\nabla P$. Fluid accelerates in the direction of decreasing pressure.
-- **Structural / FEA:** Stress gradients across a section. High gradient regions are where you need mesh refinement.
-- **Optimization:** Gradient descent. You step opposite to the gradient to minimize a cost function.
-
-The `@gradient` trigger renders contour lines of $f$ overlaid with gradient arrows. This makes it immediately obvious that arrows are perpendicular to contours.
-
-### Syntax
+Dedicated mode for vectors and geometric objects. Same rendering as `@plot3d` but optimized for geometric work.
 
 ```
-$x^2 + y^2 @gradient$
+$\langle 1, 2, 3 \rangle @geom$f    — 3D vector arrow
 ```
-Paraboloid. Gradient arrows point radially outward from the origin — steepest ascent on the bowl is straight up the bowl wall. Contours are circles; arrows are radii.
+
+### `@region` — Shaded Region Between Curves
+
+Fills the area between two curves. Useful for setting up integral limits visually.
 
 ```
-$\sin(x)\cos(y) @gradient$
+$y = x^2; y = 2x @region$          — region between parabola and line
+$y = \sin(x); y = 0 @region$       — area under sine curve
+$y = \sqrt{x}; y = x^2 @region$   — region on [0,1], √x above x²
+$y = e^x; y = x + 2 @region$      — exponential vs. linear bound
 ```
-Egg-carton function. Gradient arrows point toward nearby peaks and away from valleys. At saddle points, the gradient is zero.
 
-```
-$x^2 - y^2 @gradient$
-```
-Saddle surface. Gradient points in the $+x$ direction along the x-axis (uphill on the ridge) and in the $-y$ direction along the y-axis (downhill into the valley). At the origin, $\nabla f = \mathbf{0}$ — a critical point but neither max nor min.
-
-```
-$3x + 2y @gradient$
-```
-Linear field. Gradient is constant: $\nabla f = \langle 3, 2 \rangle$ everywhere. All arrows are identical — uniform slope in a fixed direction. Contours are parallel straight lines.
-
-### Visualization Tips
-
-- Zero-gradient points (where arrows vanish) are critical points: maxima, minima, or saddle points.
-- The density of contour lines combined with arrow length gives a sense of curvature: tightly packed contours with long arrows = rapidly changing field.
-- To find the directional derivative in direction $\hat{u}$, compute $D_{\hat{u}} f = \nabla f \cdot \hat{u}$. The gradient visualization shows the maximum directional derivative.
+> Intersection points are detected automatically. The shaded region directly shows you the integration domain and which curve is "on top."
 
 ---
 
-## Tangent Planes (`@tangent`)
+## 11. Settings
 
-### What Is a Tangent Plane?
-
-For a function $f(x,y)$, the tangent plane at a point $(a, b)$ is the best linear approximation to the surface near that point. It is defined by:
-
-$$z = f(a,b) + f_x(a,b)(x - a) + f_y(a,b)(y - b)$$
-
-where $f_x$ and $f_y$ are the partial derivatives. This is the 3D analog of the tangent line in single-variable calculus.
-
-The normal vector to the tangent plane is $\mathbf{n} = \langle -f_x(a,b),\, -f_y(a,b),\, 1 \rangle$ (or any scalar multiple).
-
-**Engineering relevance:**
-- **Linearization / Error Propagation:** If you compute $z = f(x,y)$ from measured $x$ and $y$, small errors $\Delta x$ and $\Delta y$ propagate as $\Delta z \approx f_x \Delta x + f_y \Delta y$. The tangent plane is the error propagation formula.
-- **Structural Surface Analysis:** Tangent planes define the local orientation of a curved surface — critical for computing surface normals for aerodynamic panel methods or FEA contact problems.
-- **Optimization:** Gradient descent on a surface uses the tangent plane to step downhill. Newton's method uses it to find critical points.
-- **Heat Transfer:** Local surface orientation (normal vector from tangent plane) determines the angle of incidence for radiative heat transfer.
-
-### Syntax
-
-Format: `f(x,y); (a, b)` — surface expression then evaluation point.
-
-Renders three objects:
-1. The surface $z = f(x,y)$ (semi-transparent)
-2. The tangent plane at $(a, b, f(a,b))$
-3. A point marker at the tangency point
-
-```
-$x^2 + y^2; (1, 1) @tangent$
-```
-Paraboloid with tangent plane at $(1,1)$. Here $f_x = 2x = 2$ and $f_y = 2y = 2$, so the plane is $z = 2 + 2(x-1) + 2(y-1) = 2x + 2y - 2$.
-
-```
-$\sin(x)\cos(y); (0, 0) @tangent$
-```
-Tangent plane to egg-carton at origin. Since $f_x(0,0) = \cos(0)\cos(0) = 1$ and $f_y(0,0) = -\sin(0)\sin(0) = 0$, the plane is $z = x$ — a tilted plane through the origin.
-
-```
-$x^2 - y^2; (1, 0) @tangent$
-```
-Saddle surface tangent at $(1,0)$. The tangent plane at a saddle point is not flat — it intersects the surface along two lines, which is visible if you look closely at the rendering.
-
-```
-$\sqrt{x^2 + y^2}; (3, 4) @tangent$
-```
-Cone surface. The partial derivatives are $f_x = x/\sqrt{x^2+y^2}$ and $f_y = y/\sqrt{x^2+y^2}$. At $(3,4)$ the surface value is $5$ and the tangent plane has a well-defined normal.
-
-### Visualization Tips
-
-- The tangent plane should appear to "kiss" the surface at the point — it lies flat against the surface locally.
-- Where the surface has high curvature, the tangent plane departs rapidly from the surface as you move away from the point.
-- At a critical point (local max, min, or saddle), the tangent plane is horizontal ($f_x = f_y = 0$).
-
----
-
-## Region Shading (`@region`)
-
-### What Is Region Shading?
-
-Region shading fills the area between two curves, making it easy to visualize the domain of a double integral or an area calculation. Setting up integration limits correctly is often the hardest part of multivariable calculus — seeing the region graphically eliminates ambiguity about which curve is "on top" and where the curves intersect.
-
-**Engineering relevance:**
-- **Double Integrals:** $\iint_R f(x,y)\, dA$ requires knowing $R$. Visualizing $R$ before computing saves errors in limit-setting.
-- **Fluid Mechanics / Hydrostatics:** Cross-sectional areas of flow passages, submerged surfaces, pressure distribution integrals.
-- **Structural:** Moment of inertia calculations $I = \iint_R y^2\, dA$ over cross-sectional regions.
-- **Thermodynamics:** Work computed as area under a $P$-$V$ curve — the region between process curve and axis.
-
-### Syntax
-
-```
-$y = x^2; y = 2x + 1 @region$
-```
-Shades the area between the parabola $y = x^2$ and the line $y = 2x+1$. Boundary curves drawn on top. Find intersections: $x^2 = 2x+1 \Rightarrow x = 1 \pm \sqrt{2}$.
-
-```
-$y = \sin(x); y = 0 @region$
-```
-Area between sine curve and x-axis. Over $[0, \pi]$ this is the classic $\int_0^\pi \sin(x)\, dx = 2$.
-
-```
-$y = \sqrt{x}; y = x^2 @region$
-```
-Region between $y = \sqrt{x}$ and $y = x^2$ over $[0,1]$. The square root curve is above the parabola on this interval — verify visually before integrating.
-
-```
-$y = e^x; y = x + 2 @region$
-```
-Region between exponential and a line. Useful for setting up $\int_a^b [(x+2) - e^x]\, dx$ when studying bounded areas.
-
-### Visualization Tips
-
-- The shaded region directly tells you the order of integration and the direction of inequality.
-- Identify intersection points visually before computing them algebraically — confirms you have the right number of pieces.
-- For type I (vertical slices) vs type II (horizontal slices) integration, the shape of the region tells you which is simpler to set up.
-
----
-
-## Parametric Curves: 2D and 3D
-
-### What Are Parametric Curves?
-
-A parametric curve traces a path through space as a parameter $t$ varies. Instead of $y = f(x)$ (which fails for curves that loop back), you write $\mathbf{r}(t) = \langle x(t), y(t) \rangle$ or $\langle x(t), y(t), z(t) \rangle$.
-
-The parameter $t$ usually represents time, arc length, or angle. The velocity vector $\mathbf{r}'(t) = \langle x'(t), y'(t), z'(t) \rangle$ is always tangent to the curve.
-
-**Engineering relevance:**
-- **Kinematics:** Position of a particle or robot end-effector as a function of time. $\mathbf{r}(t)$ is the trajectory.
-- **CNC / Path Planning:** Tool paths for machining are parametric curves.
-- **Structural:** Curved beam geometries, arch shapes (catenary, cycloid).
-- **Fluid Mechanics:** Streamlines are parametric curves tangent to the velocity field.
-- **Electromagnetism:** Particle trajectories in electric/magnetic fields.
-
-**Frenet frame intuition:** At every point on a smooth 3D curve, three orthogonal vectors describe the local geometry:
-- $\hat{T}$: unit tangent (direction of travel)
-- $\hat{N}$: unit normal (toward which the curve turns)
-- $\hat{B} = \hat{T} \times \hat{N}$: binormal (perpendicular to the plane of curvature)
-
-Curvature $\kappa$ measures how fast the curve bends; torsion $\tau$ measures how fast it twists out of the plane.
-
-### 2D Parametric Curves
-
-```
-$(\cos(t), \sin(t)) @plot2d$
-```
-Unit circle. $t \in [-2\pi, 2\pi]$. Velocity: $\mathbf{r}'(t) = \langle -\sin t, \cos t \rangle$ — always perpendicular to position, confirming circular motion.
-
-```
-$(\cos(t), \sin(2t)) @plot2d$
-```
-Lissajous figure. The ratio of frequencies (here 1:2) determines the shape. These appear in vibration analysis as phase portraits of two coupled oscillators.
-
-```
-$(t - \sin(t), 1 - \cos(t)) @plot2d$
-```
-Cycloid — the path traced by a point on the rim of a rolling circle. Famous in brachistochrone problem (fastest descent under gravity). The cusps occur when the point touches the ground ($t = 0, 2\pi, ...$).
-
-```
-$(e^{0.1 t} \cos(t), e^{0.1 t} \sin(t)) @plot2d$
-```
-Archimedean/logarithmic spiral. Appears in gear profiles, drill-bit geometries, and galaxy arms.
-
-### 3D Parametric Curves
-
-```
-$(\cos(t), \sin(t), t/3) @plot3d$
-```
-Circular helix. Radius 1, pitch $1/3$ per radian. The tangent vector $\mathbf{r}'(t) = \langle -\sin t, \cos t, 1/3 \rangle$ has constant magnitude — the curve has constant curvature and constant torsion. Think: coil spring, DNA strand, helical antenna.
-
-```
-$(\cos(t), \sin(t), \sin(2t)) @plot3d$
-```
-Trefoil-style curve. The z-component oscillates twice per revolution, giving a figure-8 cross-section when projected onto the xz-plane.
-
-```
-$(t, t^2, t^3) @plot3d$
-```
-Twisted cubic — the canonical example of a space curve that is not planar. The projections onto xy, xz, and yz planes are a parabola, cubic, and semicubic parabola respectively.
-
-```
-$(\cos(t), \sin(t), t) @plot3d$
-```
-Standard helix, full pitch. Compare with `t/3` version to see how pitch changes slope.
-
----
-
-## Implicit Surfaces in 3D
-
-### What Is an Implicit Surface?
-
-An implicit surface is defined by $F(x, y, z) = c$ rather than $z = f(x, y)$. The surface is the set of all $(x,y,z)$ satisfying the equation — a level surface of the function $F$ in 3D space. Rendered via marching cubes algorithm.
-
-**Engineering relevance:**
-- **Constraint surfaces:** In optimization, equality constraints $g(x,y,z) = 0$ define feasible regions — these are implicit surfaces.
-- **Quadric surfaces:** All conic sections generalize to 3D as quadrics (ellipsoids, hyperboloids, paraboloids, cones). These appear in antenna design, optics, pressure vessels, and stress ellipsoids.
-- **Level surfaces in scalar fields:** In thermodynamics, isothermal surfaces $T(x,y,z) = T_0$ in a 3D temperature field are implicit surfaces.
-
-### Quadric Surface Taxonomy
-
-All quadric surfaces follow the form $\frac{x^2}{a^2} + \frac{y^2}{b^2} + \frac{z^2}{c^2} = 1$ (with sign variations):
-
-**Ellipsoid** — all three signs positive, equals 1:
-```
-$\frac{x^2}{4} + \frac{y^2}{9} + z^2 = 1 @plot3d$
-```
-Egg-shaped closed surface. Special case $a=b=c$: sphere. Appears in stress ellipsoids, inertia ellipsoids, diffusion ellipsoids.
-
-**Sphere:**
-```
-$x^2 + y^2 + z^2 = 9 @plot3d$
-```
-Radius 3. The simplest implicit surface. Every point is distance 3 from origin.
-
-**Elliptic Paraboloid** — one variable linear in $z$:
-```
-$z = x^2 + y^2 @plot3d$
-```
-Bowl opening upward. Has a global minimum at origin. Cross-sections parallel to xy-plane are circles; parallel to xz or yz are parabolas.
-
-**Hyperbolic Paraboloid** (saddle):
-```
-$z = x^2 - y^2 @plot3d$
-```
-Saddle shape. Cross-sections parallel to xy-plane are hyperbolas; parallel to xz/yz are parabolas. Appears in saddle roof architecture and in the second derivative test failure case.
-
-**Hyperboloid of One Sheet** — middle sign negative:
-```
-$x^2 + y^2 - z^2 = 1 @plot3d$
-```
-Waist-shaped, connected surface. Cross-sections at constant $z$ are circles (or ellipses). Appears in cooling tower shapes and ruled surfaces in structural engineering.
-
-**Hyperboloid of Two Sheets** — $z^2$ dominates:
-```
-$z^2 - x^2 - y^2 = 1 @plot3d$
-```
-Two disconnected bowls opening up and down. The "gap" around the origin is characteristic.
-
-**Elliptic Cone:**
-```
-$x^2 + y^2 - z^2 = 0 @plot3d$
-```
-Double cone with apex at origin. The boundary case between one-sheet and two-sheet hyperboloid.
-
-**Cylinder** (no $z$ term):
-```
-$x^2 + y^2 = 4 @plot3d$
-```
-Infinite circular cylinder of radius 2. The absence of $z$ means the surface extends infinitely in the $z$-direction — any point $(x,y)$ on the circle generates the full vertical line.
-
-### Visualization Tips
-
-- To classify a quadric surface: count how many variables are squared, and check whether the squared terms all have the same sign.
-- The marching cubes algorithm may show slight faceting on smooth surfaces — zoom out for a better sense of global shape.
-- Overlay with a point `$(a,b,c) @plot3d$` to check a specific point on or near the surface.
-
----
-
-## Interaction
-
-### 2D Graphs
-- **Scroll** to zoom (anchored at cursor)
-- **Drag** to pan
-- **Hover** for nearest-curve coordinates with crosshair snapping
-- **Double-click** or press **0** to reset view
-- **+/-** keys to zoom in/out
-- Grid toggle button (top-right): All / Major / None
-- POI toggle button: Show/hide points of interest (roots, extrema, intersections)
-
-### 3D Graphs
-- **Click** to enter interactive mode (static snapshot by default)
-- **Drag** to rotate (OrbitControls)
-- **Scroll** to zoom (rescales math ranges)
-- **Double-click** to reset
-- **Hover** for 3D coordinate tooltip on surfaces
-- Expression labels overlay (top-left)
-
----
-
-## Graph Inspector
-
-Open via Command Palette: **King's CalcLatex: Open Graph Inspector**
-
-Shows details for the currently rendered graph:
-- Expression LaTeX
-- Plot mode and type classification
-- Diagnostics (info/warning/error)
-- PlotSpec data
-
----
-
-## Settings
-
-Open Obsidian Settings → King's CalcLatex:
+Open **Obsidian Settings → King's CalcLatex**.
 
 | Setting | Default | Description |
 |:--------|:--------|:------------|
-| Default 2D Range | [-10, 10] | Default x/y range for 2D graphs |
-| Default 3D Range | [-5, 5] | Default x/y/z range for 3D graphs |
-| Numeric Precision | 12 | Decimal places for `\approx` mode |
-| Auto Range | On | Automatically determine viewport from expression |
-| Graph Theme | Auto | Light/dark follows Obsidian theme |
-| 3D Zoom Mode | Origin | Zoom anchored at origin vs range center |
-| Show POIs | On | Points of interest on 2D graphs |
-| Default Vector Arrow Scale | 1.0 | Default arrow size for `@vecfield` (overridden per-expression by suffix) |
+| Default 2D Range | [-10, 10] | x/y axis range for 2D graphs |
+| Default 3D Range | [-5, 5] | x/y/z range for 3D graphs |
+| Numeric Precision | 12 | Decimal places for `\approx` |
+| Auto Range | On | Smart viewport from expression shape |
+| Graph Theme | Auto | Follows Obsidian light/dark theme |
+| 3D Zoom Mode | Origin | Zoom anchored at origin vs. range center |
+| Show POIs | On | Roots, extrema, intersections on 2D graphs |
+| 3D Axis Tick Marks | On | Show tick marks on 3D axes |
+| Default Vector Arrow Scale | 1.0 | Global arrow scale for `@vecfield` |
+| Giac WASM CAS | Off | Enable advanced CAS (requires giacwasm.js) |
+| 2D Curves on 3D | Curtain | How 2D equations render on @plot3d: 'Curtain' extrudes as wall, 'Plane curve' draws at z=0 |
+| Auto-Scale Z (3D) | Off | Auto-fit Z axis to data range. Off = 1:1:1 proportional axes (Desmos-style) |
 
 ---
 
-## Test Equations
+## 12. Interaction
 
-Quick copy-paste tests to verify everything works:
+### 2D Graphs
+
+| Action | Effect |
+|:-------|:-------|
+| Scroll | Zoom (anchored at cursor) |
+| Drag | Pan |
+| Hover | Nearest-curve coordinates with crosshair |
+| Double-click or `0` | Reset view |
+| `+` / `-` | Zoom in/out |
+| Grid button (top-right) | Toggle: All / Major / None |
+| POI button | Show/hide roots, extrema, intersections |
+
+### 3D Graphs
+
+| Action | Effect |
+|:-------|:-------|
+| Click | Enter interactive mode |
+| Drag | Rotate (OrbitControls) |
+| Scroll | Zoom (rescales math ranges) |
+| Double-click | Reset view |
+| Hover on surface | 3D coordinate tooltip |
+
+---
+
+## 13. Export
+
+| Button | Action |
+|:-------|:-------|
+| Screenshot (clipboard icon) | Copy graph to clipboard |
+| Download (arrow icon) | Save graph as PNG file |
+
+Both 2D and 3D graphs support export via toolbar buttons.
+
+---
+
+## 14. Graph Inspector
+
+Open via Command Palette: **King's CalcLatex: Open Graph Inspector**
+
+Shows for the active graph:
+- Expression LaTeX source
+- Detected plot mode and type classification
+- Diagnostics (info / warning / error)
+- Raw PlotSpec object
+
+---
+
+## 15. Test Equations
+
+Copy-paste these to verify everything is working.
 
 ### Evaluation
-- `$2+3=$`
-- `$\sin(\pi/4) \approx$`
-- `$x^2 + 2x + 1 \equiv$`
 
-### CAS / Symbolic
-- `$x^3 + 2x @diff$` — derivative → 3x² + 2
-- `$3x^2 + 2 @int$` — integral → x³ + 2x
-- `$x^2 y + y^3 @px$` — ∂/∂x → 2xy
-- `$x^2 y + y^3 @py$` — ∂/∂y → x² + 3y²
-- `$x^2 + y^2 @grad$` — gradient → (2x, 2y)
-- `$z = x^2 + y^2 @normal$` — surface normal → (2x, 2y, -1)
-- `$x^2 - 4 = 0 @solve$` — solve → x = ±2
-- `$x^2 + 3x + 2 @factor$` — factor → (x+1)(x+2)
+```
+$2 + 3 =$
+$\frac{1}{2} + \frac{1}{3} =$
+$\sin(\pi/4) \approx$
+$x^2 + 2x + 1 \equiv$
+```
 
-### 2D
-- `$y = \sin(x) @plot2d$`
-- `$x^2 + y^2 = 25 @plot2d$`
-- `$y > \sin(x) @plot2d$`
-- `$(5,5) @plot2d$`
-- `$y = \sin(x); y = \cos(x) @plot2d$`
+### Core CAS
 
-### 3D
-- `$z = x^2 + y^2 @plot3d$`
-- `$x^2 + y^2 + z^2 = 9 @plot3d$`
-- `$(\cos(t), \sin(t), t/3) @plot3d$`
-- `$\langle 1,2,3 \rangle @plot3d$`
-- `$(1,2,3) @plot3d$`
+```
+$x^3 + 2x @diff$                   → 3x² + 2
+$3x^2 + 2 @int$                    → x³ + 2x
+$x^2 - 4 = 0 @solve$               → x = ±2
+$x^2 - 5x + 6 @factor$             → (x-2)(x-3)
+```
 
-### Calc 3 Features
-- `$x^2 + y^2 @contour$`
-- `$-y; x @vecfield$`
-- `$x^2 + y^2 @gradient$`
-- `$x^2 + y^2; (1,1) @tangent$`
-- `$y = x^2; y = 2x + 1 @region$`
+### Giac CAS
 
-### Geometry
-- `$\langle 1,2,3 \rangle @geom$`
+```
+$(x+1)^3 @expand$                  → x³ + 3x² + 3x + 1
+$\frac{\sin(x)}{x} @limit$         → 1
+$e^x @taylor$                      → Taylor series order 5
+$\frac{1}{x^2-1} @partfrac$        → partial fractions
+```
 
----
+### Multivariable
 
-## Calc 3 Study Guide
+```
+$x^2 y + y^3 @px$                  → 2xy
+$x^2 y + y^3 @py$                  → x² + 3y²
+$x^2 + y^2 @gradient$
+$z = x^2 + y^2 @normal$            → (2x, 2y, -1)
+$x^2 + y^2; (1,1) @tangent$
+```
 
-Suggested equation sequences for studying specific topics. Type each into a fresh note cell and observe the visualization progression.
+### 2D Plots
 
----
+```
+$y = \sin(x) @plot2d$
+$x^2 + y^2 = 25 @plot2d$
+$r = 1 + \cos(\theta) @plot2d$
+$y > \sin(x) @plot2d$
+$y = \sin(x); y = \cos(x) @plot2d$
+$y = a\sin(bx) @plot2d$
+```
 
-### Partial Derivatives and Tangent Planes
+### 3D Plots
 
-Start with a surface, then examine its tangent planes at different points to build intuition for partial derivatives.
+```
+$z = x^2 + y^2 @plot3d$
+$x^2 + y^2 + z^2 = 9 @plot3d$
+$(\cos(t), \sin(t), t/3) @plot3d$
+$\langle 1, 2, 3 \rangle @plot3d$
+```
 
-1. Visualize the surface:
-   `$z = x^2 + y^2 @plot3d$`
+### Special Modes
 
-2. Contour map to see level curves:
-   `$x^2 + y^2 @contour$`
-
-3. Tangent plane at a generic point — inspect the tilt:
-   `$x^2 + y^2; (1, 1) @tangent$`
-
-4. Tangent plane at the vertex — should be flat ($f_x = f_y = 0$):
-   `$x^2 + y^2; (0, 0) @tangent$`
-
-5. Now try a saddle — tangent plane at the saddle point:
-   `$x^2 - y^2; (0, 0) @tangent$`
-
-6. Tangent plane away from the saddle:
-   `$x^2 - y^2; (2, 1) @tangent$`
-
-Key questions: Does the tangent plane "look flat" at a critical point? Does it tilt more steeply as you move to a point with larger partial derivatives?
+```
+$x^2 + y^2 @contour$
+$x^2 - y^2 @contour$
+$-y; x @vecfield$
+$x^2 + y^2 @gradient$
+$y = x^2; y = 2x @region$
+$\langle 1,2,3 \rangle @geom$
+```
 
 ---
 
-### Gradient and Directional Derivatives
+## 16. CAS Capability Summary
 
-1. Gradient of a paraboloid — arrows point radially outward:
-   `$x^2 + y^2 @gradient$`
+| Operation | Without Giac | With Giac |
+|:----------|:------------|:---------|
+| Basic arithmetic (`=`) | CortexJS | CortexJS |
+| Differentiation (`@diff`) | CortexJS (polynomials, trig, exp) | Enhanced (all standard functions) |
+| Integration (`@int`) | CortexJS (limited) | Giac (broader coverage) |
+| Solve (`@solve`) | CortexJS (polynomial) | Giac (general) |
+| Factor (`@factor`) | CortexJS | Giac |
+| Partial derivatives | CortexJS | Enhanced |
+| Gradient / Normal | CortexJS | Enhanced |
+| Expand (`@expand`) | Not available | Giac |
+| Limits (`@limit`) | Not available | Giac |
+| Taylor series (`@taylor`) | Not available | Giac |
+| Partial fractions (`@partfrac`) | Not available | Giac |
+| Steps (`@steps`) | Not available | Giac (step-by-step walkthrough) |
 
-2. Gradient of a linear function — constant direction everywhere:
-   `$3x + 2y @gradient$`
-
-3. Gradient at a saddle — zero at origin, opposite directions along axes:
-   `$x^2 - y^2 @gradient$`
-
-4. Gradient of a wavy function — complex pattern with multiple critical points:
-   `$\sin(x)\cos(y) @gradient$`
-
-5. Compare gradient to the raw contour map — confirm perpendicularity:
-   `$\sin(x)\cos(y) @contour$`
-
-Key observation: In step 5, every gradient arrow should be perpendicular to the contour line it originates from. If you can see this clearly, you understand the gradient theorem geometrically.
-
-**Directional derivative formula:** $D_{\hat{u}} f(a,b) = \nabla f(a,b) \cdot \hat{u}$. It is maximized when $\hat{u}$ is parallel to $\nabla f$ — hence "steepest ascent."
+> Giac WASM (`giacwasm.js`) is ~19 MB and loaded on demand. Toggle it in Settings.
 
 ---
 
-### Double and Triple Integral Regions
+## 17. Common Engineering Patterns
 
-1. Simple region between a parabola and a line:
-   `$y = x^2; y = 2x @region$`
-   Intersection points: $x^2 = 2x \Rightarrow x = 0,\, x = 2$. Integral: $\int_0^2 \int_{x^2}^{2x} f\, dy\, dx$.
+### Heat Transfer — Fourier's Law
 
-2. Trigonometric bounded region:
-   `$y = \sin(x); y = 0 @region$`
-   Classic: $\int_0^\pi \sin(x)\, dx = 2$.
+```
+$T(x,y) = e^{-(x^2+y^2)} @gradient$   — heat flux direction = -k∇T
+$e^{-(x^2+y^2)} @contour$              — isotherms (ellipses around peak)
+```
 
-3. Region between two parabolas:
-   `$y = \sqrt{x}; y = x^2 @region$`
-   Intersect at $(0,0)$ and $(1,1)$. On $[0,1]$, $\sqrt{x} \geq x^2$. Type I: $\int_0^1 \int_{x^2}^{\sqrt{x}} dy\, dx$.
+### Fluid Mechanics — Stream Function
 
-4. Circular region (use implicit plot):
-   `$x^2 + y^2 = 4 @plot2d$`
-   Reminder that polar coordinates simplify this: $\int_0^{2\pi} \int_0^2 f(r,\theta)\, r\, dr\, d\theta$.
+```
+$\psi = -y; \psi = x @vecfield$        — velocity field from ψ
+$-y; x @vecfield$                      — vortex/rotation flow
+```
 
-5. 3D domain visualization — surface over region:
-   `$z = x^2 + y^2 @plot3d$`
-   Then `$z = 4 @plot3d$` to see where the horizontal plane intersects the paraboloid — this defines a triple integral domain.
+### Dynamics / Kinematics
 
----
+```
+$(\cos(t), \sin(t)) @plot2d$           — circular trajectory
+$(\cos(t), \sin(t), t/3) @plot3d$     — helical path (e.g., threaded rod)
+$x^3 - 3x @diff$                      → 3x² - 3 (velocity from position)
+$3x^2 - 3 @int$                       → x³ - 3x (recover position)
+```
 
-### Vector Fields and Line Integrals (Conceptual)
+### Structural — Error Propagation / Linearization
 
-A line integral $\int_C \mathbf{F} \cdot d\mathbf{r}$ measures the total "work" done by field $\mathbf{F}$ along curve $C$. Visualize both the field and the path together.
+```
+$x^2 + y^2; (3, 4) @tangent$          — linear approximation at (3,4,5)
+$x^2 y + y^3 @px$                     → ∂f/∂x for sensitivity analysis
+```
 
-1. Pure rotation field (zero work for any closed loop):
-   `$-y; x @vecfield$`
-   This field has zero divergence and nonzero curl. A particle moving with the flow does no net work around a closed orbit.
+### Optimization — Critical Points
 
-2. Conservative field (work depends only on endpoints):
-   `$y; x @vecfield$`
-   This is $\nabla(xy)$ — a gradient field. The line integral around any closed curve is zero.
-
-3. Source field:
-   `$x; y @vecfield$`
-   Positive divergence everywhere. Analogous to a fluid source at the origin.
-
-4. Sink field:
-   `$-x; -y @vecfield$`
-   Negative divergence everywhere.
-
-5. Overlay a parametric path with a field — manually place them in the same cell:
-   `$-y; x @vecfield$` then `$(\cos(t), \sin(t)) @plot2d$`
-   The circular path follows the arrows exactly — the vector field is tangent to the circle everywhere. Work is maximized.
-
-**Conservative test:** $\mathbf{F} = \langle P, Q \rangle$ is conservative if and only if $\frac{\partial Q}{\partial x} = \frac{\partial P}{\partial y}$ (in a simply connected domain).
-
----
-
-### Surface Classification (Quadric Surfaces)
-
-Work through these in order to build pattern recognition:
-
-1. Sphere:
-   `$x^2 + y^2 + z^2 = 4 @plot3d$`
-   All signs equal, right-hand side positive. Closed, symmetric.
-
-2. Ellipsoid (stretched sphere):
-   `$\frac{x^2}{4} + y^2 + \frac{z^2}{9} = 1 @plot3d$`
-   Different denominators give different radii in each axis direction.
-
-3. Elliptic paraboloid (bowl):
-   `$z = x^2 + y^2 @plot3d$`
-   One variable is linear (not squared). Opens upward. No upper bound.
-
-4. Hyperbolic paraboloid (saddle):
-   `$z = x^2 - y^2 @plot3d$`
-   Mixed signs on the squared terms. No closed cross-sections.
-
-5. Hyperboloid of one sheet (cooling tower):
-   `$x^2 + y^2 - z^2 = 1 @plot3d$`
-   Two positive, one negative. Connected. Minimum circular cross-section at $z=0$ ("waist").
-
-6. Hyperboloid of two sheets (two bowls):
-   `$z^2 - x^2 - y^2 = 1 @plot3d$`
-   One positive, two negative. Disconnected. Gap around origin.
-
-7. Cone (boundary between hyperboloids):
-   `$x^2 + y^2 = z^2 @plot3d$`
-   Right-hand side is zero — the cone is the degenerate case where the hyperboloid "collapses."
-
-**Identification rule:** Write the equation as $\pm\frac{x^2}{a^2} \pm \frac{y^2}{b^2} \pm \frac{z^2}{c^2} = k$ and count signs:
-- All same sign, $k > 0$: ellipsoid
-- Two same sign, one opposite, $k > 0$: hyperboloid of one sheet
-- One sign, two opposite, $k > 0$: hyperboloid of two sheets
-- All same sign, $k = 0$: single point (degenerate)
-- Mixed, $k = 0$: cone
-- One variable not squared: paraboloid (elliptic if other two same sign, hyperbolic if opposite)
-
----
-
-### Symbolic CAS Workflow: From Surface to Normal
-
-Walk through the full symbolic pipeline for a surface — partials, gradient, normal, tangent plane.
-
-1. Define the surface and visualize it:
-   `$z = x^2 + y^2 @plot3d$`
-
-2. Compute partial derivatives symbolically:
-   `$x^2 + y^2 @px$`       → 2x
-   `$x^2 + y^2 @py$`       → 2y
-
-3. Compute the gradient:
-   `$x^2 + y^2 @grad$`     → ∇f = (2x, 2y)
-
-4. Verify gradient visually — arrows should be perpendicular to contours:
-   `$x^2 + y^2 @gradient$`
-
-5. Compute the surface normal:
-   `$z = x^2 + y^2 @normal$` → n = (2x, 2y, -1)
-
-6. Visualize the tangent plane at a specific point:
-   `$x^2 + y^2; (1, 1) @tangent$`
-
-**Key insight:** The gradient `@grad` gives you the 2D direction of steepest ascent on the surface. The normal `@normal` gives you the 3D vector perpendicular to the surface itself. At point $(1,1)$: $\nabla f = (2, 2)$ points away from origin in xy-plane, while $\vec{n} = (2, 2, -1)$ tilts downward in 3D.
-
----
-
-### Symbolic CAS Workflow: Implicit Surfaces
-
-For implicit surfaces $F(x,y,z) = 0$, the normal is simply the gradient of $F$.
-
-1. Visualize a sphere:
-   `$x^2 + y^2 + z^2 = 9 @plot3d$`
-
-2. Compute its normal:
-   `$x^2 + y^2 + z^2 = 9 @normal$` → n = (2x, 2y, 2z)
-
-   On the sphere surface, this always points radially outward — as expected.
-
-3. Try a hyperboloid:
-   `$x^2 + y^2 - z^2 = 1 @plot3d$`
-   `$x^2 + y^2 - z^2 = 1 @normal$` → n = (2x, 2y, -2z)
-
-   The z-component sign flip reflects the "waist" geometry.
-
-4. Partial derivative check — each component independently:
-   `$x^2 + y^2 - z^2 @px$` → 2x
-   `$x^2 + y^2 - z^2 @py$` → 2y
-   `$x^2 + y^2 - z^2 @pz$` → -2z
-
----
-
-### Derivatives and Integration Practice
-
-Build intuition by computing derivatives and verifying with plots.
-
-1. Derivative of a polynomial:
-   `$x^3 - 3x @diff$`      → 3x² - 3
-   `$y = x^3 - 3x @plot2d$` — visualize the original
-   `$y = 3x^2 - 3 @plot2d$` — the derivative: zeros at x = ±1 are the extrema of the original
-
-2. Derivative of trig:
-   `$\sin(x) @diff$`        → cos(x)
-   `$\cos(x) @diff$`        → -sin(x)
-
-3. Chain rule:
-   `$\sin(x^2) @diff$`      → 2x·cos(x²)
-   `$e^{-x^2} @diff$`       → -2x·e^{-x²} (Gaussian derivative)
-
-4. Integration as inverse:
-   `$3x^2 - 3 @int$`        → x³ - 3x (recovers the original from step 1)
+```
+$x^2 - y^2 @gradient$                 — zero at saddle, identify critical pts
+$x^2 + y^2 @contour$                  — level curves of objective function
+$-(x^2 + y^2) + 4 @gradient$          — gradient descent direction = -∇f
+```
