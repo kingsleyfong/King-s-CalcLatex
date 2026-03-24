@@ -86,6 +86,28 @@ $\det\begin{pmatrix}1 & 2\\3 & 4\end{pmatrix} =$
 $\begin{pmatrix}1 & 0 & 0\end{pmatrix}\times\begin{pmatrix}0 & 1 & 0\end{pmatrix} =$
 ```
 
+### ODE Phase Portraits
+Solve first-order ODEs numerically — direction field + solution curves via RK4.
+
+```
+$y' = x - y @phase$            → direction field + solution curves
+$y' = y(1-y) @ode$             → direction field only
+```
+
+### Laplace Transforms (Giac WASM)
+
+```
+$t^2 @laplace$                 → 2/s³
+$\frac{1}{s^2+1} @ilaplace$   → sin(t)
+```
+
+### Per-Expression Colors & Line Styles
+
+```
+$y = \sin(x) #red; y = \cos(x) #blue @plot2d$
+$y = x^2 --; y = -x .. @plot2d$    ← dashed and dotted
+```
+
 ### Vector Fields & Contour Plots
 
 ```
@@ -128,7 +150,11 @@ $100\text{kg} \to \text{lb} @convert$   → 220.462 lb
 | `@gradient` | Graph | Gradient + contour overlay |
 | `@tangent` | Graph | Tangent plane |
 | `@region` | Graph | Shaded region |
+| `@phase` | Graph | ODE phase portrait |
+| `@ode` | Graph | ODE direction field |
 | `@geom` | Graph | Geometry mode |
+| `@laplace` | CAS (Giac) | Laplace transform |
+| `@ilaplace` | CAS (Giac) | Inverse Laplace |
 
 ## Installation
 

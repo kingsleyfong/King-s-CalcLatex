@@ -56,9 +56,11 @@ export type EvalMode = "exact" | "approximate" | "simplify" | "solve" | "factor"
   | "partial_x" | "partial_y" | "partial_z"
   | "gradient" | "normal"
   | "limit" | "taylor" | "partfrac" | "expand"
-  | "convert" | "steps";
+  | "convert" | "steps"
+  | "laplace" | "ilaplace";
 export type PlotMode = "plot2d" | "plot3d" | "geometry"
-  | "contour" | "vecfield" | "gradient" | "tangent" | "region";
+  | "contour" | "vecfield" | "gradient" | "tangent" | "region"
+  | "phase" | "ode";
 
 export interface EvalResult {
   /** LaTeX-formatted result (for display) */
@@ -82,7 +84,8 @@ export type ExprType =
   | "contour_2d"     // z=f(x,y) rendered as iso-level curves in 2D
   | "vector_field_2d"  // (P(x,y), Q(x,y)) rendered as arrow grid in 2D
   | "vector_field_3d"  // (P,Q,R)(x,y,z) rendered as 3D arrow grid
-  | "region_2d";     // area between curves shaded in 2D
+  | "region_2d"      // area between curves shaded in 2D
+  | "ode_phase";     // ODE direction field + solution curves
 
 /**
  * A single plottable expression, prepared by the engine for the renderer.
@@ -116,6 +119,10 @@ export interface PlotData {
   };
   /** When a 2D expression is promoted to 3D, track the original type */
   originalType?: ExprType;
+  /** Per-expression color override (CSS color string: "red", "#ff0000", etc.) */
+  color?: string;
+  /** Line rendering style */
+  lineStyle?: "solid" | "dashed" | "dotted";
 }
 
 /**

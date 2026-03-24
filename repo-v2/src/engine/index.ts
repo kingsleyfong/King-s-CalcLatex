@@ -124,6 +124,11 @@ export class ExpressionEngine {
       // ── Region mode: shade area between curves ──────────────────
       // Falls through to multi-eq handling below; type override happens after the loop.
 
+      // ── Phase portrait / ODE mode ──────────────────────────────────
+      if (mode === "phase" || mode === "ode") {
+        return this.buildODESpec(latex, mode, diagnostics);
+      }
+
       // ── Multi-equation: split on semicolons ────────────────────────
       const subExpressions = latex.split(";").map((s) => s.trim()).filter(Boolean);
       const allData: PlotData[] = [];
@@ -133,7 +138,27 @@ export class ExpressionEngine {
 
       const plot3d2dMode = this.settings?.plot3d2dMode ?? "curtain";
 
-      for (const subLatex of subExpressions) {
+      for (let subLatex of subExpressions) {
+        // Extract per-expression color: #red, #blue, #ff00aa, etc.
+        let exprColor: string | undefined;
+        let exprLineStyle: "solid" | "dashed" | "dotted" | undefined;
+
+        // Line style: -- for dashed, .. for dotted (before trigger was already stripped)
+        if (/\s+\.\.\s*$/.test(subLatex)) {
+          exprLineStyle = "dotted";
+          subLatex = subLatex.replace(/\s+\.\.\s*$/, "").trim();
+        } else if (/\s+--\s*$/.test(subLatex)) {
+          exprLineStyle = "dashed";
+          subLatex = subLatex.replace(/\s+--\s*$/, "").trim();
+        }
+
+        // Color: #colorname or #hexcode at end
+        const colorMatch = subLatex.match(/\s+#([a-zA-Z]+|[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\s*$/);
+        if (colorMatch) {
+          exprColor = colorMatch[1].match(/^\d/) ? `#${colorMatch[1]}` : colorMatch[1];
+          subLatex = subLatex.replace(colorMatch[0], "").trim();
+        }
+
         const exprType = classifyExpression(subLatex);
         const is3d = mode === "plot3d" || is3dType(exprType);
         if (is3d) anyIs3d = true;
@@ -154,6 +179,10 @@ export class ExpressionEngine {
 
         const plotData = buildPlotData(subLatex, finalType, diagnostics);
         if (!plotData) continue;
+
+        // Apply per-expression color and line style overrides
+        if (exprColor) plotData.color = exprColor;
+        if (exprLineStyle) plotData.lineStyle = exprLineStyle;
 
         // Mark original type for plane-curve mode
         if (mode === "plot3d" && plot3d2dMode === "plane-curve" && exprType === "explicit_2d") {
@@ -482,6 +511,55 @@ export class ExpressionEngine {
     } catch (e) {
       return err(
         `Gradient mode failed: ${e instanceof Error ? e.message : String(e)}`,
+        diagnostics,
+      );
+    }
+  }
+
+  /**
+   * Build a PlotSpec for ODE phase portrait / direction field mode.
+   *
+   * Parses expressions of the form "y' = f(x, y)" or just "f(x, y)" (RHS only).
+   * Strips common ODE prefixes: y'=, \frac{dy}{dx}=, \dot{y}=
+   */
+  private buildODESpec(
+    latex: string,
+    mode: string,
+    diagnostics: Diagnostic[],
+  ): Result<PlotSpec> {
+    try {
+      // Parse y' = f(x, y) — strip "y'" or "y'=" or "\frac{dy}{dx}=" prefix
+      let rhs = latex.trim();
+      rhs = rhs.replace(/^y'\s*=\s*/i, "");
+      rhs = rhs.replace(/^\\frac\{dy\}\{dx\}\s*=\s*/, "");
+      rhs = rhs.replace(/^\\dot\{y\}\s*=\s*/, "");
+
+      const expr = parseLatex(rhs);
+      const fn = compileToFunction(expr, ["x", "y"]);
+      const fnStr = toFnString(expr);
+
+      const range: [number, number] = this.settings?.default2dRange || [-10, 10];
+
+      const plotData: PlotData = {
+        latex,
+        type: "ode_phase",
+        fnStrings: [fnStr],
+        compiledFns: [fn],
+      };
+
+      diagnostics.push({ level: "info", message: `ODE phase portrait: y' = ${fnStr}` });
+
+      return ok(
+        {
+          data: [plotData],
+          freeVars: [],
+          ranges: { x: range, y: range },
+        },
+        diagnostics,
+      );
+    } catch (e) {
+      return err(
+        `Failed to parse ODE: ${e instanceof Error ? e.message : String(e)}`,
         diagnostics,
       );
     }

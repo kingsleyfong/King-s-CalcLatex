@@ -19,6 +19,7 @@
 import type { PlotSpec, PlotData, GraphHandle } from "../types";
 import { COLORS } from "./colors";
 import { detectPOIs, type POI } from "../engine/poi";
+import { computeDirectionField, generateSolutionCurves } from "../engine/ode";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -56,6 +57,24 @@ const LIGHT_THEME: Theme = {
   traceBg: "rgba(255,255,255,0.92)",
   traceText: "#111",
 };
+
+/** Convert any CSS color string (named, #hex, etc.) to [r, g, b] via offscreen canvas. */
+const _colorCanvas = typeof OffscreenCanvas !== "undefined"
+  ? new OffscreenCanvas(1, 1) : document.createElement("canvas");
+const _colorCtx = _colorCanvas.getContext("2d")! as CanvasRenderingContext2D;
+function colorToRGB(color: string): [number, number, number] {
+  if (color.startsWith("#") && (color.length === 7 || color.length === 4)) {
+    const r = parseInt(color.length === 7 ? color.slice(1, 3) : color[1] + color[1], 16);
+    const g = parseInt(color.length === 7 ? color.slice(3, 5) : color[2] + color[2], 16);
+    const b = parseInt(color.length === 7 ? color.slice(5, 7) : color[3] + color[3], 16);
+    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+  }
+  // Fallback: let the canvas context parse any CSS color
+  _colorCtx.fillStyle = "#000";
+  _colorCtx.fillStyle = color;
+  const hex = _colorCtx.fillStyle; // always returns #rrggbb
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
 
 // ── Math Helpers ─────────────────────────────────────────────────────
 
@@ -424,7 +443,7 @@ export function create2DGraph(
 
     for (let i = 0; i < currentSpec.data.length; i++) {
       const pd = currentSpec.data[i];
-      const color = COLORS[i % COLORS.length];
+      const color = pd.color || COLORS[i % COLORS.length];
       try {
         switch (pd.type) {
           case "explicit_2d":
@@ -454,6 +473,9 @@ export function create2DGraph(
           case "region_2d":
             drawExplicit(pd, color);
             break;
+          case "ode_phase":
+            drawODEPhase(pd, color, xMin, xMax, yMin, yMax);
+            break;
           default:
             break;
         }
@@ -471,6 +493,13 @@ export function create2DGraph(
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    if (pd.lineStyle === "dashed") {
+      ctx.setLineDash([8, 4]);
+    } else if (pd.lineStyle === "dotted") {
+      ctx.setLineDash([2, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
     ctx.beginPath();
 
     let moved = false;
@@ -495,6 +524,7 @@ export function create2DGraph(
       prevPy = py;
     }
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   function drawImplicit(
@@ -585,6 +615,13 @@ export function create2DGraph(
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    if (pd.lineStyle === "dashed") {
+      ctx.setLineDash([8, 4]);
+    } else if (pd.lineStyle === "dotted") {
+      ctx.setLineDash([2, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
     ctx.beginPath();
 
     let moved = false;
@@ -599,6 +636,7 @@ export function create2DGraph(
       else { ctx.lineTo(px, py); }
     }
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   function drawPolar(pd: PlotData, color: string): void {
@@ -613,6 +651,13 @@ export function create2DGraph(
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    if (pd.lineStyle === "dashed") {
+      ctx.setLineDash([8, 4]);
+    } else if (pd.lineStyle === "dotted") {
+      ctx.setLineDash([2, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
     ctx.beginPath();
 
     let moved = false;
@@ -629,6 +674,7 @@ export function create2DGraph(
       else { ctx.lineTo(px, py); }
     }
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // ── Point ───────────────────────────────────────────────────────
@@ -701,10 +747,7 @@ export function create2DGraph(
     ctx.setLineDash([]);
 
     // Draw shaded region (iterate x pixels, fill vertical strips)
-    // Parse the color hex to get rgba with alpha
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
+    const [r, g, b] = colorToRGB(color);
     ctx.fillStyle = `rgba(${r},${g},${b},0.20)`;
 
     for (let px = 0; px < logicalWidth; px += 1) {
@@ -773,9 +816,7 @@ export function create2DGraph(
     for (; lv <= zHi; lv += step) levels.push(lv);
     if (levels.length === 0) return;
 
-    const cr = parseInt(color.slice(1, 3), 16);
-    const cg = parseInt(color.slice(3, 5), 16);
-    const cb = parseInt(color.slice(5, 7), 16);
+    const [cr, cg, cb] = colorToRGB(color);
 
     for (let li = 0; li < levels.length; li++) {
       const level = levels[li];
@@ -903,6 +944,69 @@ export function create2DGraph(
     }
   }
 
+  // ── ODE Phase Portrait ───────────────────────────────────────────
+
+  function drawODEPhase(
+    pd: PlotData, _color: string,
+    xMin: number, xMax: number, yMin: number, yMax: number,
+  ): void {
+    const fn = pd.compiledFns[0];
+    if (!fn) return;
+
+    const xRange: [number, number] = [xMin, xMax];
+    const yRange: [number, number] = [yMin, yMax];
+
+    // 1. Direction field — light-gray arrows centered at each grid point
+    const arrows = computeDirectionField(fn, xRange, yRange, 20);
+    ctx.strokeStyle = isDark
+      ? "rgba(150,150,180,0.4)"
+      : "rgba(100,100,130,0.35)";
+    ctx.lineWidth = 1;
+    for (const { x, y, dx, dy } of arrows) {
+      const px  = mathToPixelX(x);
+      const py  = mathToPixelY(y);
+      const px2 = mathToPixelX(x + dx);
+      const py2 = mathToPixelY(y + dy);
+      const hx  = (px2 - px) / 2;
+      const hy  = (py2 - py) / 2;
+      ctx.beginPath();
+      ctx.moveTo(px - hx, py - hy);
+      ctx.lineTo(px + hx, py + hy);
+      ctx.stroke();
+    }
+
+    // 2. Solution curves — each in a distinct color from the palette
+    const curves = generateSolutionCurves(fn, xRange, yRange, 12);
+    const palette = [
+      "#e74c3c", "#3498db", "#2ecc71", "#e67e22", "#9b59b6", "#1abc9c",
+      "#f1c40f", "#e91e63", "#00bcd4", "#8bc34a", "#ff5722", "#607d8b",
+    ];
+    for (let ci = 0; ci < curves.length; ci++) {
+      const curve = curves[ci];
+      ctx.strokeStyle = palette[ci % palette.length];
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      let started = false;
+      for (const [cx, cy] of curve) {
+        const px = mathToPixelX(cx);
+        const py = mathToPixelY(cy);
+        // Clip: skip points well outside the canvas to avoid glitching artefacts
+        if (px < -50 || px > logicalWidth + 50 || py < -50 || py > logicalHeight + 50) {
+          started = false;
+          continue;
+        }
+        if (!started) {
+          ctx.moveTo(px, py);
+          started = true;
+        } else {
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.stroke();
+    }
+  }
+
   // ── Region Fill (between two curves) ─────────────────────────────
 
   function drawRegionFill(pd1: PlotData, pd2: PlotData, color: string): void {
@@ -910,9 +1014,7 @@ export function create2DGraph(
     const fn2 = pd2.compiledFns[0];
     if (!fn1 || !fn2) return;
 
-    const cr = parseInt(color.slice(1, 3), 16);
-    const cg = parseInt(color.slice(3, 5), 16);
-    const cb = parseInt(color.slice(5, 7), 16);
+    const [cr, cg, cb] = colorToRGB(color);
     ctx.fillStyle = `rgba(${cr},${cg},${cb},0.20)`;
 
     for (let px = 0; px < logicalWidth; px += 1) {

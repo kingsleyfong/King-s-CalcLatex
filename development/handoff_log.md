@@ -1,6 +1,58 @@
 # Handoff Log: King's CalcLatex Session Summary
 
-## Session: 2026-03-24 — High-Impact Feature Batch (4 parallel agents)
+## Session: 2026-03-24 (Part 2) — Tier 1 Competitive Features (3 parallel agents)
+
+### What Was Done
+
+#### New Features (implemented via 3 parallel Sonnet agents + orchestrator validation)
+
+1. **Per-expression colors + line styles** (`engine/index.ts`, `renderer2d.ts`, `renderer3d.ts`)
+   - `#colorname` suffix (red, blue, green, orange, purple, cyan, yellow, pink, etc.)
+   - `#hexcode` suffix (3-digit and 6-digit hex)
+   - `--` for dashed lines, `..` for dotted lines
+   - 2D: `ctx.strokeStyle = pd.color`, `ctx.setLineDash()` per trace with proper reset
+   - 3D: `NAMED_COLORS` lookup map + hex parsing for Three.js material color override
+
+2. **Laplace transforms** (`engine/giac.ts`, `engine/evaluator.ts`)
+   - `giacLaplace(latex)` — Giac command `laplace(expr, t, s)`
+   - `giacILaplace(latex)` — Giac command `ilaplace(expr, s, t)`
+   - Smart variable detection: isolated character match (avoids false positives from `\sin`, `\tan`, etc.)
+
+3. **ODE solving + phase portraits** (`engine/ode.ts` NEW, `engine/index.ts`, `renderer2d.ts`)
+   - `solveODE_RK4()` — textbook 4th-order Runge-Kutta numerical solver
+   - `computeDirectionField()` — arrow grid for y' = f(x,y)
+   - `generateSolutionCurves()` — RK4 from multiple initial conditions
+   - `buildODESpec()` — strips y'/frac{dy}{dx}/dot{y} prefix, compiles with [x,y]
+   - `drawODEPhase()` — gray direction field + colored solution curves in 2D canvas
+
+#### Bugs Found & Fixed by Validation Agent
+
+| # | Severity | Fix |
+|---|----------|-----|
+| 1 | HIGH | Color regex `\d{3}\|\d{6}` → `[0-9a-fA-F]{3}\|[0-9a-fA-F]{6}` (hex letters not matched) |
+| 2 | HIGH | `drawInequality`/`drawContour`/`drawRegionFill` — `parseInt(color.slice(1,3), 16)` → `colorToRGB()` helper (named colors like "red" produced NaN) |
+| 3 | MEDIUM | `giacLaplace` variable detection — `latex.includes("t")` → `/(?<![a-zA-Z\\])t(?![a-zA-Z])/` (false positive on `\tan`, `\sqrt`, etc.) |
+| 4 | MEDIUM | `giacILaplace` variable detection — same isolated-char regex fix for `s` |
+
+### Files Modified
+- `src/types.ts` — added EvalMode "laplace"/"ilaplace", PlotMode "phase"/"ode", ExprType "ode_phase", PlotData color?/lineStyle?
+- `src/editor/triggers.ts` — @laplace, @ilaplace, @phase, @ode trigger patterns
+- `src/engine/index.ts` — color/style extraction in preparePlot, buildODESpec(), hex regex fix
+- `src/engine/giac.ts` — giacLaplace(), giacILaplace() with isolated variable detection
+- `src/engine/evaluator.ts` — "laplace"/"ilaplace" cases calling giac functions
+- `src/engine/ode.ts` — NEW: solveODE_RK4, computeDirectionField, generateSolutionCurves
+- `src/renderer/renderer2d.ts` — pd.color/lineStyle, drawODEPhase(), colorToRGB() helper
+- `src/renderer/renderer3d.ts` — NAMED_COLORS map, pd.color applied to 3D materials
+
+### Next Session Priorities
+1. Tables + scatter plots + regression
+2. Animation export (GIF / slider animation)
+3. Mobile touch events
+4. Giac lazy loading (19MB startup cost)
+
+---
+
+## Session: 2026-03-24 (Part 1) — High-Impact Feature Batch (4 parallel agents)
 
 ### What Was Done
 
@@ -48,12 +100,6 @@
 - `src/engine/evaluator.ts` — trySummationProduct()
 - `src/engine/parser.ts` — tryParsePiecewise(), conditionToInfix(), Piecewise/Which in jsonToInfix
 - `src/engine/index.ts` — domain restriction regex + wrapper in buildPlotData()
-
-### Next Session Priorities
-1. Tables + scatter plots + regression
-2. Per-expression color picker
-3. Systems of equations
-4. Animation export (GIF)
 
 ---
 
