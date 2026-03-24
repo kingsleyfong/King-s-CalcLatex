@@ -1,5 +1,62 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-03-24 — High-Impact Feature Batch (4 parallel agents)
+
+### What Was Done
+
+#### New Features (all implemented via parallel Sonnet agents, validated, and deployed)
+
+1. **Height-based 3D surface coloring** (`renderer3d.ts`)
+   - `heightToColor(t)` — 5-stop gradient: deep blue → cyan → green → yellow → red
+   - `buildExplicit3DMesh()` adds per-vertex color attribute normalized to z range
+   - `buildExplicit3D()` uses `vertexColors: true` on MeshPhongMaterial
+   - Flat surfaces (zMin ≈ zMax) get uniform mid-green
+
+2. **Slider range customization** (`widgets.ts`, `styles/main.css`)
+   - Editable min/max number inputs flanking each slider
+   - Bounds validated (min < max), step auto-recalculated as (max-min)/200
+   - Current value clamped when bounds change
+   - Animation speed auto-adapts to new range
+
+3. **Summation & product evaluation** (`evaluator.ts`)
+   - `trySummationProduct()` detects `\sum_{var=lo}^{hi} body` and `\prod_{var=lo}^{hi} body`
+   - Body compiled via `compileToFunction`, iterated from lo to hi
+   - Capped at 100,000 iterations
+   - Works with both `=` (exact) and `\approx` (approximate) triggers
+
+4. **Piecewise functions** (`parser.ts`)
+   - `tryParsePiecewise()` string-level preprocessor for `\begin{cases}...\end{cases}`
+   - Splits on `\\` and `&`, builds `["Piecewise", [expr, cond], ...]` MathJSON
+   - `conditionToInfix()` converts Less/Greater/And/Or/Not to JS booleans
+   - `jsonToInfix()` handles Piecewise/Which heads via nested ternary
+
+5. **Domain restrictions** (`engine/index.ts`)
+   - Regex detects `\{lo OP var OP hi\}` suffix in buildPlotData()
+   - Supports <, >, ≤, ≥, \le, \leq, \ge, \geq and reversed forms
+   - Compiled functions wrapped to return NaN outside [lo, hi]
+   - Bug fix: uses Math.min/max to normalize regardless of operator direction
+
+### Validation
+- Full code review agent verified all 4 features + regression check on existing functionality
+- One bug found and fixed: domain restriction reversed operator `\{5 > x > 0\}` normalization
+- Clean build, deployed to Obsidian
+
+### Files Modified
+- `src/renderer/renderer3d.ts` — heightToColor(), vertex colors in buildExplicit3DMesh/buildExplicit3D
+- `src/editor/widgets.ts` — minInput/maxInput in addSliders()
+- `styles/main.css` — .kcl-slider-bound styles
+- `src/engine/evaluator.ts` — trySummationProduct()
+- `src/engine/parser.ts` — tryParsePiecewise(), conditionToInfix(), Piecewise/Which in jsonToInfix
+- `src/engine/index.ts` — domain restriction regex + wrapper in buildPlotData()
+
+### Next Session Priorities
+1. Tables + scatter plots + regression
+2. Per-expression color picker
+3. Systems of equations
+4. Animation export (GIF)
+
+---
+
 ## Session: 2026-03-23 — 3D Quality Fixes + Feature Batch + Documentation
 
 ### What Was Done

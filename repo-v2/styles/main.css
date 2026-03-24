@@ -490,3 +490,22 @@
   color: var(--text-accent);
   background: var(--background-modifier-hover);
 }
+
+/* ── Slider Range Bound Inputs (min / max) ────────────────── */
+
+.kcl-slider-bound {
+  width: 45px;
+  padding: 1px 3px;
+  font-size: 11px;
+  text-align: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  flex-shrink: 0;
+}
+
+.kcl-slider-bound:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}

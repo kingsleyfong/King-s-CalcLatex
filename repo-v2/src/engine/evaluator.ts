@@ -276,6 +276,116 @@ async function tryDefiniteIntegral(
 }
 
 /**
+ * Detect and evaluate \sum and \prod notation.
+ *
+ * Handles forms like:
+ *   \sum_{n=1}^{10} n^2       → 385
+ *   \prod_{k=1}^{5} k          → 120
+ *   \sum_{i=0}^{100} \frac{1}{2^i}
+ *
+ * Returns null if the pattern is not matched or bounds are non-numeric,
+ * allowing the caller to fall through to regular evaluation.
+ */
+async function trySummationProduct(
+  rawLatex: string,
+  mode: EvalMode,
+  diagnostics: Diagnostic[],
+  precision?: number,
+): Promise<Result<EvalResult> | null> {
+  // Strip leading/trailing whitespace for matching
+  const stripped = rawLatex.trim();
+
+  // Match braced form: \sum_{var=lo}^{hi} body  or  \prod_{var=lo}^{hi} body
+  const m = stripped.match(
+    /^\\(sum|prod)\s*_\{([a-zA-Z])\s*=\s*([^{}]+)\}\s*\^\{([^{}]+)\}\s*([\s\S]+)$/,
+  );
+
+  if (!m) return null;
+
+  const opName  = m[1] as "sum" | "prod";
+  const varName = m[2];
+  const loStr   = m[3].trim();
+  const hiStr   = m[4].trim();
+  const body    = m[5].trim();
+
+  // Parse bounds as numeric values via CortexJS
+  let loNum: number;
+  let hiNum: number;
+  try {
+    const ce = getCE();
+    const loVal = ce.parse(loStr).N().valueOf();
+    const hiVal = ce.parse(hiStr).N().valueOf();
+    loNum = typeof loVal === "number" ? loVal : Number(loVal);
+    hiNum = typeof hiVal === "number" ? hiVal : Number(hiVal);
+  } catch {
+    return null; // bounds are non-numeric / symbolic — fall through
+  }
+
+  if (!Number.isFinite(loNum) || !Number.isFinite(hiNum)) return null;
+
+  // Bounds must be integers
+  loNum = Math.round(loNum);
+  hiNum = Math.round(hiNum);
+
+  // Compile the body as a function of the index variable
+  let bodyFn: (val: number) => number;
+  try {
+    const bodyExpr = parseLatex(body);
+    bodyFn = compileToFunction(bodyExpr, [varName]);
+  } catch {
+    return null; // body compilation failed — fall through
+  }
+
+  // Evaluate the sum / product with an iteration cap
+  const MAX_ITER = 100_000;
+  const steps = hiNum - loNum + 1;
+
+  let result: number;
+  if (opName === "sum") {
+    // Empty sum (lo > hi) → 0
+    if (steps <= 0) {
+      result = 0;
+    } else {
+      result = 0;
+      const cap = Math.min(steps, MAX_ITER);
+      for (let i = 0; i < cap; i++) {
+        result += bodyFn(loNum + i);
+      }
+    }
+  } else {
+    // Empty product (lo > hi) → 1
+    if (steps <= 0) {
+      result = 1;
+    } else {
+      result = 1;
+      const cap = Math.min(steps, MAX_ITER);
+      for (let i = 0; i < cap; i++) {
+        result *= bodyFn(loNum + i);
+      }
+    }
+  }
+
+  // Format the result
+  let resultStr: string;
+  if (mode === "approximate" && precision !== undefined && precision > 0) {
+    resultStr = parseFloat(result.toPrecision(precision)).toString();
+  } else {
+    // Exact / default: show integer if possible, otherwise full decimal
+    resultStr = Number.isInteger(result) ? result.toString() : result.toString();
+  }
+
+  const opLatex = opName === "sum" ? "\\sum" : "\\prod";
+  const resultLatex = `${opLatex}_{${varName}=${loStr}}^{${hiStr}} ${body} = ${resultStr}`;
+
+  diagnostics.push({
+    level: "info",
+    message: `${opName === "sum" ? "Summation" : "Product"} evaluated over ${varName} = ${loNum} to ${hiNum}: ${resultStr}`,
+  });
+
+  return ok({ latex: resultLatex, text: `${resultStr}` }, diagnostics);
+}
+
+/**
  * Evaluate a LaTeX expression in the given mode.
  *
  * Modes:
@@ -319,6 +429,12 @@ export async function evaluate(
   if (mode === "exact" || mode === "approximate") {
     const defIntResult = await tryDefiniteIntegral(latex, mode, diagnostics, precision);
     if (defIntResult) return defIntResult;
+  }
+
+  // ── Summation / Product notation ──────────────────────────────────
+  if (mode === "exact" || mode === "approximate") {
+    const sumProdResult = await trySummationProduct(latex, mode, diagnostics, precision);
+    if (sumProdResult) return sumProdResult;
   }
 
   // ── Raw-LaTeX linear algebra pre-processing ───────────────────────

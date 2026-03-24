@@ -34,12 +34,67 @@ function stripDelimiters(latex: string): string {
 }
 
 /**
+ * Attempt to manually parse a \begin{cases}...\end{cases} block that
+ * CortexJS may not handle correctly. Returns a BoxedExpression with head
+ * "Piecewise" on success, or null if no cases block is present.
+ */
+function tryParsePiecewise(
+  latex: string,
+  ce: ComputeEngine,
+): BoxedExpression | null {
+  const casesMatch = latex.match(/\\begin\{cases\}([\s\S]+?)\\end\{cases\}/);
+  if (!casesMatch) return null;
+
+  const casesBody = casesMatch[1];
+  // Split rows on \\ (LaTeX row separator), filter empty
+  const rows = casesBody.split(/\\\\/).map(r => r.trim()).filter(r => r.length > 0);
+
+  const branches: [unknown, unknown][] = [];
+  for (const row of rows) {
+    // Each row: "expression & condition" or "expression & \text{otherwise}"
+    const parts = row.split("&").map(p => p.trim());
+    if (parts.length < 2) {
+      // No & separator — treat as unconditional default branch
+      const expr = ce.parse(parts[0]);
+      branches.push([expr.json, "True"]);
+    } else {
+      const expr = ce.parse(parts[0]);
+      const rawCond = parts[1]
+        .replace(/\\text\{otherwise\}/gi, "")
+        .replace(/\\text\{else\}/gi, "")
+        .replace(/\\text\{[^}]*\}/gi, "") // strip any other \text{...}
+        .trim();
+      if (
+        rawCond === "" ||
+        rawCond.toLowerCase() === "otherwise" ||
+        rawCond.toLowerCase() === "else"
+      ) {
+        branches.push([expr.json, "True"]);
+      } else {
+        const cond = ce.parse(rawCond);
+        branches.push([expr.json, cond.json]);
+      }
+    }
+  }
+
+  if (branches.length === 0) return null;
+  return ce.box(["Piecewise", ...branches] as any);
+}
+
+/**
  * Parse a LaTeX string into a CortexJS BoxedExpression.
  * Strips math delimiters automatically.
+ * Intercepts \begin{cases}...\end{cases} before CortexJS sees it,
+ * building a Piecewise expression manually for reliable branch handling.
  */
 export function parseLatex(latex: string): BoxedExpression {
   const ce = getCE();
   const clean = stripDelimiters(latex);
+
+  // Handle \begin{cases}...\end{cases} manually — CortexJS may not parse it
+  const piecewiseResult = tryParsePiecewise(clean, ce);
+  if (piecewiseResult) return piecewiseResult;
+
   return ce.parse(clean);
 }
 
@@ -83,6 +138,47 @@ const UNARY_FN_MAP: Record<string, string> = {
   Round: "round",
   Sign: "sign",
 };
+
+/**
+ * Convert a MathJSON condition node (inside Piecewise/Which branches) into
+ * a JS-evaluable boolean expression string.
+ *
+ * Handles: Less, Greater, LessEqual, GreaterEqual, Equal, And, Or, Not,
+ * Element, NotElement, True, False, Otherwise.
+ * Falls back to jsonToInfix for unknown numeric nodes.
+ */
+function conditionToInfix(node: unknown): string {
+  if (typeof node === "string") {
+    if (node === "True" || node === "Otherwise") return "true";
+    if (node === "False") return "false";
+    return node;
+  }
+  if (!Array.isArray(node)) return "true";
+
+  const [head, ...args] = node as [string, ...unknown[]];
+
+  if (head === "Less" && args.length === 2)
+    return `(${jsonToInfix(args[0])} < ${jsonToInfix(args[1])})`;
+  if (head === "Greater" && args.length === 2)
+    return `(${jsonToInfix(args[0])} > ${jsonToInfix(args[1])})`;
+  if (head === "LessEqual" && args.length === 2)
+    return `(${jsonToInfix(args[0])} <= ${jsonToInfix(args[1])})`;
+  if (head === "GreaterEqual" && args.length === 2)
+    return `(${jsonToInfix(args[0])} >= ${jsonToInfix(args[1])})`;
+  if (head === "Equal" && args.length === 2)
+    return `(${jsonToInfix(args[0])} === ${jsonToInfix(args[1])})`;
+  if (head === "And")
+    return "(" + args.map(conditionToInfix).join(" && ") + ")";
+  if (head === "Or")
+    return "(" + args.map(conditionToInfix).join(" || ") + ")";
+  if (head === "Not" && args.length === 1)
+    return `(!${conditionToInfix(args[0])})`;
+  if (head === "Element" || head === "NotElement")
+    return "true"; // unsupported membership test — pass through
+
+  // Fallback: numeric expression used directly as condition value
+  return jsonToInfix(node);
+}
 
 /**
  * Convert a MathJSON node (from `expr.json`) into an infix string that
@@ -133,6 +229,46 @@ function jsonToInfix(node: unknown): string {
     // ["Delimiter", inner, open, close] — parenthesized expression
     if (head === "Delimiter" && args.length >= 1) {
       return jsonToInfix(args[0]);
+    }
+    // ────────────────────────────────────────────────────────────────
+
+    // ── Piecewise / Which → nested JS ternary ──────────────────────
+    // CortexJS parses \begin{cases}...\end{cases} into one of:
+    //   ["Piecewise", [expr1, cond1], [expr2, cond2], ...]
+    //   ["Which", cond1, expr1, cond2, expr2, ...]
+    if (head === "Piecewise") {
+      const branches = args.map(a => {
+        if (Array.isArray(a) && a.length >= 2) {
+          return { expr: jsonToInfix(a[0]), cond: conditionToInfix(a[1]) };
+        }
+        return { expr: jsonToInfix(a), cond: "true" };
+      });
+      // Build nested ternary: (cond1 ? expr1 : (cond2 ? expr2 : (0/0)))
+      let result = "(0/0)"; // NaN sentinel for unmatched branch
+      for (let i = branches.length - 1; i >= 0; i--) {
+        const b = branches[i];
+        if (b.cond === "true") {
+          result = b.expr; // default/else branch — no conditional needed
+        } else {
+          result = `(${b.cond} ? ${b.expr} : ${result})`;
+        }
+      }
+      return result;
+    }
+
+    if (head === "Which") {
+      // ["Which", cond1, expr1, cond2, expr2, ...]  (alternating cond/expr pairs)
+      let result = "(0/0)";
+      for (let i = args.length - 2; i >= 0; i -= 2) {
+        const cond = conditionToInfix(args[i]);
+        const expr = jsonToInfix(args[i + 1]);
+        if (cond === "true") {
+          result = expr;
+        } else {
+          result = `(${cond} ? ${expr} : ${result})`;
+        }
+      }
+      return result;
     }
     // ────────────────────────────────────────────────────────────────
 

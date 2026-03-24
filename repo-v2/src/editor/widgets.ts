@@ -242,6 +242,38 @@ function addSliders(
 
     input.addEventListener("input", updateFromSlider);
 
+    const minInput = document.createElement("input");
+    minInput.type = "number";
+    minInput.className = "kcl-slider-bound";
+    minInput.value = "-10";
+    minInput.step = "any";
+    minInput.addEventListener("change", () => {
+      const newMin = parseFloat(minInput.value);
+      if (!isFinite(newMin) || newMin >= parseFloat(maxInput.value)) return;
+      input.min = String(newMin);
+      input.step = String((parseFloat(input.max) - newMin) / 200);
+      if (parseFloat(input.value) < newMin) {
+        input.value = String(newMin);
+        updateFromSlider();
+      }
+    });
+
+    const maxInput = document.createElement("input");
+    maxInput.type = "number";
+    maxInput.className = "kcl-slider-bound";
+    maxInput.value = "10";
+    maxInput.step = "any";
+    maxInput.addEventListener("change", () => {
+      const newMax = parseFloat(maxInput.value);
+      if (!isFinite(newMax) || newMax <= parseFloat(minInput.value)) return;
+      input.max = String(newMax);
+      input.step = String((newMax - parseFloat(input.min)) / 200);
+      if (parseFloat(input.value) > newMax) {
+        input.value = String(newMax);
+        updateFromSlider();
+      }
+    });
+
     // Animation loop
     let animThrottleAccum = 0;
     const ANIM_FRAME_INTERVAL = 1000 / 30; // ~30fps throttle
@@ -297,7 +329,9 @@ function addSliders(
 
     row.appendChild(playBtn);
     row.appendChild(label);
+    row.appendChild(minInput);
     row.appendChild(input);
+    row.appendChild(maxInput);
     row.appendChild(valueDisplay);
     sliderContainer.appendChild(row);
   }

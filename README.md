@@ -13,6 +13,8 @@ Type LaTeX inside `$...$` and add a trigger suffix:
 | `$\sin(\pi/4) \approx$` | `0.707106781187` |
 | `$x^2 + 2x + 1 \equiv$` | `(x+1)^2` |
 | `$\int_0^{\pi} \sin(x)\,dx =$` | `2` |
+| `$\sum_{n=1}^{10} n^2 =$` | `385` |
+| `$\prod_{k=1}^{5} k =$` | `120` |
 
 ### Symbolic CAS
 Differentiation, integration, solving, factoring — all in-browser.
@@ -48,10 +50,14 @@ $r = 1 + \cos(\theta) @plot2d$
 $y > \sin(x) @plot2d$
 $y = a\sin(bx) @plot2d$          ← auto-generates sliders for a, b
 $(5,5) @plot2d$                  ← renders as filled dot
+$y = \begin{cases} x^2 & x > 0 \\ -x & x \leq 0 \end{cases} @plot2d$
+$y = \sin(x) \{0 < x < 2\pi\} @plot2d$
 ```
 
+Free variables auto-generate sliders with editable min/max bounds.
+
 ### 3D Graphing
-WebGL surfaces, implicit surfaces (marching cubes), parametric curves, vectors, and points with click-to-interact rotation. All three axes use 1:1:1 proportional scaling by default (consistent with Desmos/GeoGebra behavior). Analytical planes fill the full bounding box with no diamond artifacts.
+WebGL surfaces, implicit surfaces (marching cubes), parametric curves, vectors, and points with click-to-interact rotation. All three axes use 1:1:1 proportional scaling by default (consistent with Desmos/GeoGebra behavior). Analytical planes fill the full bounding box with no diamond artifacts. Explicit surfaces use height-based coloring (blue-to-red gradient by z-value) for Desmos-style visualization.
 
 ```
 $z = x^2 + y^2 @plot3d$
