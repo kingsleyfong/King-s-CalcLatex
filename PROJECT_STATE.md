@@ -8,7 +8,7 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v2.0 Path C — Giac WASM integrated, 2026-03-23)
+## Current Status: 🟢 WORKING (v2.0 Path C — Giac WASM integrated, 2026-03-24)
 
 ### What Happened
 On 2026-03-16, after analyzing v1's fundamental architecture limitations, decided to pursue **Path C** — a full browser-native rewrite. The v1 architecture (Python/SymPy/Plotly → HTTP → iframe) had rendering limitations that could never reach Desmos-level UX:
@@ -53,6 +53,7 @@ On 2026-03-16, after analyzing v1's fundamental architecture limitations, decide
 - [x] `@convert <unit>` unit conversion
 - [x] `@steps` — step-by-step CAS solution walkthrough (Giac debug capture, classified into named calculus rules) (2026-03-23)
 - [x] Definite integral evaluation: `\int_a^b f(x)\,dx =` renders with notation and numeric result via Simpson's rule (2026-03-23)
+- [x] `\sum_{n=lo}^{hi}` and `\prod_{n=lo}^{hi}` — finite summation and product evaluation, capped at 100k iterations (2026-03-24)
 
 #### CAS Triggers (all new, 2026-03-19)
 - [x] `@diff` — symbolic differentiation (auto-detects variable)
@@ -83,6 +84,8 @@ On 2026-03-16, after analyzing v1's fundamental architecture limitations, decide
 - [x] Points: `(5,5)` — filled dot with coordinate label
 - [x] Multi-equation overlay (semicolon-separated)
 - [x] POIs: roots, extrema, intersections
+- [x] Piecewise functions: `\begin{cases}` with conditional branches compiled to nested ternary (2026-03-24)
+- [x] Domain restrictions: `\{0 < x < 5\}` suffix clips compiled functions to specified interval (2026-03-24)
 
 #### 3D Graphing (`@plot3d`)
 - [x] Explicit surfaces: `z = f(x,y)` — z-clamping to prevent cube overflow
@@ -96,6 +99,7 @@ On 2026-03-16, after analyzing v1's fundamental architecture limitations, decide
 - [x] 2D expressions promoted to 3D when in `@plot3d` mode
 - [x] Default 1:1:1 proportional axis scaling (autoScaleZ3d setting, default: off) (2026-03-23)
 - [x] Analytical plane rendering for implicit_3d — planes render as full box-filling polygons, not diamond artifacts from marching cubes (2026-03-23)
+- [x] Height-based vertex coloring for explicit_3d surfaces — 5-stop blue→cyan→green→yellow→red gradient by z-value (2026-03-24)
 
 #### Calc 3 Plot Modes
 - [x] `@contour` — contour/iso-level curves of f(x,y)
@@ -114,14 +118,15 @@ On 2026-03-16, after analyzing v1's fundamental architecture limitations, decide
 #### Export & UI
 - [x] PNG download button on 2D and 3D graph toolbars (2026-03-23)
 - [x] Screenshot-to-clipboard button on graph toolbars (2026-03-23)
+- [x] Per-slider editable min/max bounds — click to customize range instead of fixed ±10 (2026-03-24)
 
 ### Known Issues
 - 3D interactive mode: only one graph interactive at a time (by design — Chrome 16-context limit)
-- Parameter sliders: fixed range ±10, step 0.1 — no per-slider customization yet
 - `giacwasm.js` is 19MB — loaded on plugin startup; no lazy-loading yet
 - 3D static snapshot of parametric curves may appear thin; click to interact
-- No piecewise function support
 - No table/data/regression features
+- Piecewise: CortexJS may not parse all `\begin{cases}` forms; string-level preprocessor handles most common patterns
+- Summation: only braced bound form `_{n=1}^{10}` supported; unbraced `_1^{10}` falls through to CortexJS
 
 ### All Runtime Bugs Fixed (cumulative)
 1. **Block decorations RangeError** — ViewPlugin → StateField
@@ -212,13 +217,10 @@ Do not create persistent WebGL contexts. Use `renderSnapshot()` (creates context
 Use `jsonToLatex(expr.json)` (defined in `parser.ts`) whenever you need a LaTeX string from a CortexJS expression that came back from a CAS operation. The `.latex` getter silently returns wrong/empty strings for several expression forms.
 
 ## Next Steps (Priority Order)
-1. **Slider range customization** — per-slider min/max/step instead of fixed ±10
-2. **Piecewise functions** — `{x>0: x^2, x<=0: -x}` syntax support
-3. **Tables + scatter plots** — data entry and regression
-4. **Summation/product notation** — `\sum_{n=1}^{10} n^2 =` evaluation
-5. **Per-expression colors** — color picker per curve
-6. **Height-based 3D surface coloring** — color gradient by z value (Desmos-style)
-7. **Systems of equations** — simultaneous solving
-8. **Domain restrictions** — `y=x^2 {0<x<5}` syntax
-9. **Mobile** — touch event handling for 2D pan/zoom
-10. **Performance profiling** — Giac 19MB load time; investigate lazy loading
+1. **Tables + scatter plots** — data entry and regression
+2. **Per-expression colors** — color picker per curve
+3. **Systems of equations** — simultaneous solving
+4. **Domain restrictions with inequality operators** — e.g. `y = x^2 {x \geq 0}` single-bound form
+5. **Animation export** — GIF export
+6. **Mobile** — touch event handling for 2D pan/zoom
+7. **Performance profiling** — Giac 19MB load time; investigate lazy loading

@@ -660,6 +660,40 @@ function buildPlotData(
   diagnostics: Diagnostic[],
 ): PlotData | null {
   try {
+    // ── Domain restriction: strip \{lo < var < hi\} suffix ──────
+    // Supports:  \{0 < x < 5\}  or  {0 < x < 5}
+    // Inequality symbols: <, >, ≤, ≥, \le, \leq, \ge, \geq
+    let domainRestriction: { varName: string; lo: number; hi: number } | null = null;
+    const _ltPat = "(?:<|\\\\le(?:q)?\\b|≤)";
+    const _gtPat = "(?:>|\\\\ge(?:q)?\\b|≥)";
+    // Pattern: \{num <|≤ var <|≤ num\} OR \{num >|≥ var >|≥ num\}
+    const _domainRe = new RegExp(
+      String.raw`\\?\{` +
+      String.raw`\s*([\d.eE+\-]+)\s*` +
+      `(?:${_ltPat}|${_gtPat})` +
+      String.raw`\s*([a-zA-Z])\s*` +
+      `(?:${_ltPat}|${_gtPat})` +
+      String.raw`\s*([\d.eE+\-]+)\s*` +
+      String.raw`\\?\}\s*$`,
+    );
+    const domainMatch = latex.match(_domainRe);
+    if (domainMatch) {
+      const a = parseFloat(domainMatch[1]);
+      const b = parseFloat(domainMatch[3]);
+      const varName = domainMatch[2];
+      // Normalize: always lo < hi regardless of operator direction (handles {5 > x > 0})
+      const lo = Math.min(a, b);
+      const hi = Math.max(a, b);
+      if (isFinite(lo) && isFinite(hi) && lo < hi) {
+        domainRestriction = { varName, lo, hi };
+        latex = latex.replace(domainMatch[0], "").trim();
+        diagnostics.push({
+          level: "info",
+          message: `Domain restriction: ${varName} ∈ [${lo}, ${hi}]`,
+        });
+      }
+    }
+
     // ── Inequality handling ──────────────────────────────────────
     if (exprType === "inequality_2d") {
       return buildInequalityPlotData(latex, diagnostics);
@@ -757,12 +791,29 @@ function buildPlotData(
     const vars = getVarsForType(exprType);
     const compiledFn = compileToFunction(plotExpr, vars);
 
-    return {
+    const plotData: PlotData = {
       latex,
       type: exprType,
       fnStrings: [fnStr],
       compiledFns: [compiledFn],
     };
+
+    // ── Apply domain restriction wrapper ────────────────────────
+    if (domainRestriction) {
+      const { varName, lo, hi } = domainRestriction;
+      const varIdx = vars.indexOf(varName);
+      if (varIdx >= 0) {
+        plotData.compiledFns = plotData.compiledFns.map(fn => {
+          return (...args: number[]): number => {
+            const v = args[varIdx];
+            if (v < lo || v > hi) return NaN;
+            return fn(...args);
+          };
+        });
+      }
+    }
+
+    return plotData;
   } catch (e) {
     diagnostics.push({
       level: "error",

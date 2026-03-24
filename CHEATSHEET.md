@@ -72,6 +72,19 @@ $\frac{x^2 - 1}{x - 1} \equiv$    → x + 1
 $\sin^2(x) + \cos^2(x) \equiv$    → 1
 ```
 
+### `\sum` / `\prod` — Summation and Product Notation
+
+Evaluates finite sums and products. Use braced bounds: `_{var=lo}^{hi}`.
+
+```
+$\sum_{n=1}^{10} n^2 =$                 → 385
+$\sum_{n=0}^{100} \frac{1}{2^n} \approx$ → 2.0
+$\prod_{k=1}^{5} k =$                   → 120 (5!)
+$\sum_{i=1}^{4} i^3 =$                  → 100
+```
+
+> Iteration is capped at 100,000 terms. Both `=` and `\approx` triggers work.
+
 ---
 
 ## 2. Symbolic CAS — Core Operations
@@ -331,6 +344,28 @@ $(5, 5) @plot2d$                    — filled dot with coordinate label
 $(0,0); (3,4) @plot2d$             — multiple points
 ```
 
+### Piecewise Functions
+
+Use `\begin{cases}...\end{cases}` with conditions separated by `&`.
+
+```
+$y = \begin{cases} x^2 & x > 0 \\ -x & x \leq 0 \end{cases} @plot2d$
+$y = \begin{cases} \sin(x) & x < \pi \\ 0 & \text{otherwise} \end{cases} @plot2d$
+```
+
+Each branch is evaluated conditionally. Gaps appear at discontinuities.
+
+### Domain Restrictions
+
+Append `\{lo < var < hi\}` to clip an expression to a specific interval.
+
+```
+$y = x^2 \{0 < x < 5\} @plot2d$         — parabola only on [0, 5]
+$y = \sin(x) \{-\pi < x < \pi\} @plot2d$ — one period of sine
+```
+
+Supports `<`, `>`, `\le`, `\leq`, `\ge`, `\geq`. Also works with reversed notation: `\{5 > x > 0\}`.
+
 ### Multi-Equation Overlay
 
 Separate expressions with semicolons. Each gets a distinct color.
@@ -364,6 +399,8 @@ $z = \sin(x)\cos(y) @plot3d$       — egg-carton
 $z = x^2 - y^2 @plot3d$           — saddle (hyperbolic paraboloid)
 $z = e^{-(x^2+y^2)} @plot3d$       — Gaussian bell
 ```
+
+> Explicit surfaces use height-based vertex coloring — a blue-to-red gradient mapped to the z-value range, matching Desmos/GeoGebra visual style.
 
 ### Implicit Surfaces
 
@@ -536,6 +573,7 @@ Open **Obsidian Settings → King's CalcLatex**.
 | `+` / `-` | Zoom in/out |
 | Grid button (top-right) | Toggle: All / Major / None |
 | POI button | Show/hide roots, extrema, intersections |
+| Slider min/max | Edit bounds | Click the min or max number next to a slider to set custom range |
 
 ### 3D Graphs
 
@@ -644,6 +682,15 @@ $y = x^2; y = 2x @region$
 $\langle 1,2,3 \rangle @geom$
 ```
 
+### Summation & Piecewise
+
+```
+$\sum_{n=1}^{10} n^2 =$
+$\prod_{k=1}^{5} k =$
+$y = \begin{cases} x^2 & x > 0 \\ -x & x \leq 0 \end{cases} @plot2d$
+$y = x^2 \{0 < x < 5\} @plot2d$
+```
+
 ---
 
 ## 16. CAS Capability Summary
@@ -662,6 +709,7 @@ $\langle 1,2,3 \rangle @geom$
 | Taylor series (`@taylor`) | Not available | Giac |
 | Partial fractions (`@partfrac`) | Not available | Giac |
 | Steps (`@steps`) | Not available | Giac (step-by-step walkthrough) |
+| Summation/Product (`\sum`, `\prod`) | Numeric evaluation | Numeric evaluation |
 
 > Giac WASM (`giacwasm.js`) is ~19 MB and loaded on demand. Toggle it in Settings.
 

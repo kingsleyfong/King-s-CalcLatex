@@ -138,6 +138,45 @@ function rangeCenter(range: [number, number]): number {
   return (range[0] + range[1]) / 2;
 }
 
+/**
+ * Map a normalized height t ∈ [0,1] to an RGB color using a 5-stop
+ * Desmos-style gradient:
+ *   t=0.00 → deep blue  (0.05, 0.15, 0.65)
+ *   t=0.25 → cyan       (0.00, 0.75, 0.85)
+ *   t=0.50 → green      (0.15, 0.85, 0.25)
+ *   t=0.75 → yellow     (0.95, 0.85, 0.10)
+ *   t=1.00 → red        (0.90, 0.15, 0.10)
+ */
+function heightToColor(t: number): [number, number, number] {
+  const stops: [number, [number, number, number]][] = [
+    [0.00, [0.05, 0.15, 0.65]],
+    [0.25, [0.00, 0.75, 0.85]],
+    [0.50, [0.15, 0.85, 0.25]],
+    [0.75, [0.95, 0.85, 0.10]],
+    [1.00, [0.90, 0.15, 0.10]],
+  ];
+
+  // Clamp t to [0, 1]
+  const tc = Math.max(0, Math.min(1, t));
+
+  // Find surrounding stops and linearly interpolate
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [t0, c0] = stops[i];
+    const [t1, c1] = stops[i + 1];
+    if (tc <= t1) {
+      const alpha = (tc - t0) / (t1 - t0);
+      return [
+        c0[0] + alpha * (c1[0] - c0[0]),
+        c0[1] + alpha * (c1[1] - c0[1]),
+        c0[2] + alpha * (c1[2] - c0[2]),
+      ];
+    }
+  }
+
+  // Fallback: return the last stop color
+  return stops[stops.length - 1][1];
+}
+
 // ── Surface Builders ─────────────────────────────────────────────────
 
 /**
@@ -172,7 +211,22 @@ function buildExplicit3DMesh(
     }
   }
 
+  // ── Find zMin/zMax across all valid vertices for height coloring ──
+  let zMin = Infinity, zMax = -Infinity;
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      const z = zValues[i][j];
+      if (!isNaN(z)) {
+        if (z < zMin) zMin = z;
+        if (z > zMax) zMax = z;
+      }
+    }
+  }
+  const zSpanValid = zMax - zMin;
+  const flatSurface = zSpanValid < 1e-10 || !isFinite(zSpanValid);
+
   const positions: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
 
   for (let i = 0; i < nx; i++) {
@@ -181,6 +235,17 @@ function buildExplicit3DMesh(
       const y = yMin + j * dy;
       const z = zValues[i][j];
       positions.push(x, z, y); // Three.js Y-up: swap y/z
+
+      // Height-based vertex color
+      let r: number, g: number, b: number;
+      if (flatSurface || isNaN(z)) {
+        // Flat surface or invalid vertex → uniform mid-color (green)
+        [r, g, b] = [0.15, 0.85, 0.25];
+      } else {
+        const t = (z - zMin) / zSpanValid;
+        [r, g, b] = heightToColor(t);
+      }
+      colors.push(r, g, b);
     }
   }
 
@@ -204,6 +269,7 @@ function buildExplicit3DMesh(
 
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -861,12 +927,11 @@ function buildExplicit3D(
 
   const geometry = buildExplicit3DMesh(fn, ranges, GRID_RESOLUTION);
   const material = new MeshPhongMaterial({
-    color,
+    vertexColors: true,
     side: DoubleSide,
     transparent: true,
     opacity: 0.85,
-    shininess: 40,
-    specular: 0x444444,
+    shininess: 30,
   });
 
   const mesh = new Mesh(geometry, material);
