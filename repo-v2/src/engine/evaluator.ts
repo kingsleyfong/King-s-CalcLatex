@@ -25,6 +25,8 @@ import {
   giacExpand,
   giacSteps,
   giacIntegrate,
+  giacLaplace,
+  giacILaplace,
   latexToGiac,
   isGiacReady,
 } from "./giac";
@@ -500,6 +502,15 @@ export async function evaluate(
         return (await giacExpand(latex)) ?? err(giacOnlyError("Expand"));
       case "steps":
         return (await giacSteps(latex)) ?? err(giacOnlyError("Step-by-step"));
+
+      case "laplace": {
+        const laplaceResult = await giacLaplace(latex);
+        return laplaceResult ?? err(giacOnlyError("Laplace transform"));
+      }
+      case "ilaplace": {
+        const ilaplaceResult = await giacILaplace(latex);
+        return ilaplaceResult ?? err(giacOnlyError("Inverse Laplace transform"));
+      }
 
       case "convert": {
         // Expected syntax: `5 \text{ft} \to \text{m}` or `5\,\text{ft} \to \text{m}` or `5 ft \to m`

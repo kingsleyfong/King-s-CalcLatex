@@ -115,6 +115,25 @@ On 2026-03-16, after analyzing v1's fundamental architecture limitations, decide
 - [x] Determinant, transpose, inverse
 - [x] Dot product, matrix multiplication
 
+#### Laplace Transforms (2026-03-24 — Giac-powered)
+- [x] `@laplace` — forward Laplace transform (t → s) via Giac WASM
+- [x] `@ilaplace` — inverse Laplace transform (s → t) via Giac WASM
+- [x] Auto-detects time/frequency variable (isolated `t` or `s`, not inside `\tan`, `\sin`, etc.)
+
+#### ODE Phase Portraits (2026-03-24)
+- [x] `@phase` — direction field (gray arrows) + RK4 solution curves from multiple initial conditions
+- [x] `@ode` — direction field only (no solution curves)
+- [x] Supports `y' = f(x,y)`, `\frac{dy}{dx} = f(x,y)`, and `\dot{y} = f(x,y)` input formats
+- [x] RK4 solver with adaptive step limiting, divergence clipping (|y| > 1e6)
+- [x] New `engine/ode.ts` module: `solveODE_RK4`, `computeDirectionField`, `generateSolutionCurves`
+
+#### Per-Expression Colors & Line Styles (2026-03-24)
+- [x] `#colorname` suffix (red, blue, green, orange, purple, cyan, yellow, pink, white, black, gray)
+- [x] `#hexcode` suffix (3-digit and 6-digit hex: `#f00`, `#ff0000`)
+- [x] `--` suffix for dashed lines, `..` suffix for dotted lines
+- [x] Applied in 2D renderer (stroke color + setLineDash) and 3D renderer (material color via NAMED_COLORS map)
+- [x] Color parsing handles both named CSS colors and hex via offscreen canvas fallback
+
 #### Export & UI
 - [x] PNG download button on 2D and 3D graph toolbars (2026-03-23)
 - [x] Screenshot-to-clipboard button on graph toolbars (2026-03-23)
@@ -166,6 +185,7 @@ repo-v2/src/
 │   ├── parser.ts        ← CortexJS LaTeX→MathJSON, jsonToInfix, compileToFunction
 │   ├── evaluator.ts     ← Numeric/symbolic eval + linear algebra intercepts
 │   ├── cas.ts           ← Differentiate, integrate, solve, partials, gradient, normal
+│   ├── ode.ts           ← ODE RK4 solver, direction fields, solution curves
 │   ├── units.ts         ← Unit conversions via math.js
 │   └── poi.ts           ← Points of interest (roots, extrema, intersections)
 ├── renderer/
@@ -218,9 +238,9 @@ Use `jsonToLatex(expr.json)` (defined in `parser.ts`) whenever you need a LaTeX 
 
 ## Next Steps (Priority Order)
 1. **Tables + scatter plots** — data entry and regression
-2. **Per-expression colors** — color picker per curve
-3. **Systems of equations** — simultaneous solving
-4. **Domain restrictions with inequality operators** — e.g. `y = x^2 {x \geq 0}` single-bound form
-5. **Animation export** — GIF export
-6. **Mobile** — touch event handling for 2D pan/zoom
-7. **Performance profiling** — Giac 19MB load time; investigate lazy loading
+2. **Animation export** — GIF export / slider animation
+3. **Mobile** — touch event handling for 2D pan/zoom
+4. **Performance profiling** — Giac 19MB load time; investigate lazy loading
+5. **Color picker UI** — visual color selection per curve (currently suffix-only)
+6. **Higher-order ODE** — extend @phase to 2nd-order systems
+7. **Save/load graph state** — persist zoom level, slider values, interactive angle

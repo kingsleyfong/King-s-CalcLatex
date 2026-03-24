@@ -43,6 +43,8 @@ const TRIGGER_DEFS: TriggerDef[] = [
   { pattern: /@partfrac\s*$/, kind: "evaluate", mode: "partfrac" },
   { pattern: /@expand\s*$/,   kind: "evaluate", mode: "expand" },
   { pattern: /@steps\s*$/,    kind: "evaluate", mode: "steps" },
+  { pattern: /@laplace\s*$/,  kind: "evaluate", mode: "laplace" },
+  { pattern: /@ilaplace\s*$/, kind: "evaluate", mode: "ilaplace" },
 
   // Plot triggers
   { pattern: /@plot3d\s*$/,    kind: "plot", mode: "plot3d" },
@@ -53,6 +55,8 @@ const TRIGGER_DEFS: TriggerDef[] = [
   { pattern: /@gradient\s*$/,  kind: "plot", mode: "gradient" },
   { pattern: /@tangent\s*$/,   kind: "plot", mode: "tangent" },
   { pattern: /@region\s*$/,    kind: "plot", mode: "region" },
+  { pattern: /@phase\s*$/,    kind: "plot", mode: "phase" },
+  { pattern: /@ode\s*$/,      kind: "plot", mode: "ode" },
 
   // Persist trigger
   { pattern: /@persist\s*$/, kind: "persist", mode: "persist" },

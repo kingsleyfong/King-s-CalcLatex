@@ -32,6 +32,10 @@
 | `@vecfield` | Graphing | 2D or 3D vector field |
 | `@geom` | Graphing | Geometry mode (vectors, points) |
 | `@region` | Graphing | Shaded region between curves |
+| `@phase` | Graphing | ODE phase portrait (direction field + solution curves) |
+| `@ode` | Graphing | ODE direction field |
+| `@laplace` | CAS (Giac) | Laplace transform (t → s) |
+| `@ilaplace` | CAS (Giac) | Inverse Laplace transform (s → t) |
 
 > **Giac WASM** — Triggers marked "(Giac)" require `giacwasm.js` (19 MB) to be present in the plugin folder. Without it, those triggers return an unsupported message. All other triggers run on CortexJS + math.js.
 
@@ -512,9 +516,97 @@ $-y; x @vecfield 2.0$              — 200% scale (for sparse or low-magnitude f
 
 Default scale is set globally in plugin settings.
 
+### Per-Expression Colors
+
+Append `#colorname` or `#hexcode` after any sub-expression to override its color.
+
+```
+$y = \sin(x) #red; y = \cos(x) #blue @plot2d$
+$y = x^2 #ff8800; y = -x^2 #00aaff @plot2d$
+$z = x^2 + y^2 #green @plot3d$
+```
+
+Supported named colors: `red`, `blue`, `green`, `orange`, `purple`, `cyan`, `yellow`, `pink`, `white`, `black`, `gray`.
+
+### Line Styles
+
+Append `--` for dashed or `..` for dotted lines (after color, if both).
+
+```
+$y = \sin(x) --; y = \cos(x) .. @plot2d$
+$y = x^2 #red --; y = -x #blue .. @plot2d$
+```
+
+> Color suffix must come before line style suffix: `#red --` not `-- #red`.
+
 ---
 
-## 10. Special Modes
+## 10. ODE Phase Portraits (`@phase`, `@ode`)
+
+Solve first-order ODEs numerically and visualize direction fields + solution curves.
+
+### `@phase` — Direction Field + Solution Curves
+
+Draws a direction field (gray arrows) overlaid with multiple solution curves integrated from different initial conditions via RK4.
+
+```
+$y' = x - y @phase$                    — exponential approach
+$y' = y(1-y) @phase$                   — logistic growth
+$y' = \sin(x) - y @phase$             — oscillatory settling
+$y' = x^2 - y^2 @phase$              — nonlinear dynamics
+```
+
+### `@ode` — Direction Field Only
+
+Same direction field arrows but without solution curves.
+
+```
+$y' = -y @ode$                        — exponential decay field
+$y' = x + y @ode$                     — divergent field
+```
+
+### ODE Input Formats
+
+```
+$y' = f(x,y) @phase$                  — standard notation
+$\frac{dy}{dx} = f(x,y) @phase$       — Leibniz notation
+$\dot{y} = f(x,y) @phase$            — Newton notation
+```
+
+> Solution curves use RK4 (4th-order Runge-Kutta) with adaptive step limiting. Curves that diverge are clipped.
+
+---
+
+## 11. Laplace Transforms (`@laplace`, `@ilaplace`)
+
+Requires Giac WASM.
+
+### `@laplace` — Forward Laplace Transform
+
+Transforms a time-domain expression to the s-domain.
+
+```
+$t^2 @laplace$                         → 2/s³
+$e^{-3t} @laplace$                     → 1/(s+3)
+$\sin(2t) @laplace$                    → 2/(s²+4)
+$t e^{-t} @laplace$                    → 1/(s+1)²
+```
+
+### `@ilaplace` — Inverse Laplace Transform
+
+Transforms an s-domain expression back to time domain.
+
+```
+$\frac{1}{s^2+1} @ilaplace$           → sin(t)
+$\frac{s}{s^2+4} @ilaplace$           → cos(2t)
+$\frac{1}{(s+1)^2} @ilaplace$         → t·e^{-t}
+```
+
+> The variable is auto-detected: `t` for forward, `s` for inverse.
+
+---
+
+## 12. Special Modes
 
 ### `@geom` — Geometry Mode
 
@@ -539,7 +631,7 @@ $y = e^x; y = x + 2 @region$      — exponential vs. linear bound
 
 ---
 
-## 11. Settings
+## 13. Settings
 
 Open **Obsidian Settings → King's CalcLatex**.
 
@@ -560,7 +652,7 @@ Open **Obsidian Settings → King's CalcLatex**.
 
 ---
 
-## 12. Interaction
+## 14. Interaction
 
 ### 2D Graphs
 
@@ -587,7 +679,7 @@ Open **Obsidian Settings → King's CalcLatex**.
 
 ---
 
-## 13. Export
+## 15. Export
 
 | Button | Action |
 |:-------|:-------|
@@ -598,7 +690,7 @@ Both 2D and 3D graphs support export via toolbar buttons.
 
 ---
 
-## 14. Graph Inspector
+## 16. Graph Inspector
 
 Open via Command Palette: **King's CalcLatex: Open Graph Inspector**
 
@@ -610,7 +702,7 @@ Shows for the active graph:
 
 ---
 
-## 15. Test Equations
+## 17. Test Equations
 
 Copy-paste these to verify everything is working.
 
@@ -691,9 +783,20 @@ $y = \begin{cases} x^2 & x > 0 \\ -x & x \leq 0 \end{cases} @plot2d$
 $y = x^2 \{0 < x < 5\} @plot2d$
 ```
 
+### Colors, Styles & ODE
+
+```
+$y = \sin(x) #red; y = \cos(x) #blue @plot2d$
+$y = x^2 #ff8800 --; y = -x #green .. @plot2d$
+$y' = x - y @phase$
+$y' = y(1-y) @ode$
+$t^2 @laplace$
+$\frac{1}{s^2+1} @ilaplace$
+```
+
 ---
 
-## 16. CAS Capability Summary
+## 18. CAS Capability Summary
 
 | Operation | Without Giac | With Giac |
 |:----------|:------------|:---------|
@@ -709,13 +812,15 @@ $y = x^2 \{0 < x < 5\} @plot2d$
 | Taylor series (`@taylor`) | Not available | Giac |
 | Partial fractions (`@partfrac`) | Not available | Giac |
 | Steps (`@steps`) | Not available | Giac (step-by-step walkthrough) |
+| Laplace (`@laplace`) | Not available | Giac |
+| Inverse Laplace (`@ilaplace`) | Not available | Giac |
 | Summation/Product (`\sum`, `\prod`) | Numeric evaluation | Numeric evaluation |
 
 > Giac WASM (`giacwasm.js`) is ~19 MB and loaded on demand. Toggle it in Settings.
 
 ---
 
-## 17. Common Engineering Patterns
+## 19. Common Engineering Patterns
 
 ### Heat Transfer — Fourier's Law
 

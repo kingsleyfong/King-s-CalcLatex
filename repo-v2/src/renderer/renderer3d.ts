@@ -62,6 +62,13 @@ const COLOR_X_CSS      = "#ff4d4d";
 const COLOR_Y_MATH_CSS = "#44cc44";
 const COLOR_Z_MATH_CSS = "#4488ff";
 
+// Named color lookup for per-expression color overrides
+const NAMED_COLORS: Record<string, number> = {
+  red: 0xff0000, blue: 0x0000ff, green: 0x00ff00, orange: 0xff8800,
+  purple: 0x8800ff, cyan: 0x00ffff, yellow: 0xffff00, pink: 0xff69b4,
+  white: 0xffffff, black: 0x000000, gray: 0x888888, grey: 0x888888,
+};
+
 // Axis geometry
 const AXIS_RADIUS  = 0.012;
 const AXIS_LENGTH  = 2.2;  // from -1.1 to +1.1
@@ -881,7 +888,10 @@ function buildSceneObjects(
 ): void {
   for (let i = 0; i < spec.data.length; i++) {
     const pd = spec.data[i];
-    const color = COLORS_HEX[i % COLORS_HEX.length];
+    const color = pd.color
+      ? (NAMED_COLORS[pd.color.toLowerCase()] ??
+         (parseInt(pd.color.replace("#", ""), 16) || COLORS_HEX[i % COLORS_HEX.length]))
+      : COLORS_HEX[i % COLORS_HEX.length];
     try {
       switch (pd.type) {
         case "explicit_3d":

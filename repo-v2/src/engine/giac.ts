@@ -1504,3 +1504,25 @@ export async function giacSteps(latex: string): Promise<Result<EvalResult> | nul
 
   return formatStepResultFn(operation, result.steps, resultLatex);
 }
+
+/** Laplace transform using Giac: laplace(expr, t, s) */
+export async function giacLaplace(latex: string): Promise<Result<EvalResult> | null> {
+  if (!giacReady) return null;
+  const giacExpr = latexToGiac(latex);
+  // Detect the time-domain variable by checking for isolated 't' (not inside \tan, \text, etc.)
+  const timeVar = /(?<![a-zA-Z\\])t(?![a-zA-Z])/.test(latex) ? "t" : "x";
+  const result = await giacLatex(`laplace(${giacExpr},${timeVar},s)`);
+  if (!result) return null;
+  return makeResult(result, [{ level: "info", message: `Laplace transform (${timeVar} → s) (Giac)` }]);
+}
+
+/** Inverse Laplace transform using Giac: ilaplace(expr, s, t) */
+export async function giacILaplace(latex: string): Promise<Result<EvalResult> | null> {
+  if (!giacReady) return null;
+  const giacExpr = latexToGiac(latex);
+  // Detect the frequency-domain variable by checking for isolated 's' (not inside \sin, \sec, etc.)
+  const freqVar = /(?<![a-zA-Z\\])s(?![a-zA-Z])/.test(latex) ? "s" : "z";
+  const result = await giacLatex(`ilaplace(${giacExpr},${freqVar},t)`);
+  if (!result) return null;
+  return makeResult(result, [{ level: "info", message: `Inverse Laplace (${freqVar} → t) (Giac)` }]);
+}
