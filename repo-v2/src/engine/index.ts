@@ -714,9 +714,10 @@ function is3dType(t: ExprType): boolean {
 function promoteToExplicit3d(t: ExprType): ExprType {
   switch (t) {
     case "explicit_2d":
-    case "implicit_2d":
     case "inequality_2d":
       return "explicit_3d";
+    case "implicit_2d":
+      return "implicit_3d";
     case "parametric_2d":
       return "parametric_3d";
     case "point_2d":
