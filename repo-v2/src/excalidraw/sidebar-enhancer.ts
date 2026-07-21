@@ -65,13 +65,13 @@ export class SidebarStyleEnhancer {
   }
 
   private checkAndEnhance(container: HTMLElement, view: any) {
+    const panel = container.querySelector(".selected-shape-actions");
+    if (!panel) return;
+
     const api = this.getExcalidrawAPI(view);
     if (!api) return;
 
     this.syncUnderlineProperties(api);
-
-    const panel = container.querySelector(".selected-shape-actions");
-    if (!panel) return;
 
     const panelColumn = panel.querySelector(".panelColumn");
     if (!panelColumn) return;
