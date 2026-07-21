@@ -45,7 +45,6 @@ export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
       if (isMathOnly && !inMath) continue;
       if (isTextOnly && inMath) continue;
 
-      // Check for custom triggers (e.g. inlineMathTrigger, displayMathTrigger)
       let trigger = s.trigger;
       if (trigger === "mk" && plugin.settings.inlineMathTrigger) {
         trigger = plugin.settings.inlineMathTrigger;
@@ -70,26 +69,76 @@ export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
     return false;
   });
 
+  // ── Tab Navigation & Tabout (Flowing around equations and field tabstops) ──
   const tabKeybinding: KeyBinding = {
     key: "Tab",
     run: (view: EditorView) => {
-      if (!plugin.settings.enableLaTeXSuite) return false;
+      if (!plugin.settings.enableLaTeXSuite || !plugin.settings.taboutOnTab) return false;
       const mainSel = view.state.selection.main;
+      if (!mainSel.empty) return false;
       const pos = mainSel.head;
       const docStr = view.state.doc.toString();
 
-      const nextDollar = docStr.indexOf("$", pos);
-      if (nextDollar !== -1 && nextDollar - pos < 60) {
+      // 1. Immediately followed by closing bracket or math delimiter
+      const charAfter = docStr.slice(pos, pos + 2);
+      if (charAfter.startsWith("}") || charAfter.startsWith("]") || charAfter.startsWith(")")) {
         view.dispatch({
-          selection: { anchor: nextDollar, head: nextDollar },
+          selection: { anchor: pos + 1, head: pos + 1 },
         });
         return true;
+      }
+      if (charAfter.startsWith("$$")) {
+        view.dispatch({
+          selection: { anchor: pos + 2, head: pos + 2 },
+        });
+        return true;
+      }
+      if (charAfter.startsWith("$")) {
+        view.dispatch({
+          selection: { anchor: pos + 1, head: pos + 1 },
+        });
+        return true;
+      }
+
+      // 2. Scan forward for next field delimiter (}, ], ), $, or $$) within 80 chars
+      for (let offset = 1; offset < 80 && pos + offset <= docStr.length; offset++) {
+        const ch = docStr[pos + offset - 1];
+        if (ch === "}" || ch === "]" || ch === ")" || ch === "$") {
+          view.dispatch({
+            selection: { anchor: pos + offset, head: pos + offset },
+          });
+          return true;
+        }
+      }
+
+      return false;
+    },
+  };
+
+  const shiftTabKeybinding: KeyBinding = {
+    key: "Shift-Tab",
+    run: (view: EditorView) => {
+      if (!plugin.settings.enableLaTeXSuite || !plugin.settings.taboutOnTab) return false;
+      const mainSel = view.state.selection.main;
+      if (!mainSel.empty) return false;
+      const pos = mainSel.head;
+
+      // Scan backward for opening {, [, (, $, or $$
+      const docStr = view.state.doc.toString();
+      for (let offset = 1; offset < 80 && pos - offset >= 0; offset--) {
+        const ch = docStr[pos - offset];
+        if (ch === "{" || ch === "[" || ch === "(" || ch === "$") {
+          view.dispatch({
+            selection: { anchor: pos - offset, head: pos - offset },
+          });
+          return true;
+        }
       }
       return false;
     },
   };
 
-  return [inputExtension, keymap.of([tabKeybinding])];
+  return [inputExtension, keymap.of([tabKeybinding, shiftTabKeybinding])];
 }
 
 function isInsideMathModeCM6(state: EditorState, pos: number): boolean {
@@ -113,7 +162,6 @@ function isInsideMathModeCM6(state: EditorState, pos: number): boolean {
     if (inMath) return true;
   } catch {}
 
-  // Fallback counting non-escaped dollar signs
   const docStr = state.doc.toString();
   let count = 0;
   for (let i = 0; i < pos; i++) {

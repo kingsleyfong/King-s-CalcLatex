@@ -407,6 +407,18 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Tab Field Navigation & Tabout")
+      .setDesc("Use Tab and Shift-Tab to jump between fields ($1, $2) and flow out of math delimiters ($, $$, }, ]).")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.taboutOnTab)
+          .onChange(async (value) => {
+            this.plugin.settings.taboutOnTab = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
       .setName("Auto-Fraction Expansion")
       .setDesc("Automatically convert fra or // into \\frac{num}{den} with cursor tabstop navigation.")
       .addToggle((toggle) =>
