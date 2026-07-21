@@ -244,12 +244,18 @@ export interface KCLSettings {
   // ── LaTeX Suite Settings ──
   /** Enable LaTeX Suite snippet expansion across Markdown notes (.md) and Excalidraw overlays */
   enableLaTeXSuite: boolean;
+  /** Trigger for inline math mode (default: "mk") */
+  inlineMathTrigger: string;
+  /** Trigger for display math mode (default: "dm") */
+  displayMathTrigger: string;
   /** Auto-expand fractions (e.g. fra -> \frac{}{}) */
   enableAutoFraction: boolean;
   /** Auto-expand matrix shortcuts (pmat, bmat, vmat) */
   enableMatrixShortcuts: boolean;
   /** Auto-expand digit subscripts (e.g. x1 -> x_1) */
   enableAutoSubscript: boolean;
+  /** Custom snippet definitions string (JSON or YAML format) */
+  customSnippetsText: string;
 }
 
 export const DEFAULT_SETTINGS: KCLSettings = {
@@ -280,7 +286,10 @@ export const DEFAULT_SETTINGS: KCLSettings = {
 
   // LaTeX Suite Defaults
   enableLaTeXSuite: true,
+  inlineMathTrigger: "mk",
+  displayMathTrigger: "dm",
   enableAutoFraction: true,
   enableMatrixShortcuts: true,
   enableAutoSubscript: true,
+  customSnippetsText: "",
 };

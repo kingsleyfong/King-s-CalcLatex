@@ -375,6 +375,38 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Inline Math Mode Trigger")
+      .setDesc("Trigger string to create an inline math block ($ $). Default: mk.")
+      .addText((text) =>
+        text
+          .setPlaceholder("mk")
+          .setValue(this.plugin.settings.inlineMathTrigger || "mk")
+          .onChange(async (value) => {
+            const tr = value.trim();
+            if (tr) {
+              this.plugin.settings.inlineMathTrigger = tr;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Display Math Mode Trigger")
+      .setDesc("Trigger string to create a display math block ($$ $$). Default: dm.")
+      .addText((text) =>
+        text
+          .setPlaceholder("dm")
+          .setValue(this.plugin.settings.displayMathTrigger || "dm")
+          .onChange(async (value) => {
+            const tr = value.trim();
+            if (tr) {
+              this.plugin.settings.displayMathTrigger = tr;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
       .setName("Auto-Fraction Expansion")
       .setDesc("Automatically convert fra or // into \\frac{num}{den} with cursor tabstop navigation.")
       .addToggle((toggle) =>
@@ -394,6 +426,31 @@ export class KCLSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.enableMatrixShortcuts)
           .onChange(async (value) => {
             this.plugin.settings.enableMatrixShortcuts = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Subscript Digits")
+      .setDesc("Automatically convert letter followed by digit into subscript (e.g. x1 -> x_1, a2 -> a_2).")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableAutoSubscript)
+          .onChange(async (value) => {
+            this.plugin.settings.enableAutoSubscript = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Custom Snippet Definitions")
+      .setDesc("Define custom JSON snippet definitions to override or add to default snippets. Format: [{\"trigger\":\"foo\",\"replacement\":\"bar\",\"options\":\"mA\"}]")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder('[{"trigger": "example", "replacement": "\\\\example{$1}$0", "options": "mA"}]')
+          .setValue(this.plugin.settings.customSnippetsText || "")
+          .onChange(async (value) => {
+            this.plugin.settings.customSnippetsText = value;
             await this.plugin.saveSettings();
           }),
       );
