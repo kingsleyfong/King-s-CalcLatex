@@ -40,6 +40,8 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
             view.dispatch({
               changes: { from: replaceFrom, to: pos, insert: insertText },
               selection: { anchor: replaceFrom + insertText.length, head: replaceFrom + insertText.length },
+              userEvent: "input.type",
+              scrollIntoView: true,
             });
             event.preventDefault();
             return true;
@@ -76,10 +78,27 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
 
             const { text: replacementText, initialCursorOffset } = computeSnippetExpansion(replacementRaw);
 
+            const targetCursorPos = replaceFrom + initialCursorOffset;
+
             view.dispatch({
               changes: { from: replaceFrom, to: pos, insert: replacementText },
-              selection: { anchor: replaceFrom + initialCursorOffset, head: replaceFrom + initialCursorOffset },
+              selection: { anchor: targetCursorPos, head: targetCursorPos },
+              userEvent: "input.type",
+              scrollIntoView: true,
             });
+
+            // Double dispatch selection to prevent Obsidian's native DOM selection override
+            setTimeout(() => {
+              try {
+                if (view.state.doc.length >= targetCursorPos) {
+                  view.dispatch({
+                    selection: { anchor: targetCursorPos, head: targetCursorPos },
+                    scrollIntoView: true,
+                  });
+                }
+              } catch {}
+            }, 0);
+
             event.preventDefault();
             return true;
           }
@@ -105,18 +124,21 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
       if (charAfter.startsWith("}") || charAfter.startsWith("]") || charAfter.startsWith(")")) {
         view.dispatch({
           selection: { anchor: pos + 1, head: pos + 1 },
+          scrollIntoView: true,
         });
         return true;
       }
       if (charAfter.startsWith("$$")) {
         view.dispatch({
           selection: { anchor: pos + 2, head: pos + 2 },
+          scrollIntoView: true,
         });
         return true;
       }
       if (charAfter.startsWith("$")) {
         view.dispatch({
           selection: { anchor: pos + 1, head: pos + 1 },
+          scrollIntoView: true,
         });
         return true;
       }
@@ -127,6 +149,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
         if (ch === "}" || ch === "]" || ch === ")" || ch === "$") {
           view.dispatch({
             selection: { anchor: pos + offset, head: pos + offset },
+            scrollIntoView: true,
           });
           return true;
         }
@@ -150,6 +173,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
         if (ch === "{" || ch === "[" || ch === "(" || ch === "$") {
           view.dispatch({
             selection: { anchor: pos - offset, head: pos - offset },
+            scrollIntoView: true,
           });
           return true;
         }
