@@ -9,8 +9,6 @@ export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
     keydown(event: KeyboardEvent, view: EditorView) {
       if (!plugin.settings.enableLaTeXSuite) return false;
       if (event.ctrlKey || event.altKey || event.metaKey) return false;
-
-      // Only handle single printable character keys
       if (event.key.length !== 1) return false;
 
       const state = view.state;
@@ -157,12 +155,16 @@ function isMathMode(state: EditorState, pos: number): boolean {
     const tree = syntaxTree(state);
     let node: any = tree.resolveInner(pos, -1);
     while (node) {
-      const name = node.name || "";
+      const name: string = node.name || "";
+      // Container nodes break to fallback dollar count
+      if (name === "Document" || name === "paragraph" || name === "line" || name.startsWith("HyperMD")) {
+        break;
+      }
       if (
-        name.includes("math") ||
-        name.includes("Formula") ||
-        name.includes("katex") ||
-        name.includes("formatting-math")
+        name.includes("formatting-math") ||
+        name.includes("math-inline") ||
+        name.includes("math-block") ||
+        name.includes("katex")
       ) {
         return true;
       }
