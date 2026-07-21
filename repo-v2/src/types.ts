@@ -248,12 +248,18 @@ export interface KCLSettings {
   inlineMathTrigger: string;
   /** Trigger for display math mode (default: "dm") */
   displayMathTrigger: string;
+  /** Enable Tab key field traversal & tabout out of math delimiters */
+  taboutOnTab: boolean;
   /** Auto-expand fractions (e.g. fra -> \frac{}{}) */
   enableAutoFraction: boolean;
+  /** Symbol for auto-fraction expansion (default: "//") */
+  autofractionSymbol: string;
   /** Auto-expand matrix shortcuts (pmat, bmat, vmat) */
   enableMatrixShortcuts: boolean;
   /** Auto-expand digit subscripts (e.g. x1 -> x_1) */
   enableAutoSubscript: boolean;
+  /** Enable regex snippet evaluation */
+  enableRegexSnippets: boolean;
   /** Custom snippet definitions string (JSON or YAML format) */
   customSnippetsText: string;
 }
@@ -288,8 +294,11 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   enableLaTeXSuite: true,
   inlineMathTrigger: "mk",
   displayMathTrigger: "dm",
+  taboutOnTab: true,
   enableAutoFraction: true,
+  autofractionSymbol: "//",
   enableMatrixShortcuts: true,
   enableAutoSubscript: true,
+  enableRegexSnippets: true,
   customSnippetsText: "",
 };
