@@ -10,6 +10,19 @@ export const DEFAULT_LATEX_SUITE_SNIPPETS: RawSnippet[] = [
   { trigger: "mk", replacement: "$$0$", options: "tA", description: "Inline math environment" },
   { trigger: "dm", replacement: "$$\n$0\n$$", options: "tA", description: "Display math environment" },
 
+  // ── Blackboard & Calligraphic Shortcuts (Gilles Castel) ──
+  { trigger: "LL", replacement: "\\\\mathcal{L}", options: "mA", description: "Laplace / Calligraphic L" },
+  { trigger: "HH", replacement: "\\\\mathcal{H}", options: "mA", description: "Hamiltonian / Calligraphic H" },
+  { trigger: "CC", replacement: "\\\\mathbb{C}", options: "mA", description: "Complex numbers" },
+  { trigger: "RR", replacement: "\\\\mathbb{R}", options: "mA", description: "Real numbers" },
+  { trigger: "QQ", replacement: "\\\\mathbb{Q}", options: "mA", description: "Rational numbers" },
+  { trigger: "ZZ", replacement: "\\\\mathbb{Z}", options: "mA", description: "Integers" },
+  { trigger: "NN", replacement: "\\\\mathbb{N}", options: "mA", description: "Natural numbers" },
+  { trigger: "PP", replacement: "\\\\mathbb{P}", options: "mA", description: "Probability / Projective space" },
+  { trigger: "EE", replacement: "\\\\mathbb{E}", options: "mA", description: "Expectation" },
+  { trigger: "FF", replacement: "\\\\mathbb{F}", options: "mA", description: "Field" },
+  { trigger: "DD", replacement: "\\\\mathbb{D}", options: "mA", description: "Disk" },
+
   // ── Environment Shortcuts ──
   { trigger: "beg", replacement: "\\\\begin{$1}\n$0\n\\\\end{$1}", options: "mA", description: "Begin environment" },
   { trigger: "case", replacement: "\\\\begin{cases}\n$0\n\\\\end{cases}", options: "mA", description: "Cases environment" },
@@ -58,7 +71,7 @@ export const DEFAULT_LATEX_SUITE_SNIPPETS: RawSnippet[] = [
   { trigger: "notin", replacement: "\\\\notin ", options: "mA", description: "Not element of" },
 
   // ── Brackets & Wrappers ──
-  { trigger: "avg", replacement: "\\\\langle $1 \\\\rangle$0", options: "mA", description: "Angle brackets" },
+  { trigger: "avg", replacement: "\\\\langle $1 \\\\range$0", options: "mA", description: "Angle brackets" },
   { trigger: "norm", replacement: "\\\\| $1 \\\\|$0", options: "mA", description: "Norm" },
   { trigger: "abs", replacement: "| $1 |$0", options: "mA", description: "Absolute value" },
   { trigger: "ceil", replacement: "\\\\ceil $1 \\\\rceil$0", options: "mA", description: "Ceiling" },
