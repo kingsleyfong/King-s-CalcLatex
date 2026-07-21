@@ -319,6 +319,7 @@ export class LaTexModalEnhancer {
       });
       tooltipObserver.observe(document.body, { childList: true, subtree: true });
 
+      const container = modalEl.parentElement || document.body;
       const removalObserver = new MutationObserver(() => {
         if (!document.contains(modalEl)) {
           tooltipObserver.disconnect();
@@ -326,61 +327,40 @@ export class LaTexModalEnhancer {
           removalObserver.disconnect();
         }
       });
-      removalObserver.observe(document.body, { childList: true, subtree: true });
+      removalObserver.observe(container, { childList: true });
     }, 60);
   }
 
   /**
    * Position the Excalidraw LaTeX prompt modal dynamically based on setting.
-   * Default: "bottom" (near bottom of viewport).
+   * Modifies the outer .modal-container to keep all modal elements (title, input, color bar, buttons)
+   * as a single unified window.
    */
   private applyModalPosition(modalEl: HTMLElement): void {
     const pos = this.settings.latexModalPosition || "bottom";
 
-    modalEl.classList.remove("kcl-modal-bottom", "kcl-modal-top", "kcl-modal-center", "kcl-modal-cursor");
+    const modalContainer = (modalEl.closest(".modal-container") || modalEl.parentElement) as HTMLElement;
+    const actualModal = (modalEl.closest(".modal") || modalEl) as HTMLElement;
 
-    if (pos === "center") {
-      modalEl.classList.add("kcl-modal-center");
-      modalEl.style.setProperty("top", "50%", "important");
-      modalEl.style.setProperty("left", "50%", "important");
-      modalEl.style.setProperty("transform", "translate(-50%, -50%)", "important");
-      modalEl.style.setProperty("margin", "0", "important");
-      return;
+    if (modalContainer) {
+      modalContainer.classList.remove(
+        "kcl-modal-container-bottom",
+        "kcl-modal-container-top",
+        "kcl-modal-container-center",
+        "kcl-modal-container-cursor",
+      );
+      modalContainer.classList.add(`kcl-modal-container-${pos}`);
     }
 
-    if (pos === "top") {
-      modalEl.classList.add("kcl-modal-top");
-      modalEl.style.setProperty("top", "60px", "important");
-      modalEl.style.setProperty("bottom", "auto", "important");
-      modalEl.style.setProperty("left", "50%", "important");
-      modalEl.style.setProperty("transform", "translateX(-50%)", "important");
-      modalEl.style.setProperty("margin", "0", "important");
-      return;
-    }
-
-    if (pos === "cursor") {
-      modalEl.classList.add("kcl-modal-cursor");
-      const activeEl = document.activeElement;
-      if (activeEl) {
-        const rect = activeEl.getBoundingClientRect();
-        const top = Math.min(rect.bottom + 16, window.innerHeight - 360);
-        modalEl.style.setProperty("top", `${Math.max(20, top)}px`, "important");
-        modalEl.style.setProperty("bottom", "auto", "important");
-        modalEl.style.setProperty("left", "50%", "important");
-        modalEl.style.setProperty("transform", "translateX(-50%)", "important");
-        modalEl.style.setProperty("margin", "0", "important");
-        return;
-      }
-    }
-
-    // Default: "bottom" (Near bottom of screen)
-    modalEl.classList.add("kcl-modal-bottom");
-    modalEl.style.setProperty("position", "fixed", "important");
-    modalEl.style.setProperty("top", "auto", "important");
-    modalEl.style.setProperty("bottom", "40px", "important");
-    modalEl.style.setProperty("left", "50%", "important");
-    modalEl.style.setProperty("transform", "translateX(-50%)", "important");
-    modalEl.style.setProperty("margin", "0", "important");
+    // Reset inline overrides on inner elements so flex container rules apply cleanly
+    actualModal.style.top = "";
+    actualModal.style.bottom = "";
+    actualModal.style.transform = "";
+    actualModal.style.position = "";
+    modalEl.style.top = "";
+    modalEl.style.bottom = "";
+    modalEl.style.transform = "";
+    modalEl.style.position = "";
   }
 
   private injectColorBar(modalEl: HTMLElement, editorView: any): void {

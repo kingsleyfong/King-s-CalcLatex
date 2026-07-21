@@ -726,32 +726,43 @@
 }
 
 /* Excalidraw LaTeX Modal Positioning Classes */
-.excalidraw-LatexPrompt.kcl-modal-bottom {
-  position: fixed !important;
-  bottom: 40px !important;
-  top: auto !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+.modal-container:has(.excalidraw-LatexPrompt) {
+  display: flex !important;
+  pointer-events: none !important;
   z-index: 1000 !important;
-  margin: 0 !important;
 }
 
-.excalidraw-LatexPrompt.kcl-modal-top {
-  position: fixed !important;
-  top: 60px !important;
-  bottom: auto !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  z-index: 1000 !important;
+.modal-container:has(.excalidraw-LatexPrompt) .modal {
+  pointer-events: auto !important;
   margin: 0 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
 }
 
-.excalidraw-LatexPrompt.kcl-modal-center {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  z-index: 1000 !important;
-  margin: 0 !important;
+/* Position: Bottom (Default) */
+.modal-container.kcl-modal-container-bottom {
+  align-items: flex-end !important;
+  justify-content: center !important;
+  padding-bottom: 40px !important;
 }
+
+/* Position: Top */
+.modal-container.kcl-modal-container-top {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: 60px !important;
+}
+
+/* Position: Center */
+.modal-container.kcl-modal-container-center {
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Position: Cursor (Floating near active area) */
+.modal-container.kcl-modal-container-cursor {
+  align-items: flex-end !important;
+  justify-content: center !important;
+  padding-bottom: 80px !important;
+}
+
 
