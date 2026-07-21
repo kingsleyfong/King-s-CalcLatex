@@ -1,34 +1,50 @@
-import { EditorView, KeyBinding, keymap } from "@codemirror/view";
+import { EditorView, KeyBinding, keymap, ViewUpdate } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import type KingsCalcLatexPlugin from "../main";
 import { DEFAULT_LATEX_SUITE_SNIPPETS, RawSnippet } from "./default-snippets";
 
-export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
-  const inputExtension = EditorView.inputHandler.of((view, from, to, text) => {
-    if (!plugin.settings.enableLaTeXSuite) return false;
-    if (text.length !== 1) return false;
+let isExpandingSnippet = false;
 
-    const state = view.state;
-    const pos = from;
+export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
+  const updateListener = EditorView.updateListener.of((update: ViewUpdate) => {
+    if (!plugin.settings.enableLaTeXSuite) return;
+    if (!update.docChanged || isExpandingSnippet) return;
+
+    const state = update.state;
+    const mainSel = state.selection.main;
+    if (!mainSel.empty) return;
+
+    const pos = mainSel.head;
     const line = state.doc.lineAt(pos);
     const lineText = line.text;
     const col = pos - line.from;
 
-    const textBefore = lineText.slice(0, col) + text;
-    const inMath = isInsideMathModeCM6(state, pos);
+    const textBefore = lineText.slice(0, col);
+    const inMath = isMathMode(state, pos);
 
     // 1. Auto-subscript digits (e.g. x1 -> x_1, a2 -> a_2)
-    if (plugin.settings.enableAutoSubscript && inMath && /\d/.test(text)) {
-      const prevChar = lineText.slice(col - 1, col);
-      if (/[a-zA-Z]/.test(prevChar)) {
-        const replaceFrom = pos - 1;
-        const insertText = `${prevChar}_${text}`;
-        view.dispatch({
-          changes: { from: replaceFrom, to: pos, insert: insertText },
-          selection: { anchor: replaceFrom + insertText.length, head: replaceFrom + insertText.length },
-        });
-        return true;
+    if (plugin.settings.enableAutoSubscript && inMath) {
+      const match = textBefore.match(/([a-zA-Z])(\d)$/);
+      if (match) {
+        const charBefore = match[1];
+        const digit = match[2];
+        const triggerLen = 2; // "x1"
+        const replaceFrom = pos - triggerLen;
+        const insertText = `${charBefore}_${digit}`;
+
+        isExpandingSnippet = true;
+        setTimeout(() => {
+          try {
+            update.view.dispatch({
+              changes: { from: replaceFrom, to: pos, insert: insertText },
+              selection: { anchor: replaceFrom + insertText.length, head: replaceFrom + insertText.length },
+            });
+          } finally {
+            isExpandingSnippet = false;
+          }
+        }, 0);
+        return;
       }
     }
 
@@ -54,19 +70,24 @@ export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
 
       if (textBefore.endsWith(trigger)) {
         const triggerLen = trigger.length;
-        const replaceFrom = pos - (triggerLen - 1);
+        const replaceFrom = pos - triggerLen;
 
         const { text: replacementText, cursorOffset } = parseSnippetReplacement(s.replacement);
 
-        view.dispatch({
-          changes: { from: replaceFrom, to: pos, insert: replacementText },
-          selection: { anchor: replaceFrom + cursorOffset, head: replaceFrom + cursorOffset },
-        });
-        return true;
+        isExpandingSnippet = true;
+        setTimeout(() => {
+          try {
+            update.view.dispatch({
+              changes: { from: replaceFrom, to: pos, insert: replacementText },
+              selection: { anchor: replaceFrom + cursorOffset, head: replaceFrom + cursorOffset },
+            });
+          } finally {
+            isExpandingSnippet = false;
+          }
+        }, 0);
+        return;
       }
     }
-
-    return false;
   });
 
   // ── Tab Navigation & Tabout (Flowing around equations and field tabstops) ──
@@ -123,7 +144,6 @@ export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
       if (!mainSel.empty) return false;
       const pos = mainSel.head;
 
-      // Scan backward for opening {, [, (, $, or $$
       const docStr = view.state.doc.toString();
       for (let offset = 1; offset < 80 && pos - offset >= 0; offset--) {
         const ch = docStr[pos - offset];
@@ -138,28 +158,26 @@ export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
     },
   };
 
-  return [inputExtension, keymap.of([tabKeybinding, shiftTabKeybinding])];
+  return [updateListener, keymap.of([tabKeybinding, shiftTabKeybinding])];
 }
 
-function isInsideMathModeCM6(state: EditorState, pos: number): boolean {
+function isMathMode(state: EditorState, pos: number): boolean {
   try {
     const tree = syntaxTree(state);
-    let inMath = false;
-    tree.iterate({
-      from: Math.max(0, pos - 1),
-      to: Math.min(state.doc.length, pos + 1),
-      enter(node) {
-        if (
-          node.name.includes("math") ||
-          node.name.includes("Formula") ||
-          node.name.includes("katex") ||
-          node.name.includes("formatting-math")
-        ) {
-          inMath = true;
-        }
-      },
-    });
-    if (inMath) return true;
+    let node: any = tree.resolveInner(pos, -1);
+    while (node) {
+      const name = node.name || "";
+      if (
+        name.includes("math") ||
+        name.includes("Formula") ||
+        name.includes("katex") ||
+        name.includes("formatting-math")
+      ) {
+        return true;
+      }
+      if (!node.parent) break;
+      node = node.parent;
+    }
   } catch {}
 
   const docStr = state.doc.toString();
