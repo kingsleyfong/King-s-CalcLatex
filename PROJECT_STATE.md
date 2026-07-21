@@ -8,14 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v2.0 — Web Worker termination & CM6 fast-path added, 2026-07-21)
+## Current Status: 🟢 WORKING (v2.2.0 — Excalidraw OD Merged, Settings Restructure, Custom Modal Position, 2026-07-21)
 
 ### What Happened
-On 2026-03-16, after analyzing v1's fundamental architecture limitations, decided to pursue **Path C** — a full browser-native rewrite. The v1 architecture (Python/SymPy/Plotly → HTTP → iframe) had rendering limitations that could never reach Desmos-level UX:
-- Plotly is a data viz library, not a math engine (no interval arithmetic, no adaptive sampling)
-- Fixed-grid rendering (500x500 2D, 60³ 3D) with no infinite-zoom capability
-- HTTP round-trips for every interaction
-- Iframe sandboxing killed theme propagation and widget state
+On 2026-07-21, merged the standalone `kings-excalidraw-math-companion` plugin directly into **King's CalcLatex** v2.2.0 to unify codebase logic and eliminate redundant plugins.
+- **Excalidraw OD Integration**: Integrated textarea snippet engine, live MathJax preview tooltip, ExcalidrawAutomate graph placement, color dot bar (`\color{red}`), and `\bbox` panel.
+- **UI/UX Settings Restructure**: Split settings into two clean sections: **Markdown Note Features (`.md`)** and **Excalidraw OD Features (Canvas & Math Companion)**.
+- **Excalidraw LaTeX Modal Position**: Added configurable modal window positioning setting (`latexModalPosition`) defaulting to **Near Bottom of Screen** (`bottom: 40px`).
+- **Archive `Kings CalcTex`**: Summarized obsolete v1 Python prototype (`development/archive_summary_kings_calctex.md`).
 
 ### v2.0 Architecture
 ```

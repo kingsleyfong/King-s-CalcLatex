@@ -1,5 +1,29 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-21 (Part 2) — Excalidraw OD Integration, UI/UX Settings Restructure & Modal Placement
+
+### Status: 🟢 Build clean | Deployed to Obsidian Vault (v2.2.0)
+
+### What Was Done
+
+1. **Archived `Kings CalcTex`**:
+   - Created `development/archive_summary_kings_calctex.md` summarizing the obsolete v1 Python prototype.
+
+2. **Merged Excalidraw OD into `King's CalcLatex` (`repo-v2/src/excalidraw/`)**:
+   - Integrated `TextareaInterceptor`, `SnippetEngine`, `PreviewTooltip`, `LaTexModalEnhancer`, `SidebarStyleEnhancer`, and `GraphInjector`.
+   - Updated bridge logic to call `plugin.engine` directly in-process.
+
+3. **UI/UX Settings & Modal Positioning**:
+   - Split settings tab in `settings.ts` into two clear sections: **Markdown Note Features (`.md`)** and **Excalidraw OD Features (Canvas & Math Companion)**.
+   - Added `latexModalPosition` setting: `bottom` (default — near bottom of screen, `top: calc(100vh - 380px)`), `center`, `top`, `cursor`.
+
+4. **Vault & Release Sync**:
+   - Updated version to `2.2.0` across `package.json`, `manifest.json`, `versions.json`, `.obsidian/plugins/kings-calclatex/manifest.json`, and `CHANGELOG.md`.
+   - Built production bundle (`npm run build`) and synced `main.js` and `styles.css`.
+   - Updated `.obsidian/community-plugins.json` to disable/remove duplicate plugin IDs (`kings-excalidraw-math-companion`, `kings-excalidraw-od`).
+
+---
+
 ## Session: 2026-07-21 — WASM Worker Termination & CM6 Decoration Performance Optimization
 
 ### Status: 🟢 Build clean | Synced to Vault

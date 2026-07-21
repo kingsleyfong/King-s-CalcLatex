@@ -218,6 +218,28 @@ export interface KCLSettings {
   enableGiac: boolean;
   /** Auto-scale Z axis for 3D explicit surfaces (breaks 1:1:1 aspect ratio) */
   autoScaleZ3d: boolean;
+
+  // ── Excalidraw OD Settings ──
+  /** Enable Excalidraw On-Demand Companion integration */
+  enableExcalidrawOD: boolean;
+  /** Position of the Excalidraw LaTeX prompt modification modal */
+  latexModalPosition: "bottom" | "center" | "top" | "cursor";
+  /** Enable auto-expanding LaTeX snippets in Excalidraw textareas */
+  excalidrawSnippetsEnabled: boolean;
+  /** Enable live preview tooltip above Excalidraw textareas */
+  excalidrawPreviewTooltipEnabled: boolean;
+  /** Position of live preview tooltip relative to textarea */
+  excalidrawPreviewPosition: "above" | "below";
+  /** Default width for plots rendered into Excalidraw */
+  excalidrawGraphWidth: number;
+  /** Default height for plots rendered into Excalidraw */
+  excalidrawGraphHeight: number;
+  /** Enable keyboard shortcut to edit selected Excalidraw LaTeX element */
+  latexEditorShortcutEnabled: boolean;
+  /** Modifier for LaTeX editor shortcut */
+  latexEditorShortcutModifier: "ctrl" | "alt" | "shift";
+  /** Key for LaTeX editor shortcut */
+  latexEditorShortcutKey: string;
 }
 
 export const DEFAULT_SETTINGS: KCLSettings = {
@@ -233,4 +255,16 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   show3DAxisTicks: true,
   enableGiac: true,
   autoScaleZ3d: false,
+
+  // Excalidraw OD Defaults
+  enableExcalidrawOD: true,
+  latexModalPosition: "bottom",
+  excalidrawSnippetsEnabled: true,
+  excalidrawPreviewTooltipEnabled: true,
+  excalidrawPreviewPosition: "below",
+  excalidrawGraphWidth: 500,
+  excalidrawGraphHeight: 350,
+  latexEditorShortcutEnabled: true,
+  latexEditorShortcutModifier: "ctrl",
+  latexEditorShortcutKey: "l",
 };

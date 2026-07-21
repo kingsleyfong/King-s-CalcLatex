@@ -624,3 +624,134 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Excalidraw OD Companion Styles
+   ════════════════════════════════════════════════════════════════ */
+
+.kcl-preview-tooltip {
+  position: fixed;
+  z-index: 10000;
+  padding: 8px 12px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  max-width: 450px;
+  max-height: 220px;
+  overflow: hidden;
+}
+
+.kcl-preview-tooltip img {
+  max-width: 100%;
+  max-height: 200px;
+  display: block;
+}
+
+.theme-dark .kcl-preview-tooltip {
+  background: var(--background-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.theme-dark .kcl-preview-tooltip img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Color Dots Selector Bar */
+.kcl-latex-color-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 6px 0;
+  padding: 8px 12px;
+  background: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.kcl-latex-color-bar-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.kcl-latex-color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.kcl-latex-color-dot:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.kcl-latex-color-dot.is-active {
+  border-color: var(--text-accent);
+  transform: scale(1.15);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Text Styles Underline Button */
+.kcl-text-styles-container {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.kcl-underline-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--button-bg-color, var(--background-primary));
+  border: 1px solid var(--button-border-color, var(--background-modifier-border));
+  border-radius: 6px;
+  color: var(--icon-fill-color, var(--text-normal));
+  cursor: pointer;
+}
+
+.kcl-underline-btn.is-active {
+  background: var(--button-active-bg-color, var(--background-modifier-border-hover));
+  border-color: var(--interactive-accent, var(--text-accent));
+  color: var(--interactive-accent, var(--text-accent));
+}
+
+/* Excalidraw LaTeX Modal Positioning Classes */
+.excalidraw-LatexPrompt.kcl-modal-bottom {
+  position: fixed !important;
+  bottom: 40px !important;
+  top: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 1000 !important;
+  margin: 0 !important;
+}
+
+.excalidraw-LatexPrompt.kcl-modal-top {
+  position: fixed !important;
+  top: 60px !important;
+  bottom: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 1000 !important;
+  margin: 0 !important;
+}
+
+.excalidraw-LatexPrompt.kcl-modal-center {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 1000 !important;
+  margin: 0 !important;
+}
+
