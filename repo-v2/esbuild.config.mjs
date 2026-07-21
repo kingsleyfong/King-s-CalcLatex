@@ -10,20 +10,22 @@ const syncVaultPlugin = {
   name: "sync-vault-plugin",
   setup(build) {
     build.onEnd(() => {
-      try {
-        if (fs.existsSync("main.js")) {
-          fs.copyFileSync("main.js", path.join(vaultPluginDir, "main.js"));
+      setTimeout(() => {
+        try {
+          if (fs.existsSync("main.js")) {
+            fs.copyFileSync("main.js", path.join(vaultPluginDir, "main.js"));
+          }
+          if (fs.existsSync("styles.css")) {
+            fs.copyFileSync("styles.css", path.join(vaultPluginDir, "styles.css"));
+          }
+          if (fs.existsSync("manifest.json")) {
+            fs.copyFileSync("manifest.json", path.join(vaultPluginDir, "manifest.json"));
+          }
+          console.log("[esbuild] Synced build to Obsidian vault plugin directory.");
+        } catch (e) {
+          console.error("[esbuild] Failed to sync to vault plugin directory:", e);
         }
-        if (fs.existsSync("styles.css")) {
-          fs.copyFileSync("styles.css", path.join(vaultPluginDir, "styles.css"));
-        }
-        if (fs.existsSync("manifest.json")) {
-          fs.copyFileSync("manifest.json", path.join(vaultPluginDir, "manifest.json"));
-        }
-        console.log("[esbuild] Synced build to Obsidian vault plugin directory.");
-      } catch (e) {
-        console.error("[esbuild] Failed to sync to vault plugin directory:", e);
-      }
+      }, 50);
     });
   },
 };
