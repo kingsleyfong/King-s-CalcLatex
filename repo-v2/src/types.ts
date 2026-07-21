@@ -60,7 +60,8 @@ export type EvalMode = "exact" | "approximate" | "simplify" | "solve" | "factor"
   | "laplace" | "ilaplace";
 export type PlotMode = "plot2d" | "plot3d" | "geometry"
   | "contour" | "vecfield" | "gradient" | "tangent" | "region"
-  | "phase" | "ode";
+  | "phase" | "ode"
+  | "scatter" | "table";
 
 export interface EvalResult {
   /** LaTeX-formatted result (for display) */
@@ -85,7 +86,8 @@ export type ExprType =
   | "vector_field_2d"  // (P(x,y), Q(x,y)) rendered as arrow grid in 2D
   | "vector_field_3d"  // (P,Q,R)(x,y,z) rendered as 3D arrow grid
   | "region_2d"      // area between curves shaded in 2D
-  | "ode_phase";     // ODE direction field + solution curves
+  | "ode_phase"      // ODE direction field + solution curves
+  | "dataset";       // scatter plot: set of (x,y) data points + optional regression
 
 /**
  * A single plottable expression, prepared by the engine for the renderer.
@@ -123,6 +125,16 @@ export interface PlotData {
   color?: string;
   /** Line rendering style */
   lineStyle?: "solid" | "dashed" | "dotted";
+  /** Raw (x,y) data points — only for type "dataset" */
+  points?: [number, number][];
+  /** Regression model for dataset type */
+  regressionType?: "lin" | "poly2" | "poly3" | "exp";
+  /** Fitted regression coefficients [a0, a1, a2, ...] — polynomial order ascending */
+  regressionCoeffs?: number[];
+  /** R² goodness-of-fit for regression (0–1) */
+  rSquared?: number;
+  /** Override label shown in expression overlay (plain text, not LaTeX) */
+  label?: string;
 }
 
 /**

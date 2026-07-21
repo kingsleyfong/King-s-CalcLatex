@@ -28,7 +28,7 @@ import {
 } from "@codemirror/view";
 import type { TriggerMatch } from "../types";
 import { detectTriggers } from "./triggers";
-import { ResultWidget, Graph2DWidget, Graph3DWidget } from "./widgets";
+import { ResultWidget, Graph2DWidget, Graph3DWidget, TableWidget } from "./widgets";
 
 // ══════════════════════════════════════════════════════════════
 //  WIDGET FACTORY
@@ -54,6 +54,10 @@ function createWidget(plugin: any, trigger: TriggerMatch): WidgetType {
     case "geometry":
     case "tangent":
       return new Graph3DWidget(plugin, trigger);
+    case "scatter":
+      return new Graph2DWidget(plugin, trigger);
+    case "table":
+      return new TableWidget(plugin, trigger);
     default:
       return new ResultWidget(plugin, trigger);
   }
@@ -68,6 +72,17 @@ function isBlockWidget(trigger: TriggerMatch): boolean {
 // ══════════════════════════════════════════════════════════════
 
 function buildDecorationsFromState(state: EditorState, plugin: any): DecorationSet {
+  // Fast path: if document has no '@', '=', '\approx', or '\equiv', no KCL trigger can exist
+  const docText = state.doc.toString();
+  if (
+    !docText.includes("@") &&
+    !docText.includes("=") &&
+    !docText.includes("\\approx") &&
+    !docText.includes("\\equiv")
+  ) {
+    return Decoration.none;
+  }
+
   const builder = new RangeSetBuilder<Decoration>();
 
   for (let lineNum = 1; lineNum <= state.doc.lines; lineNum++) {

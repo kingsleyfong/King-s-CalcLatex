@@ -21,6 +21,7 @@
  */
 
 import { WidgetType } from "@codemirror/view";
+import { renderMath, finishRenderMath } from "obsidian";
 import type { TriggerMatch, GraphHandle, PlotSpec } from "../types";
 import { COLORS } from "../renderer/colors";
 
@@ -327,7 +328,81 @@ function addSliders(
       }
     });
 
+    // ── Record / Export button ─────────────────────────────────────
+    const recordBtn = document.createElement("button");
+    recordBtn.className = "kcl-slider-record";
+    recordBtn.textContent = "\u23FA"; // ⏺
+    recordBtn.title = "Export animation as WebM";
+
+    let _mrec: MediaRecorder | null = null;
+    let _mrecTimeout: ReturnType<typeof setTimeout> | null = null;
+    let _wasPlaying = false;
+
+    function _stopRecord(): void {
+      if (_mrecTimeout !== null) { clearTimeout(_mrecTimeout); _mrecTimeout = null; }
+      if (_mrec && _mrec.state !== "inactive") _mrec.stop();
+    }
+
+    recordBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Stop if already recording
+      if (_mrec && _mrec.state !== "inactive") { _stopRecord(); return; }
+      const canvas = wrapper.querySelector("canvas") as HTMLCanvasElement | null;
+      if (!canvas) return; // 3D static mode — no live canvas; user must enter interactive mode first
+      if (typeof MediaRecorder === "undefined") return;
+      const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9" : "video/webm";
+      const stream = canvas.captureStream(30);
+      _mrec = new MediaRecorder(stream, { mimeType: mime });
+      const chunks: Blob[] = [];
+      _mrec.ondataavailable = (ev: BlobEvent) => { if (ev.data.size > 0) chunks.push(ev.data); };
+      _mrec.onstop = () => {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `kcl-${varName}-anim.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        _mrec = null;
+        recordBtn.classList.remove("recording");
+        recordBtn.textContent = "\u23FA";
+        recordBtn.title = "Export animation as WebM";
+        // Stop animation if it wasn't running before we started recording
+        if (!_wasPlaying && animState.playing) {
+          animState.playing = false;
+          playBtn.textContent = "\u25B6";
+          if (animState.rafId !== null) { cancelAnimationFrame(animState.rafId); animState.rafId = null; }
+        }
+      };
+      // Reset slider to start, force forward direction
+      input.value = input.min;
+      animState.direction = 1;
+      animThrottleAccum = 0;
+      updateFromSlider();
+      // Ensure animation is running
+      _wasPlaying = animState.playing;
+      if (!animState.playing) {
+        animState.playing = true;
+        animState.lastFrame = 0;
+        animThrottleAccum = 0;
+        playBtn.textContent = "\u23F8"; // ⏸
+        animState.rafId = requestAnimationFrame(animLoop);
+      }
+      recordBtn.classList.add("recording");
+      recordBtn.textContent = "\u23F9"; // ⏹
+      recordBtn.title = "Stop recording";
+      _mrec.start(100); // collect blobs every 100 ms
+      // Auto-stop after one full pass (min → max = 4 s, matching animLoop speed)
+      _mrecTimeout = setTimeout(_stopRecord, 4000);
+    });
+
+    animCleanups.push(_stopRecord);
+
     row.appendChild(playBtn);
+    row.appendChild(recordBtn);
     row.appendChild(label);
     row.appendChild(minInput);
     row.appendChild(input);
@@ -487,18 +562,41 @@ export class Graph2DWidget extends WidgetType {
       },
     );
 
+    // Callback fired by renderer2d whenever it (re)builds the label DOM elements.
+    // Called only on spec change — never on pan/zoom frames — so MathJax nodes survive.
+    const onLabelsBuilt = (els: HTMLElement[]) => {
+      let didRender = false;
+      for (const el of els) {
+        const latex = el.dataset.latex;
+        if (!latex) continue; // plain-text label (e.g. scatter dataset, regression eq)
+        el.textContent = "";
+        try {
+          el.appendChild(renderMath(latex, false));
+          didRender = true;
+        } catch {
+          el.textContent = latex;
+        }
+      }
+      if (didRender) {
+        try { finishRenderMath(); } catch { /* non-critical */ }
+      }
+    };
+
     Promise.resolve().then(async () => {
       try {
         const specResult = await this.plugin.engine.preparePlot(this.latex, this.mode);
         if (this.destroyed) return;
         if (specResult.ok) {
           const showPOIs = this.plugin.settings?.showPOIs ?? true;
-          this.handle = await this.plugin.renderer2d.create(container, specResult.value, showPOIs);
+          this.handle = await this.plugin.renderer2d.create(
+            container, specResult.value, showPOIs, onLabelsBuilt,
+          );
           if (this.destroyed) {
             this.handle?.destroy?.();
             this.handle = null;
             return;
           }
+
           this.plugin.publishInspectorState?.({
             spec: specResult.value,
             latex: this.latex,
@@ -664,18 +762,34 @@ export class Graph3DWidget extends WidgetType {
     img.draggable = false;
     this.container.appendChild(img);
 
-    // Expression labels on snapshot
+    // Expression labels on snapshot — rendered as formatted math via Obsidian MathJax
     if (this.cachedSpec) {
       const labelOverlay = document.createElement("div");
       labelOverlay.className = "kcl-graph-3d-labels";
+      let didRender3d = false;
       for (let i = 0; i < this.cachedSpec.data.length; i++) {
         const pd = this.cachedSpec.data[i];
-        const color = COLORS[i % COLORS.length];
+        const color = pd.color || COLORS[i % COLORS.length];
         const lbl = document.createElement("div");
         lbl.className = "kcl-graph-3d-label";
         lbl.style.color = color;
-        lbl.textContent = pd.latex.replace(/@plot3d\s*$/i, "").trim();
+        // Use plain-text label for dataset/scatter types; strip ALL trigger suffixes otherwise
+        const cleanLatex = pd.label ?? pd.latex.replace(/@\w+.*$/i, "").trim();
+        if (pd.label) {
+          lbl.textContent = cleanLatex; // plain text (e.g. regression equation)
+        } else {
+          try {
+            lbl.appendChild(renderMath(cleanLatex, false));
+            didRender3d = true;
+          } catch {
+            lbl.textContent = cleanLatex;
+          }
+        }
         labelOverlay.appendChild(lbl);
+      }
+      // Call finishRenderMath once after all labels — not inside the loop
+      if (didRender3d) {
+        try { finishRenderMath(); } catch { /* non-critical */ }
       }
       this.container.appendChild(labelOverlay);
     }
@@ -752,6 +866,24 @@ export class Graph3DWidget extends WidgetType {
     try {
       this.handle = this.plugin.renderer3d.create(this.container, this.cachedSpec);
 
+      // Post-process 3D label overlay with MathJax (renderer3d has no Obsidian API access)
+      const label3dEls = this.container.querySelectorAll<HTMLElement>(".kcl-graph-3d-label[data-latex]");
+      let didRender3dInteractive = false;
+      label3dEls.forEach(el => {
+        const latex = el.dataset.latex;
+        if (!latex) return;
+        el.textContent = "";
+        try {
+          el.appendChild(renderMath(latex, false));
+          didRender3dInteractive = true;
+        } catch {
+          el.textContent = latex;
+        }
+      });
+      if (didRender3dInteractive) {
+        try { finishRenderMath(); } catch { /* non-critical */ }
+      }
+
       const closeBtn = document.createElement("button");
       closeBtn.className = "kcl-graph-3d-close";
       closeBtn.textContent = "\u00d7";
@@ -817,5 +949,109 @@ export class Graph3DWidget extends WidgetType {
 
   ignoreEvent(): boolean {
     return true;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TABLE WIDGET — Renders (x,y) data as an HTML table
+// ══════════════════════════════════════════════════════════════
+
+/** Parse numeric (x,y) pairs from a LaTeX string — local copy for widget use. */
+function _parseDataPoints(latex: string): [number, number][] {
+  const pts: [number, number][] = [];
+  const re = /\(\s*(-?[\d.]+(?:[eE][+-]?\d+)?)\s*,\s*(-?[\d.]+(?:[eE][+-]?\d+)?)\s*\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(latex)) !== null) {
+    const x = parseFloat(m[1]);
+    const y = parseFloat(m[2]);
+    if (isFinite(x) && isFinite(y)) pts.push([x, y]);
+  }
+  return pts;
+}
+
+export class TableWidget extends WidgetType {
+  private readonly latex: string;
+  private readonly plugin: any;
+  private destroyed = false;
+
+  constructor(plugin: any, trigger: TriggerMatch) {
+    super();
+    this.plugin = plugin;
+    this.latex = trigger.latex;
+  }
+
+  eq(other: TableWidget): boolean {
+    return this.latex === other.latex;
+  }
+
+  toDOM(): HTMLElement {
+    this.destroyed = false;
+    const wrapper = document.createElement("div");
+    wrapper.className = "kcl-table-widget";
+
+    const pts = _parseDataPoints(this.latex);
+    if (pts.length === 0) {
+      wrapper.textContent = "⚠ No data points found (format: (x1,y1);(x2,y2);...)";
+      wrapper.classList.add("kcl-table-error");
+      return wrapper;
+    }
+
+    // ── Summary bar ──────────────────────────────────────────────
+    const summary = document.createElement("div");
+    summary.className = "kcl-table-summary";
+    summary.textContent = `${pts.length} data points`;
+
+    // Compute basic stats
+    const xs = pts.map(([x]) => x);
+    const ys = pts.map(([, y]) => y);
+    const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const meanY = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const fmt = (n: number) => parseFloat(n.toPrecision(5)).toString();
+    summary.textContent = `n=${pts.length}  x̄=${fmt(meanX)}  ȳ=${fmt(meanY)}`;
+    wrapper.appendChild(summary);
+
+    // ── Table ─────────────────────────────────────────────────────
+    const table = document.createElement("table");
+    table.className = "kcl-table";
+
+    // Header
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    for (const h of ["n", "x", "y"]) {
+      const th = document.createElement("th");
+      th.textContent = h;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body
+    const tbody = document.createElement("tbody");
+    for (let i = 0; i < pts.length; i++) {
+      const [x, y] = pts[i];
+      const tr = document.createElement("tr");
+      for (const v of [i + 1, x, y]) {
+        const td = document.createElement("td");
+        td.textContent = String(v);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+
+    return wrapper;
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+  }
+
+  get estimatedHeight(): number {
+    return 200;
+  }
+
+  ignoreEvent(): boolean {
+    return false;
   }
 }

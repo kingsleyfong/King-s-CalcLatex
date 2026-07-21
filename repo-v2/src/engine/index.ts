@@ -129,6 +129,11 @@ export class ExpressionEngine {
         return this.buildODESpec(latex, mode, diagnostics);
       }
 
+      // ── Scatter / table mode: data points ──────────────────────────
+      if (mode === "scatter" || mode.startsWith("scatter:") || mode === "table") {
+        return this.buildScatterSpec(latex, mode, diagnostics);
+      }
+
       // ── Multi-equation: split on semicolons ────────────────────────
       const subExpressions = latex.split(";").map((s) => s.trim()).filter(Boolean);
       const allData: PlotData[] = [];
@@ -698,6 +703,108 @@ export class ExpressionEngine {
       );
     }
   }
+
+  /**
+   * Build a PlotSpec for scatter/table mode.
+   *
+   * Parses (x,y) data pairs and optionally computes a regression curve.
+   * Mode can be:
+   *   "scatter"       → dots only
+   *   "scatter:lin"   → dots + linear regression
+   *   "scatter:poly2" → dots + degree-2 polynomial regression
+   *   "scatter:poly3" → dots + degree-3 polynomial regression
+   *   "scatter:exp"   → dots + exponential regression (y > 0 required)
+   *   "table"         → data points only (for TableWidget to render as HTML table)
+   */
+  private buildScatterSpec(
+    latex: string,
+    mode: string,
+    diagnostics: Diagnostic[],
+  ): Result<PlotSpec> {
+    try {
+      const points = parseDataPoints(latex);
+      if (points.length < 2) {
+        return err(
+          "Need at least 2 data points (format: (x1,y1);(x2,y2);...)",
+          diagnostics,
+        );
+      }
+
+      // Auto-range from the data extent with 15% padding
+      const xs = points.map(([x]) => x);
+      const ys = points.map(([, y]) => y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const padX = Math.max((maxX - minX) * 0.15, 1);
+      const padY = Math.max((maxY - minY) * 0.15, 1);
+
+      const ranges: AxisRanges = {
+        x: [minX - padX, maxX + padX],
+        y: [minY - padY, maxY + padY],
+      };
+
+      // Extract regression suffix from mode ("scatter:lin" → "lin")
+      const regArg = mode.includes(":") ? mode.split(":")[1] : null;
+
+      const scatterData: PlotData = {
+        latex,
+        type: "dataset",
+        fnStrings: [],
+        compiledFns: [],
+        points,
+        label: `${points.length} data points`,
+      };
+
+      if (regArg && mode !== "table") {
+        let regResult: { coeffs: number[]; r2: number } | null = null;
+
+        if (regArg === "lin") {
+          regResult = polyRegression(points, 1);
+          scatterData.regressionType = "lin";
+        } else if (regArg === "poly2") {
+          regResult = polyRegression(points, 2);
+          scatterData.regressionType = "poly2";
+        } else if (regArg === "poly3") {
+          regResult = polyRegression(points, 3);
+          scatterData.regressionType = "poly3";
+        } else if (regArg === "exp") {
+          regResult = expRegression(points);
+          scatterData.regressionType = "exp";
+        }
+
+        if (regResult) {
+          scatterData.regressionCoeffs = regResult.coeffs;
+          scatterData.rSquared = regResult.r2;
+          scatterData.label = formatRegressionLabel(
+            regArg, regResult.coeffs, regResult.r2,
+          );
+          // Extend y range to accommodate regression curve
+          const [rx0, rx1] = ranges.x;
+          const steps = 50;
+          for (let i = 0; i <= steps; i++) {
+            const x = rx0 + (rx1 - rx0) * i / steps;
+            const yReg = evalRegression(regArg, regResult.coeffs, x);
+            if (isFinite(yReg)) {
+              if (yReg < ranges.y[0]) ranges.y[0] = yReg - padY;
+              if (yReg > ranges.y[1]) ranges.y[1] = yReg + padY;
+            }
+          }
+        }
+      }
+
+      diagnostics.push({
+        level: "info",
+        message: `${points.length} data points parsed`,
+      });
+
+      return ok({ data: [scatterData], freeVars: [], ranges }, diagnostics);
+    } catch (e) {
+      return err(
+        `Scatter/table mode failed: ${e instanceof Error ? e.message : String(e)}`,
+        diagnostics,
+      );
+    }
+  }
 }
 
 // ── Internal Helpers ──────────────────────────────────────────────
@@ -972,6 +1079,9 @@ function getVarsForType(t: ExprType): string[] {
       return ["x", "y"];
     case "vector_field_3d":
       return ["x", "y", "z"];
+    case "ode_phase":
+    case "dataset":
+      return [];
   }
 }
 
@@ -1301,6 +1411,135 @@ function buildGeomSpec(
       z: [-pad, pad],
     },
   };
+}
+
+// ── Scatter / Regression Helpers ─────────────────────────────────────
+
+/**
+ * Parse numeric (x,y) data pairs from a LaTeX string.
+ * Accepts: (x1,y1);(x2,y2);...
+ * Supports integers, decimals, and scientific notation values.
+ */
+export function parseDataPoints(latex: string): [number, number][] {
+  const pts: [number, number][] = [];
+  const re = /\(\s*(-?[\d.]+(?:[eE][+-]?\d+)?)\s*,\s*(-?[\d.]+(?:[eE][+-]?\d+)?)\s*\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(latex)) !== null) {
+    const x = parseFloat(m[1]);
+    const y = parseFloat(m[2]);
+    if (isFinite(x) && isFinite(y)) pts.push([x, y]);
+  }
+  return pts;
+}
+
+/**
+ * Polynomial regression via normal equations (least squares).
+ * Returns coefficients [a0, a1, ..., ak] where y = a0 + a1*x + ... + ak*x^k.
+ */
+function polyRegression(pts: [number, number][], degree: number): { coeffs: number[]; r2: number } {
+  const n = pts.length;
+  const d = degree + 1;
+
+  // Build Gram matrix (A^T A) and right-hand side (A^T y)
+  const ATA = Array.from({ length: d }, () => new Array<number>(d).fill(0));
+  const ATy = new Array<number>(d).fill(0);
+
+  for (const [x, y] of pts) {
+    const row = Array.from({ length: d }, (_, k) => Math.pow(x, k));
+    for (let i = 0; i < d; i++) {
+      ATy[i] += row[i] * y;
+      for (let j = 0; j < d; j++) ATA[i][j] += row[i] * row[j];
+    }
+  }
+
+  const coeffs = gaussianElim(ATA, ATy);
+
+  // R² = 1 - SS_res / SS_tot
+  const yMean = pts.reduce((s, [, y]) => s + y, 0) / n;
+  let ssRes = 0, ssTot = 0;
+  for (const [x, y] of pts) {
+    const yHat = coeffs.reduce((s, c, k) => s + c * Math.pow(x, k), 0);
+    ssRes += (y - yHat) ** 2;
+    ssTot += (y - yMean) ** 2;
+  }
+  const r2 = ssTot > 0 ? Math.max(0, 1 - ssRes / ssTot) : 1;
+
+  return { coeffs, r2 };
+}
+
+/**
+ * Exponential regression: y = a * e^(b*x).
+ * Linearizes as ln(y) = ln(a) + b*x; only valid for y > 0.
+ */
+function expRegression(pts: [number, number][]): { coeffs: number[]; r2: number } {
+  const valid = pts.filter(([, y]) => y > 0);
+  if (valid.length < 2) return { coeffs: [1, 0], r2: 0 };
+
+  const { coeffs: [lnA, b], r2 } = polyRegression(
+    valid.map(([x, y]) => [x, Math.log(y)]),
+    1,
+  );
+  return { coeffs: [Math.exp(lnA), b], r2 };
+}
+
+/** Evaluate a regression model at a single x value. */
+function evalRegression(type: string, coeffs: number[], x: number): number {
+  if (type === "exp") {
+    const [a, b] = coeffs;
+    return a * Math.exp(b * x);
+  }
+  // Polynomial (lin, poly2, poly3)
+  return coeffs.reduce((sum, c, k) => sum + c * Math.pow(x, k), 0);
+}
+
+/** Solve Ax = b by Gauss–Jordan elimination with partial pivoting. */
+function gaussianElim(A: number[][], b: number[]): number[] {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+
+  for (let col = 0; col < n; col++) {
+    // Partial pivot
+    let maxRow = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
+    }
+    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+    if (Math.abs(M[col][col]) < 1e-14) continue;
+
+    // Eliminate column
+    for (let row = 0; row < n; row++) {
+      if (row === col) continue;
+      const f = M[row][col] / M[col][col];
+      for (let j = col; j <= n; j++) M[row][j] -= f * M[col][j];
+    }
+  }
+
+  return Array.from({ length: n }, (_, i) =>
+    Math.abs(M[i][i]) > 1e-14 ? M[i][n] / M[i][i] : 0,
+  );
+}
+
+/** Format a human-readable regression equation label. */
+function formatRegressionLabel(type: string, coeffs: number[], r2: number): string {
+  const sig = (n: number) => parseFloat(n.toPrecision(4)).toString();
+  const pm = (n: number) => n >= 0 ? ` + ${sig(n)}` : ` − ${sig(-n)}`;
+
+  let eq = "";
+  if (type === "lin") {
+    const [a0, a1] = coeffs;
+    eq = `ŷ = ${sig(a1)}x${pm(a0)}`;
+  } else if (type === "poly2") {
+    const [a0, a1, a2] = coeffs;
+    eq = `ŷ = ${sig(a2)}x²${pm(a1)}x${pm(a0)}`;
+  } else if (type === "poly3") {
+    const [a0, a1, a2, a3] = coeffs;
+    eq = `ŷ = ${sig(a3)}x³${pm(a2)}x²${pm(a1)}x${pm(a0)}`;
+  } else if (type === "exp") {
+    const [a, b] = coeffs;
+    eq = `ŷ = ${sig(a)}·e^(${sig(b)}x)`;
+  }
+
+  return `${eq}  R²=${r2.toFixed(3)}`;
 }
 
 // Re-export submodules for direct access if needed

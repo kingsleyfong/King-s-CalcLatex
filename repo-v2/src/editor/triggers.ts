@@ -57,6 +57,8 @@ const TRIGGER_DEFS: TriggerDef[] = [
   { pattern: /@region\s*$/,    kind: "plot", mode: "region" },
   { pattern: /@phase\s*$/,    kind: "plot", mode: "phase" },
   { pattern: /@ode\s*$/,      kind: "plot", mode: "ode" },
+  { pattern: /@scatter(?:\s+(lin|poly2|poly3|exp))?\s*$/, kind: "plot", mode: "scatter", captureArg: true },
+  { pattern: /@table\s*$/,    kind: "plot", mode: "table" },
 
   // Persist trigger
   { pattern: /@persist\s*$/, kind: "persist", mode: "persist" },

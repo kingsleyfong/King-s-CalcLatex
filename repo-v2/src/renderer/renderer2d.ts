@@ -130,6 +130,7 @@ export function create2DGraph(
   spec: PlotSpec,
   isDark: boolean,
   showPOIs: boolean = true,
+  onLabelsBuilt?: (els: HTMLElement[]) => void,
 ): GraphHandle {
   const theme = isDark ? DARK_THEME : LIGHT_THEME;
 
@@ -164,6 +165,18 @@ export function create2DGraph(
   const initScale = scale;
 
   let currentSpec = spec;
+  // Track which spec the label DOM was last built for — avoids wiping
+  // MathJax-rendered nodes on every pan/zoom frame.
+  let labelsBuiltForSpec: PlotSpec | null = null;
+
+  // ── Expression Label DOM Overlay ────────────────────────────────
+  // Labels are DOM elements (not canvas text) so they can be styled/enhanced
+  // (e.g. with renderMath) by the caller after graph creation.
+  const labelOverlayEl = document.createElement("div");
+  labelOverlayEl.className = "kcl-graph-2d-labels";
+  labelOverlayEl.style.cssText =
+    "position:absolute;top:8px;left:8px;pointer-events:none;z-index:2;";
+  container.appendChild(labelOverlayEl);
 
   // ── Interaction State ───────────────────────────────────────────
 
@@ -475,6 +488,9 @@ export function create2DGraph(
             break;
           case "ode_phase":
             drawODEPhase(pd, color, xMin, xMax, yMin, yMax);
+            break;
+          case "dataset":
+            drawScatter(pd, color, xMin, xMax);
             break;
           default:
             break;
@@ -944,6 +960,75 @@ export function create2DGraph(
     }
   }
 
+  // ── Scatter Plot + Regression ────────────────────────────────────
+
+  function drawScatter(
+    pd: PlotData, color: string,
+    xMin: number, xMax: number,
+  ): void {
+    const pts = pd.points;
+    if (!pts || pts.length === 0) return;
+
+    // Draw data points as filled circles with a thin white outline
+    const DOT_R = 5;
+    ctx.save();
+    for (const [x, y] of pts) {
+      const px = mathToPixelX(x);
+      const py = mathToPixelY(y);
+      // Outline
+      ctx.beginPath();
+      ctx.arc(px, py, DOT_R + 1, 0, Math.PI * 2);
+      ctx.fillStyle = isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.15)";
+      ctx.fill();
+      // Fill
+      ctx.beginPath();
+      ctx.arc(px, py, DOT_R, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Draw regression curve if coefficients are present
+    if (!pd.regressionCoeffs || !pd.regressionType) return;
+
+    const coeffs = pd.regressionCoeffs;
+    const type = pd.regressionType;
+    const steps = logicalWidth;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]); // dashed to distinguish from data
+    ctx.beginPath();
+
+    let started = false;
+    for (let i = 0; i <= steps; i++) {
+      const x = xMin + (xMax - xMin) * i / steps;
+      let y: number;
+      if (type === "exp") {
+        const [a, b] = coeffs;
+        y = a * Math.exp(b * x);
+      } else {
+        y = coeffs.reduce((sum, c, k) => sum + c * Math.pow(x, k), 0);
+      }
+      if (!isFinite(y) || Math.abs(y) > 1e12) {
+        started = false;
+        continue;
+      }
+      const px = mathToPixelX(x);
+      const py = mathToPixelY(y);
+      if (!started) {
+        ctx.moveTo(px, py);
+        started = true;
+      } else {
+        ctx.lineTo(px, py);
+      }
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   // ── ODE Phase Portrait ───────────────────────────────────────────
 
   function drawODEPhase(
@@ -1240,19 +1325,33 @@ export function create2DGraph(
   // ── Expression Labels ──────────────────────────────────────────
 
   function drawExpressionLabels(): void {
-    const padding = 10;
-    let y = padding + 12;
+    // Only rebuild the DOM when the spec actually changes.
+    // pan/zoom/hover frames reuse the same spec object → skip rebuild → MathJax nodes survive.
+    if (labelsBuiltForSpec === currentSpec) return;
+    labelsBuiltForSpec = currentSpec;
+
+    labelOverlayEl.innerHTML = "";
+    const builtEls: HTMLElement[] = [];
+
     for (let i = 0; i < currentSpec.data.length; i++) {
       const pd = currentSpec.data[i];
-      const color = COLORS[i % COLORS.length];
-      ctx.fillStyle = color;
-      ctx.font = "12px monospace";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      const label = pd.latex.replace(/@plot2d\s*$/i, "").trim();
-      ctx.fillText(label, padding, y);
-      y += 18;
+      const color = pd.color || COLORS[i % COLORS.length];
+      // pd.label: plain-text override (e.g. regression equation, point count)
+      // Otherwise: strip ALL trigger suffixes (@plot2d, @scatter, @diff, etc.)
+      const cleanLatex = pd.label ?? pd.latex.replace(/@\w+.*$/i, "").trim();
+
+      const lbl = document.createElement("div");
+      lbl.className = "kcl-graph-2d-label";
+      lbl.style.cssText = `color:${color};font-size:12px;line-height:18px;`;
+      // data-latex: the LaTeX to render via MathJax. Empty for plain-text labels.
+      lbl.dataset.latex = pd.label ? "" : cleanLatex;
+      lbl.textContent = cleanLatex; // placeholder — replaced by caller via onLabelsBuilt
+      labelOverlayEl.appendChild(lbl);
+      builtEls.push(lbl);
     }
+
+    // Notify caller so it can run renderMath on the fresh label elements
+    onLabelsBuilt?.(builtEls);
   }
 
   // ── Schedule Render ────────────────────────────────────────────

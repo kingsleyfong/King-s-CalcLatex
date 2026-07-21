@@ -1,0 +1,3 @@
+optimal agentic orchestration; spawn parallel subagents for independent tasks and workstreams (research, implementation, validation, etc.);when spawning     
+  sugagents for implementation, code search or file exploration tasks always specify model: "sonnet" in the agent tool call; never put two unrelated tasks in the same agent's context; manage your own          
+  build/test loop via bash tool - run 'rpm run build' and sync to the obsidian plugin folder yourself without asking me to test intermediate states. only surface blockers that genuinely require my input.

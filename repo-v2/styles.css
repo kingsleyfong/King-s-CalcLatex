@@ -423,6 +423,39 @@
 
 /* ── 3D Expression Labels (HTML overlay) ──────────────────── */
 
+/* ── 2D Expression Labels (DOM overlay, rendered math) ─────── */
+
+.kcl-graph-2d-labels {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  pointer-events: none;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kcl-graph-2d-label {
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+.theme-light .kcl-graph-2d-label {
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+}
+
+/* MathJax elements inside graph labels */
+.kcl-graph-2d-label mjx-container,
+.kcl-graph-3d-label mjx-container {
+  display: inline !important;
+  font-size: 0.95em !important;
+}
+
+/* ── 3D Expression Labels ──────────────────────────────────── */
+
 .kcl-graph-3d-labels {
   position: absolute;
   top: 10px;
@@ -435,8 +468,8 @@
 }
 
 .kcl-graph-3d-label {
-  font-family: var(--font-monospace);
   font-size: 11px;
+  line-height: 1.4;
   text-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
 }
@@ -466,6 +499,72 @@
   border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
+/* ── Data Table Widget ───────────────────────────────────── */
+
+.kcl-table-widget {
+  margin: 8px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--background-secondary);
+  font-size: 0.85em;
+}
+
+.kcl-table-widget.kcl-table-error {
+  padding: 12px 16px;
+  color: var(--text-error);
+  border-color: var(--text-error);
+}
+
+.kcl-table-summary {
+  padding: 6px 12px;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-family: var(--font-monospace);
+}
+
+.kcl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-monospace);
+}
+
+.kcl-table thead th {
+  padding: 6px 12px;
+  text-align: right;
+  color: var(--text-accent);
+  font-weight: 600;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: 0.9em;
+}
+
+.kcl-table thead th:first-child {
+  text-align: center;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+.kcl-table tbody td {
+  padding: 4px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.kcl-table tbody td:first-child {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.kcl-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.kcl-table tbody tr:hover {
+  background-color: var(--background-modifier-hover);
+}
+
 /* ── Slider Play/Pause Button ─────────────────────────────── */
 
 .kcl-slider-play {
@@ -489,4 +588,39 @@
 .kcl-slider-play:hover {
   color: var(--text-accent);
   background: var(--background-modifier-hover);
+}
+
+/* ── Slider Record / Export Button ───────────────────────── */
+
+.kcl-slider-record {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.kcl-slider-record:hover {
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}
+
+.kcl-slider-record.recording {
+  color: #e05555;
+  animation: kcl-rec-pulse 1s ease-in-out infinite;
+}
+
+@keyframes kcl-rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }

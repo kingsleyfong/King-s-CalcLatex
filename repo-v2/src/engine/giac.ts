@@ -445,6 +445,30 @@ export function isGiacReady(): boolean {
 }
 
 /**
+ * Terminate the running Giac Web Worker and release resources.
+ * Called during plugin unload (onunload) to prevent orphaned Web Workers
+ * and WebAssembly memory leaks.
+ */
+export function terminateGiac(): void {
+  if (worker) {
+    try {
+      worker.terminate();
+      console.log("KCL: Giac Web Worker terminated");
+    } catch (e) {
+      console.warn("KCL: Error terminating Giac Web Worker:", e);
+    }
+    worker = null;
+  }
+  giacReady = false;
+  loadPromise = null;
+  _inlineCaseval = null;
+  for (const [id, { resolve }] of pendingRequests) {
+    resolve({ value: null, steps: [] });
+  }
+  pendingRequests.clear();
+}
+
+/**
  * Initialize Giac WASM by loading giacwasm.js from the plugin folder into a
  * Web Worker. Returns true if Giac loaded successfully, false otherwise.
  * Safe to call multiple times — only loads once.

@@ -984,12 +984,18 @@ export function classifyExpression(latex: string): ExprType {
     // Rules:
     //   z = f(x,y)  or  f(x,y) = z  →  explicit_3d
     //   y = f(x)    or  f(x) = y    →  explicit_2d
-    //   x = f(y)                    →  explicit_2d
+    //   x = f(y)                    →  implicit_2d  (vertical line/curve: x - f(y) = 0)
     //   r = f(theta)                →  polar (already handled above)
+    //
+    // NOTE: x = f(y) MUST be implicit_2d, NOT explicit_2d.
+    // buildPlotData for explicit_2d extracts only the RHS and compiles as fn(x),
+    // treating it as y = RHS(x). So `x = 1` would compile to fn(x) = 1 and render
+    // as a horizontal line at y = 1. The implicit path correctly builds x - f(y) = 0
+    // and the marching-squares renderer draws the vertical line/curve.
 
     if (/^z$/.test(lhsTrimmed) || /^z$/.test(rhsTrimmed)) return "explicit_3d";
     if (/^y$/.test(lhsTrimmed) || /^y$/.test(rhsTrimmed)) return "explicit_2d";
-    if (/^x$/.test(lhsTrimmed)) return "explicit_2d";
+    if (/^x$/.test(lhsTrimmed)) return "implicit_2d";
 
     // ── Symbol-level analysis for compound LHS expressions ──────────
     // Handles cases like "x^2 + z = y^2 + 1" (implicit_3d) where the
