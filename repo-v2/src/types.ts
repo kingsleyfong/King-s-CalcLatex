@@ -240,6 +240,16 @@ export interface KCLSettings {
   latexEditorShortcutModifier: "ctrl" | "alt" | "shift";
   /** Key for LaTeX editor shortcut */
   latexEditorShortcutKey: string;
+
+  // ── LaTeX Suite Settings ──
+  /** Enable LaTeX Suite snippet expansion across Markdown notes (.md) and Excalidraw overlays */
+  enableLaTeXSuite: boolean;
+  /** Auto-expand fractions (e.g. fra -> \frac{}{}) */
+  enableAutoFraction: boolean;
+  /** Auto-expand matrix shortcuts (pmat, bmat, vmat) */
+  enableMatrixShortcuts: boolean;
+  /** Auto-expand digit subscripts (e.g. x1 -> x_1) */
+  enableAutoSubscript: boolean;
 }
 
 export const DEFAULT_SETTINGS: KCLSettings = {
@@ -267,4 +277,10 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   latexEditorShortcutEnabled: true,
   latexEditorShortcutModifier: "ctrl",
   latexEditorShortcutKey: "\\",
+
+  // LaTeX Suite Defaults
+  enableLaTeXSuite: true,
+  enableAutoFraction: true,
+  enableMatrixShortcuts: true,
+  enableAutoSubscript: true,
 };

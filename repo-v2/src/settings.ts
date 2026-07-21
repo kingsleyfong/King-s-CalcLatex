@@ -345,14 +345,56 @@ export class KCLSettingTab extends PluginSettingTab {
       )
       .addText((text) =>
         text
-          .setPlaceholder("l")
-          .setValue(this.plugin.settings.latexEditorShortcutKey || "l")
+          .setPlaceholder("\\")
+          .setValue(this.plugin.settings.latexEditorShortcutKey || "\\")
           .onChange(async (value) => {
             const key = value.trim().toLowerCase();
             if (key) {
               this.plugin.settings.latexEditorShortcutKey = key;
               await this.plugin.saveSettings();
             }
+          }),
+      );
+
+    // ══════════════════════════════════════════════════════════════
+    //  SECTION 3: LATEX SUITE FEATURES (SNIPPETS & FAST MATH ENTRY)
+    // ══════════════════════════════════════════════════════════════
+    const lsHeader = containerEl.createEl("h3", { text: "LaTeX Suite Features (Snippets & Fast Math Entry)" });
+    lsHeader.style.cssText = "color: var(--text-accent); margin-top: 2em; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 0.3em;";
+
+    new Setting(containerEl)
+      .setName("Enable Ingested LaTeX Suite Snippet Engine")
+      .setDesc("Enable trigger auto-expansion (mk -> $ $, dm -> $$ $$, sr -> ^2, fra -> \\frac{}{}) across Markdown notes and Excalidraw text overlays.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableLaTeXSuite)
+          .onChange(async (value) => {
+            this.plugin.settings.enableLaTeXSuite = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Fraction Expansion")
+      .setDesc("Automatically convert fra or // into \\frac{num}{den} with cursor tabstop navigation.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableAutoFraction)
+          .onChange(async (value) => {
+            this.plugin.settings.enableAutoFraction = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Matrix Environment Shortcuts")
+      .setDesc("Automatically expand pmat, bmat, and vmat into matrix environment blocks.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableMatrixShortcuts)
+          .onChange(async (value) => {
+            this.plugin.settings.enableMatrixShortcuts = value;
+            await this.plugin.saveSettings();
           }),
       );
   }

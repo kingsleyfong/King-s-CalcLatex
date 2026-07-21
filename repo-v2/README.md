@@ -172,6 +172,15 @@ npm run dev     # Watch mode
 npm run build   # Production build
 ```
 
+## Acknowledgements & Inspirations
+
+King's CalcLatex is built upon and inspired by several outstanding open-source projects (MIT License):
+- **LaTeX Suite** (by Gilles Castel & Arturo): Inspiration for snippet auto-expansion (`mk`, `dm`, `fra`, `pmat`), math mode detection, and tabstop traversal.
+- **CalcTex** (by Developer-Mike): Inspiration for inline LaTeX math evaluation in Markdown notes.
+- **Excalidraw & ExcalidrawAutomate** (by Zsviczian): Canvas rendering and scene injection APIs.
+
+See [ACKNOWLEDGEMENTS.md](../ACKNOWLEDGEMENTS.md) for full details.
+
 ## License
 
 [MIT](LICENSE)
