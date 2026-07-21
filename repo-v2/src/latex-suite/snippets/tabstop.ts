@@ -28,12 +28,8 @@ export function tabstopSpecsToTabstopGroups(specs: readonly TabstopSpec[]): Tabs
     result.push(new TabstopGroup(index, ranges));
   }
 
-  // Sort: $1, $2, $3... and $0 last
-  result.sort((a, b) => {
-    if (a.index === 0) return 1;
-    if (b.index === 0) return -1;
-    return a.index - b.index;
-  });
+  // In obsidian-latex-suite, tabstops are sorted in ascending numerical order ($0, $1, $2, $3...)
+  result.sort((a, b) => a.index - b.index);
 
   return result;
 }
