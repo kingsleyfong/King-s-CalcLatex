@@ -4,7 +4,8 @@ import type KingsCalcLatexPlugin from "../main";
 import { DEFAULT_LATEX_SUITE_SNIPPETS } from "../snippets/default-snippets";
 import { MathContextManager } from "./utils/context";
 import { parseRawSnippets } from "./snippets/parse";
-import { Snippet } from "./snippets/snippets";
+import { SnippetTabstopOnlyNode, emptyInsertOptions } from "./snippets/luasnip_api/node";
+import { tabstopSpecsToTabstopGroups, TabstopGroup } from "./snippets/tabstop";
 
 export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   const parsedDefaultSnippets = parseRawSnippets(DEFAULT_LATEX_SUITE_SNIPPETS);
@@ -45,7 +46,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
           }
         }
 
-        // 2. Evaluate snippets
+        // 2. Custom & Default Snippets
         for (const s of parsedDefaultSnippets) {
           const opts = s.options || "";
           const isMathOnly = opts.includes("m");
@@ -73,11 +74,11 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
               replacementRaw = nodes.map((n: any) => typeof n.insert === "string" ? n.insert : "").join("");
             }
 
-            const { text: replacementText, cursorOffset } = parseSnippetReplacement(replacementRaw);
+            const { text: replacementText, initialCursorOffset } = computeSnippetExpansion(replacementRaw);
 
             view.dispatch({
               changes: { from: replaceFrom, to: pos, insert: replacementText },
-              selection: { anchor: replaceFrom + cursorOffset, head: replaceFrom + cursorOffset },
+              selection: { anchor: replaceFrom + initialCursorOffset, head: replaceFrom + initialCursorOffset },
             });
             event.preventDefault();
             return true;
@@ -160,17 +161,19 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   return [keydownExtension, Prec.high(keymap.of([tabKeybinding, shiftTabKeybinding]))];
 }
 
-function parseSnippetReplacement(rep: string): { text: string; cursorOffset: number } {
-  let text = rep;
-  let cursorOffset = rep.length;
+export function computeSnippetExpansion(replacementRaw: string): { text: string; initialCursorOffset: number; tabstops: TabstopGroup[] } {
+  const snippetNode = new SnippetTabstopOnlyNode(replacementRaw);
+  const { insert: text, tabstops: rawSpecs } = snippetNode.applyInsert(emptyInsertOptions);
 
-  if (text.includes("$0")) {
-    cursorOffset = text.indexOf("$0");
-    text = text.replace(/\$0/g, "");
-  } else if (text.includes("$1")) {
-    cursorOffset = text.indexOf("$1");
-    text = text.replace(/\$\d+/g, "");
+  const tabstopGroups = tabstopSpecsToTabstopGroups(rawSpecs);
+
+  let initialCursorOffset = text.length;
+  if (tabstopGroups.length > 0) {
+    const firstGroup = tabstopGroups[0];
+    if (firstGroup.ranges.length > 0) {
+      initialCursorOffset = firstGroup.ranges[0].from;
+    }
   }
 
-  return { text, cursorOffset };
+  return { text, initialCursorOffset, tabstops: tabstopGroups };
 }
