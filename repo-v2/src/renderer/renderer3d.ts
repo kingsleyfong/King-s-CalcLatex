@@ -885,7 +885,8 @@ function buildSceneObjects(
   spec: PlotSpec,
   ranges: AxisRanges,
   disposables: { dispose(): void }[],
-): void {
+): { latex: string; type: string }[] {
+  const failed: { latex: string; type: string }[] = [];
   for (let i = 0; i < spec.data.length; i++) {
     const pd = spec.data[i];
     const color = pd.color
@@ -893,12 +894,13 @@ function buildSceneObjects(
          (parseInt(pd.color.replace("#", ""), 16) || COLORS_HEX[i % COLORS_HEX.length]))
       : COLORS_HEX[i % COLORS_HEX.length];
     try {
+      let ok = true;
       switch (pd.type) {
         case "explicit_3d":
           buildExplicit3D(worldGroup, pd, ranges, disposables, color);
           break;
         case "implicit_3d":
-          buildImplicit3D(worldGroup, pd, ranges, disposables, color);
+          ok = buildImplicit3D(worldGroup, pd, ranges, disposables, color);
           break;
         case "parametric_3d":
           buildParametric3D(worldGroup, pd, ranges, disposables, color);
@@ -919,10 +921,15 @@ function buildSceneObjects(
         default:
           break;
       }
+      if (!ok) {
+        failed.push({ latex: pd.latex, type: pd.type });
+      }
     } catch (e: unknown) {
       console.warn(`[KCL] Failed to build 3D object for ${pd.type}:`, e);
+      failed.push({ latex: pd.latex, type: pd.type });
     }
   }
+  return failed;
 }
 
 function buildExplicit3D(
@@ -955,11 +962,34 @@ function buildImplicit3D(
   ranges: AxisRanges,
   disposables: { dispose(): void }[],
   color: number,
-): void {
+): boolean {
   const fn = pd.compiledFns[0];
-  if (!fn) return;
+  if (!fn) return false;
 
-  // Try analytical plane detection first — produces clean full-box polygon
+  // ── Sanity-check the compiled function before marching cubes ─────────
+  // If the function returns NaN at all test points, the compiled JS is broken
+  // (e.g. CortexJS produced an unexpected MathJSON head → (0/0) sentinel).
+  // Surface this immediately so the user sees a useful console error.
+  const PROBE_POINTS: [number, number, number][] = [
+    [0, 0, 0], [1, 0, 0], [-1, 0, 0],
+    [0, 1, 0], [0, 0, 1], [2, 0, 0],
+    [0, 0, 2], [1, 1, 1],
+  ];
+  const probeVals = PROBE_POINTS.map(([x, y, z]) => fn(x, y, z));
+  const allNaN = probeVals.every(v => isNaN(v));
+  if (allNaN) {
+    console.error(
+      `[KCL] Implicit 3D: compiled function always returns NaN.\n` +
+      `  Expression: "${pd.latex}"\n` +
+      `  JS string:  "${pd.fnStrings?.[0] ?? "unknown"}"\n` +
+      `  Probe values at ${PROBE_POINTS.map(p => JSON.stringify(p)).join(", ")}: ` +
+      probeVals.join(", "),
+    );
+    return false;
+  }
+
+  // ── Try analytical plane detection first ─────────────────────────────
+  // Produces a clean full-box polygon — much sharper than marching cubes for planes.
   const plane = detectPlane(fn);
   if (plane) {
     const geometry = buildPlane3DMesh(plane, ranges);
@@ -975,15 +1005,22 @@ function buildImplicit3D(
       const mesh = new Mesh(geometry, material);
       parent.add(mesh);
       disposables.push(geometry, material, { dispose: () => parent.remove(mesh) });
-      return;
+      return true;
     }
+    // detectPlane returned non-null but buildPlane3DMesh returned null:
+    // fall through to marching cubes.
   }
 
-  // Fallback: marching cubes for nonlinear implicit surfaces
+  // ── Fallback: marching cubes for nonlinear implicit surfaces ──────────
   const geometry = buildImplicit3DMesh(fn, ranges, MC_RESOLUTION);
   if (!geometry) {
-    console.warn("[KCL] Implicit 3D: no isosurface found in the given range.");
-    return;
+    // Log probe values to help diagnose whether this is a range or compile issue
+    console.warn(
+      `[KCL] Implicit 3D: no isosurface found in range ${JSON.stringify(ranges)}.\n` +
+      `  Expression: "${pd.latex}"\n` +
+      `  Probe values: ${PROBE_POINTS.map((p, i) => `f${JSON.stringify(p)}=${probeVals[i]}`).join(", ")}`,
+    );
+    return false;
   }
 
   const material = new MeshPhongMaterial({
@@ -998,6 +1035,7 @@ function buildImplicit3D(
   const mesh = new Mesh(geometry, material);
   parent.add(mesh);
   disposables.push(geometry, material, { dispose: () => parent.remove(mesh) });
+  return true;
 }
 
 function buildParametric3D(
@@ -1340,10 +1378,10 @@ export function create3DGraph(
     regenerateTickLabels();
 
     // ── Build Geometry ───────────────────────────────────────────
-    buildSceneObjects(worldGroup, spec, currentRanges, geometryDisposables);
+    const buildFailures = buildSceneObjects(worldGroup, spec, currentRanges, geometryDisposables);
 
     // ── Expression Labels (HTML overlay) ─────────────────────────
-    labelOverlay = createLabelOverlay(container, spec);
+    labelOverlay = createLabelOverlay(container, spec, buildFailures);
 
     // ── 3D Hover Coordinates (Raycaster + tooltip) ───────────────
     tooltip = document.createElement("div");
@@ -1615,7 +1653,7 @@ export function create3DGraph(
     if (destroyed || !worldGroup) return;
 
     disposeSceneObjects(geometryDisposables);
-    buildSceneObjects(worldGroup, spec, currentRanges, geometryDisposables);
+    buildSceneObjects(worldGroup, spec, currentRanges, geometryDisposables); // failures logged to console
     needsRender = true;
   }
 
@@ -1757,19 +1795,35 @@ export function create3DGraph(
  * Create an HTML overlay showing expression labels in the top-left corner
  * of a 3D graph container. Stays static during camera rotation.
  */
-function createLabelOverlay(container: HTMLElement, spec: PlotSpec): HTMLElement {
+function createLabelOverlay(
+  container: HTMLElement,
+  spec: PlotSpec,
+  failures?: { latex: string; type: string }[],
+): HTMLElement {
   const overlay = document.createElement("div");
   overlay.className = "kcl-graph-3d-labels";
+
+  const failedLatexSet = new Set((failures ?? []).map(f => f.latex));
 
   for (let i = 0; i < spec.data.length; i++) {
     const pd = spec.data[i];
     const color = COLORS[i % COLORS.length];
     const label = document.createElement("div");
     label.className = "kcl-graph-3d-label";
-    label.style.color = color;
-    // Clean up the LaTeX for display
-    const text = pd.latex.replace(/@plot3d\s*$/i, "").trim();
-    label.textContent = text;
+    // Strip ALL trigger suffixes (@plot3d, @vecfield, @tangent, etc.)
+    // pd.label overrides with plain text (e.g. scatter dataset description)
+    const text = pd.label ?? pd.latex.replace(/@\w+.*$/i, "").trim();
+
+    if (failedLatexSet.has(pd.latex)) {
+      label.style.color = "#e05555";
+      label.textContent = `⚠ ${text}`;
+      label.title = "Surface not found in current range. Check browser console for details.";
+    } else {
+      label.style.color = color;
+      label.textContent = text;
+      // data-latex enables the widget to post-process with renderMath (renderer has no Obsidian API)
+      if (!pd.label) label.dataset.latex = text;
+    }
     overlay.appendChild(label);
   }
 

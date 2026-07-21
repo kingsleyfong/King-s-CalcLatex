@@ -8,7 +8,7 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v2.0 Path C — Giac WASM integrated, 2026-03-24)
+## Current Status: 🟢 WORKING (v2.0 — Web Worker termination & CM6 fast-path added, 2026-07-21)
 
 ### What Happened
 On 2026-03-16, after analyzing v1's fundamental architecture limitations, decided to pursue **Path C** — a full browser-native rewrite. The v1 architecture (Python/SymPy/Plotly → HTTP → iframe) had rendering limitations that could never reach Desmos-level UX:
@@ -138,6 +138,18 @@ On 2026-03-16, after analyzing v1's fundamental architecture limitations, decide
 - [x] PNG download button on 2D and 3D graph toolbars (2026-03-23)
 - [x] Screenshot-to-clipboard button on graph toolbars (2026-03-23)
 - [x] Per-slider editable min/max bounds — click to customize range instead of fixed ±10 (2026-03-24)
+- [x] WebM animation export — ⏺ record button per slider; captures one full min→max pass at 30fps via `canvas.captureStream()` + `MediaRecorder`; auto-stops at 4 s; downloads `kcl-{var}-anim.webm` (2026-04-06)
+
+#### Scatter Plots, Tables, Regression (2026-04-05)
+- [x] `@scatter` — scatter plot from `(x1,y1);(x2,y2);...` data pairs (filled dots on canvas graph)
+- [x] `@scatter lin` — linear regression overlay (dashed curve, R² in label)
+- [x] `@scatter poly2` — degree-2 polynomial regression
+- [x] `@scatter poly3` — degree-3 polynomial regression
+- [x] `@scatter exp` — exponential regression `y = a·e^(bx)` (y > 0 data required)
+- [x] `@table` — render data as a formatted HTML table with n, x̄, ȳ stats
+- [x] Auto-range from data extent (15% padding)
+- [x] Regression implemented via least-squares normal equations (Gaussian elimination — no external dep)
+- [x] R² goodness-of-fit displayed in graph expression label overlay
 
 ### Known Issues
 - 3D interactive mode: only one graph interactive at a time (by design — Chrome 16-context limit)
@@ -173,6 +185,7 @@ On 2026-03-16, after analyzing v1's fundamental architecture limitations, decide
 23. **CortexJS `.latex` property broken for CAS output** — `.latex` on a CortexJS expression object returns mangled or empty strings for some CAS results; replaced with custom `jsonToLatex()` that walks MathJSON directly
 24. **3D Z-axis not 1:1:1** — auto-computed z range broke proportional scaling; now defaults to matching x/y range with opt-in autoScaleZ3d setting
 25. **Implicit 3D planes render as diamond** — marching cubes produces diamond intersection artifact for linear surfaces; now detects planes analytically and computes exact plane-AABB intersection polygon
+26. **`x = 1` renders as horizontal line `y = 1`** — `classifyExpression` was returning `explicit_2d` for `x = f(y)`, so `buildPlotData` extracted the RHS and compiled as `fn(x) = 1` → `y = 1`. Fix: `x = ...` now returns `implicit_2d`; marching squares draws `x - 1 = 0` as a vertical line. Also fixes `x = 1 @plot3d` (was rendering `z = 1` floor instead of `x = 1` plane).
 
 ## File Map
 ```
@@ -237,10 +250,8 @@ Do not create persistent WebGL contexts. Use `renderSnapshot()` (creates context
 Use `jsonToLatex(expr.json)` (defined in `parser.ts`) whenever you need a LaTeX string from a CortexJS expression that came back from a CAS operation. The `.latex` getter silently returns wrong/empty strings for several expression forms.
 
 ## Next Steps (Priority Order)
-1. **Tables + scatter plots** — data entry and regression
-2. **Animation export** — GIF export / slider animation
-3. **Mobile** — touch event handling for 2D pan/zoom
-4. **Performance profiling** — Giac 19MB load time; investigate lazy loading
-5. **Color picker UI** — visual color selection per curve (currently suffix-only)
-6. **Higher-order ODE** — extend @phase to 2nd-order systems
-7. **Save/load graph state** — persist zoom level, slider values, interactive angle
+1. **Mobile** — touch event handling for 2D pan/zoom
+2. **Performance profiling** — Giac 19MB load time; investigate lazy loading
+3. **Color picker UI** — visual color selection per curve (currently suffix-only)
+4. **Higher-order ODE** — extend @phase to 2nd-order systems
+5. **Save/load graph state** — persist zoom level, slider values, interactive angle

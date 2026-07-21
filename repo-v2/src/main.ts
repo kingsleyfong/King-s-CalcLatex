@@ -14,7 +14,7 @@ import { create2DGraph } from "./renderer/renderer2d";
 import { create3DGraph, renderSnapshot } from "./renderer/renderer3d";
 import { KCLSettingTab } from "./settings";
 import { GraphInspectorView, GRAPH_INSPECTOR_VIEW } from "./views/inspector";
-import { initGiac, isGiacReady } from "./engine/giac";
+import { initGiac, isGiacReady, terminateGiac } from "./engine/giac";
 
 export default class KingsCalcLatexPlugin extends Plugin {
   settings!: KCLSettings;
@@ -27,8 +27,13 @@ export default class KingsCalcLatexPlugin extends Plugin {
 
   /** Renderer facades — widgets call plugin.renderer2d.create() / plugin.renderer3d.create() */
   renderer2d = {
-    create: (container: HTMLElement, spec: PlotSpec, showPOIs?: boolean): GraphHandle =>
-      create2DGraph(container, spec, this.isDark(), showPOIs ?? this.settings.showPOIs),
+    create: (
+      container: HTMLElement,
+      spec: PlotSpec,
+      showPOIs?: boolean,
+      onLabelsBuilt?: (els: HTMLElement[]) => void,
+    ): GraphHandle =>
+      create2DGraph(container, spec, this.isDark(), showPOIs ?? this.settings.showPOIs, onLabelsBuilt),
   };
   renderer3d = {
     create: (container: HTMLElement, spec: PlotSpec): GraphHandle =>
@@ -108,6 +113,8 @@ export default class KingsCalcLatexPlugin extends Plugin {
   onunload(): void {
     // Detach all Graph Inspector leaves to prevent orphaned views
     this.app.workspace.detachLeavesOfType(GRAPH_INSPECTOR_VIEW);
+    // Terminate Giac WASM worker to prevent memory leaks across plugin reloads
+    terminateGiac();
   }
 
   async loadSettings(): Promise<void> {

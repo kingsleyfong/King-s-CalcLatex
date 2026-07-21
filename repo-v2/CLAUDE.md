@@ -1,10 +1,18 @@
 # CLAUDE.md — King's CalcLatex v2 Codebase
 
-> **READ THIS FILE AT THE START OF EVERY SESSION. NO EXCEPTIONS.**
+> **Code-level reference. Read the antipatterns section before touching `editor/` or `renderer/`.**
+> New session? Start at `../SESSION_START.md` first.
+
+## Orchestration Rules (CTO)
+
+- Spawn parallel **Sonnet** subagents for independent low-level workstreams (implementation, search, validation). Specify `model: "sonnet"` explicitly.
+- Use Opus for planning/architecture requiring deep reasoning.
+- Never put two unrelated tasks in the same subagent context.
+- Take initiative on individual implementation decisions; escalate only genuine ambiguities.
 
 ## What This Is
 
-King's CalcLatex v2 is a **100% browser-native** Obsidian plugin for inline math evaluation and high-fidelity 2D/3D graphing. There is NO backend server. All computation happens in-browser.
+King's CalcLatex v2 is a **100% browser-native** Obsidian plugin for inline math evaluation and high-fidelity 2D/3D graphing. No backend server. All computation in-browser.
 
 ## Architecture
 
@@ -306,7 +314,33 @@ if (isSimpleLHS(lhsSyms, "z") || isSimpleLHS(rhsSyms, "z")) return "explicit_3d"
 // ✅ CORRECT — string-level fast path runs first, no CortexJS dependency
 if (/^z$/.test(lhsTrimmed) || /^z$/.test(rhsTrimmed)) return "explicit_3d";
 if (/^y$/.test(lhsTrimmed) || /^y$/.test(rhsTrimmed)) return "explicit_2d";
+if (/^x$/.test(lhsTrimmed)) return "implicit_2d"; // NOT explicit_2d — see rule 16
 ```
+
+### 16. NEVER classify `x = f(y)` as `explicit_2d` — it MUST be `implicit_2d` (RUNTIME BUG 2026-03-30)
+
+`x = 1` classified as `explicit_2d` causes `buildPlotData` to extract only the RHS (`1`) and
+compile it as `fn(x) = 1`. The explicit 2D renderer then draws `y = 1` — a horizontal line —
+instead of the correct vertical line at `x = 1`. The same misclassification makes `x = \sin(y)`
+draw `y = \sin(y)` (NaN for all x because y is never in scope).
+
+**Root cause**: `explicit_2d` extraction always takes the RHS and compiles with vars `["x"]`,
+treating the result as `y = RHS(x)`. For `x = f(y)` the LHS is `x`, not `y`, so this is
+semantically wrong.
+
+**Fix**: `x = f(y)` must be `implicit_2d`. The implicit path builds `Subtract(x, f(y)) = 0`,
+compiles with vars `["x", "y"]`, and the marching-squares renderer correctly draws the zero set.
+
+```ts
+// ❌ WRONG — x=1 compiles to fn(x)=1, draws y=1 (horizontal line)
+if (/^x$/.test(lhsTrimmed)) return "explicit_2d";
+
+// ✅ CORRECT — x=1 builds x-1=0, marching squares draws vertical line at x=1
+if (/^x$/.test(lhsTrimmed)) return "implicit_2d";
+```
+
+This also fixes `x = 1 @plot3d`: `implicit_2d` → promoted to `implicit_3d` →
+marching cubes renders the plane at `x = 1` instead of a flat floor at `z = 1`.
 
 ### 7. DO NOT detect Tab cursor position by proximity to mathRange.to (RUNTIME BUG 2026-03-16)
 

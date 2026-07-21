@@ -5,7 +5,7 @@
  * Opened via the "Open Graph Inspector" command.
  */
 
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, WorkspaceLeaf, renderMath, finishRenderMath } from "obsidian";
 import type { InspectorState, GraphHandle } from "../types";
 import type KingsCalcLatexPlugin from "../main";
 import { create2DGraph } from "../renderer/renderer2d";
@@ -77,9 +77,20 @@ export class GraphInspectorView extends ItemView {
 
     // ── Header ───────────────────────────────────────────────
     const header = container.createDiv({ cls: "kcl-inspector-header" });
-    header.createEl("h3", {
-      text: this.state.title || "Graph Inspector",
-    });
+    const h3 = header.createEl("h3");
+    const titleText = this.state.title || "Graph Inspector";
+    try {
+      // Render the title as formatted LaTeX if it looks like a math expression
+      if (this.state.title) {
+        const rendered = renderMath(titleText.replace(/@\w+\s*$/i, "").trim(), false);
+        h3.appendChild(rendered);
+        finishRenderMath();
+      } else {
+        h3.textContent = titleText;
+      }
+    } catch {
+      h3.textContent = titleText;
+    }
     if (this.state.summary) {
       header.createEl("p", {
         text: this.state.summary,

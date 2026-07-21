@@ -34,6 +34,12 @@
 | `@region` | Graphing | Shaded region between curves |
 | `@phase` | Graphing | ODE phase portrait (direction field + solution curves) |
 | `@ode` | Graphing | ODE direction field |
+| `@scatter` | Data | Scatter plot of (x,y) data points |
+| `@scatter lin` | Data | Scatter + linear regression curve + R² |
+| `@scatter poly2` | Data | Scatter + degree-2 polynomial regression |
+| `@scatter poly3` | Data | Scatter + degree-3 polynomial regression |
+| `@scatter exp` | Data | Scatter + exponential regression `y = a·e^(bx)` |
+| `@table` | Data | Render data as a formatted HTML table with stats |
 | `@laplace` | CAS (Giac) | Laplace transform (t → s) |
 | `@ilaplace` | CAS (Giac) | Inverse Laplace transform (s → t) |
 
@@ -631,7 +637,86 @@ $y = e^x; y = x + 2 @region$      — exponential vs. linear bound
 
 ---
 
-## 13. Settings
+## 13. Scatter Plots & Data Tables (`@scatter`, `@table`)
+
+Plot numeric (x,y) datasets directly from LaTeX notation. No CSV import needed — embed data inline.
+
+### Data Format
+
+Semicolon-separated `(x,y)` pairs inside `$...$`:
+
+```
+$(1,2.1);(2,3.9);(3,6.2);(4,7.8);(5,10.1) @scatter$
+```
+
+### `@scatter` — Scatter Plot
+
+Renders data as filled dots on an auto-ranged 2D canvas with the full pan/zoom/export toolbar.
+
+```
+$(1,2);(3,5);(5,9);(7,14) @scatter$
+```
+
+### `@scatter lin` — Linear Regression
+
+Fits `ŷ = bx + a` and overlays a dashed regression line. R² is shown in the expression label.
+
+```
+$(1,2.1);(2,3.9);(3,6.2);(4,7.8);(5,10.1) @scatter lin$
+```
+
+Label overlay shows: `ŷ = 2.01x + 0.06  R²=0.998`
+
+### `@scatter poly2` / `@scatter poly3` — Polynomial Regression
+
+Fits a degree-2 or degree-3 polynomial using least squares.
+
+```
+$(0,0);(1,1);(2,4);(3,9);(4,16) @scatter poly2$     — y = x²
+$(0,0);(1,1);(2,8);(3,27) @scatter poly3$            — y = x³
+```
+
+### `@scatter exp` — Exponential Regression
+
+Fits `ŷ = a·e^(bx)`. Requires all y values to be positive.
+
+```
+$(0,1);(1,2.72);(2,7.39);(3,20.1) @scatter exp$     — y ≈ e^x
+$(0,100);(1,50);(2,25);(3,12.5) @scatter exp$        — decay: a=100, b≈−0.69
+```
+
+Label overlay shows: `ŷ = 100.0·e^(−0.693x)  R²=1.000`
+
+### `@table` — Data Table
+
+Renders data as a formatted HTML table with a summary bar (n, x̄, ȳ).
+
+```
+$(1,2.1);(2,3.9);(3,6.2);(4,7.8);(5,10.1) @table$
+```
+
+Output:
+```
+n=5  x̄=3.0  ȳ=6.02
+n │   x │     y
+1 │   1 │   2.1
+2 │   2 │   3.9
+3 │   3 │   6.2
+4 │   4 │   7.8
+5 │   5 │  10.1
+```
+
+### Combining Colors with Scatter
+
+The standard `#colorname` suffix works on scatter plots:
+
+```
+$(1,2);(3,5);(5,9) @scatter lin #red$
+```
+
+---
+
+## 14. Settings
 
 Open **Obsidian Settings → King's CalcLatex**.
 

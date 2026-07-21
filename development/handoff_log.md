@@ -1,5 +1,156 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-21 — WASM Worker Termination & CM6 Decoration Performance Optimization
+
+### Status: 🟢 Build clean | Synced to Vault
+
+### What Was Done
+
+**Memory Leak & Performance Fixes:**
+1. **Giac WASM Worker Termination (`terminateGiac`)**:
+   - Added `terminateGiac()` to `src/engine/giac.ts` to terminate the Web Worker, clear pending promises, and reset runtime state on plugin unload.
+   - Wired `terminateGiac()` to `onunload()` in `src/main.ts`. Fixed the memory accumulation issue where multiple plugin reloads resulted in orphaned 19MB Web Workers using up to 2.5 GB of RAM.
+2. **CM6 Fast Path Check (`buildDecorationsFromState`)**:
+   - Added an $O(1)$ document string check (`!docText.includes("@") && !docText.includes("=") && ...`) in `src/editor/decorations.ts`.
+   - Notes without CalcLatex triggers (like `The Heaviside function.md`) now bypass line-by-line regex scanning completely and return `Decoration.none` instantly.
+3. **Build & Sync**:
+   - Built `repo-v2` (`npm run build`) and synced updated `main.js` and `styles.css` into `.obsidian/plugins/kings-calclatex/`.
+
+### Files Changed
+- `src/engine/giac.ts` — Added `terminateGiac()` export to terminate Web Worker and release WASM heap memory.
+- `src/main.ts` — Imported and invoked `terminateGiac()` in `onunload()`.
+- `src/editor/decorations.ts` — Added $O(1)$ document trigger check in `buildDecorationsFromState()`.
+
+---
+
+### Status: 🟢 Build clean | Deployed
+
+### What Was Done
+
+**Feature: WebM animation export via `canvas.captureStream()` + `MediaRecorder`**
+
+Each slider row now has a `⏺` record button (`.kcl-slider-record`) alongside the existing `▶` play button.
+
+**UX flow:**
+1. User clicks `⏺` — slider resets to `min`, animation starts forward, `MediaRecorder` begins at 30fps
+2. Button turns red `⏹` with pulsing animation while recording
+3. After 4 s (one full min→max pass), recording auto-stops and `kcl-{varName}-anim.webm` downloads
+4. User can also click `⏹` early to stop and get a shorter clip
+5. If animation wasn't playing before record, it stops again after download
+
+**Architecture decisions:**
+- Zero new dependencies — `canvas.captureStream(30)` + `MediaRecorder` are native Chromium/Electron APIs
+- WebM/VP9 preferred; falls back to WebM baseline if VP9 not available
+- Canvas check at click time: silently no-ops if no live canvas (3D static mode — user must enter interactive mode first)
+- Record button code lives entirely inside `addSliders` closure — shares direct access to `animState`, `animLoop`, `input`, `updateFromSlider` without any interface changes
+- `MediaRecorder` lifecycle is guarded: `onstop` handler releases chunks, revokes URL, restores button/play state
+
+**Files changed:**
+- `src/editor/widgets.ts` — inserted record button + MediaRecorder logic inside `addSliders` for-loop (after existing `animCleanups.push`)
+- `styles.css` — added `.kcl-slider-record`, `.kcl-slider-record.recording` (pulsing red), `@keyframes kcl-rec-pulse`
+
+### Next Session Priorities
+1. Mobile touch events for 2D pan/zoom
+2. Giac lazy loading (19 MB startup cost)
+3. Color picker UI per curve
+
+---
+
+## Session: 2026-04-06 — Expression Label Rendering Fix + Documentation Restructure
+
+### Status: 🟢 Build clean | Deployed
+
+### What Was Done
+
+#### 1. Expression Labels — Formatted Math (Bug Fix)
+
+**Root cause**: `render()` fires on every pan/zoom/hover frame and called `drawExpressionLabels()` which did `innerHTML = ""`, wiping MathJax-rendered nodes. `_renderMathLabels2D` was only called once after creation — every subsequent frame killed it.
+
+**Fix:**
+- `renderer2d.ts`: Added `labelsBuiltForSpec` cache. `drawExpressionLabels()` returns early if `currentSpec === labelsBuiltForSpec` (i.e. spec unchanged) → MathJax nodes survive pan/zoom frames. Added `onLabelsBuilt?` callback parameter fired on spec change.
+- `main.ts`: Threaded `onLabelsBuilt` through `renderer2d.create` facade.
+- `widgets.ts` Graph2DWidget: Removed `_renderMathLabels2D`. Added `onLabelsBuilt` callback that calls `renderMath()` on each label element; `finishRenderMath()` called once after the loop (not inside).
+- `widgets.ts` Graph3DWidget `_showSnapshot()`: Fixed strip regex `/@\w+.*$/i` (was only `/@plot(?:3|2)d/`); moved `finishRenderMath()` outside the loop.
+- `widgets.ts` Graph3DWidget `_enterInteractive()`: Post-processes labels via `querySelectorAll("[data-latex]")` after `create3DGraph`.
+- `renderer3d.ts` `createLabelOverlay()`: Added `data-latex` attribute; fixed strip regex.
+
+**Result**: All 2D and 3D graph expression labels now render as formatted LaTeX equations, not raw text.
+
+#### 2. Documentation Restructure
+
+**Problem**: Pointing sessions at project folder consumed too much context ingesting verbose CLAUDE.md files.
+
+**Solution**: Created `SESSION_START.md` as the lean entry point (~80 lines). Updated root `CLAUDE.md` to navigation-only. Added CTO orchestration directive to `repo-v2/CLAUDE.md`.
+
+**Files changed:**
+- `SESSION_START.md` — NEW: lean entry point, nav table, 60-second architecture, file map, CEO/CTO rules
+- `CLAUDE.md` (root) — Stripped to navigation index only, links to SESSION_START.md
+- `repo-v2/CLAUDE.md` — Added CTO orchestration rules at top
+- `CHEATSHEET.md` — Added `@scatter`, `@table`, regression syntax; new section 13; Settings renumbered to 14
+
+### Next Session Priorities
+1. Animation export (GIF / slider animation)  
+2. Mobile touch events for 2D pan/zoom
+3. Giac lazy loading (19 MB startup cost)
+
+---
+
+## Session: 2026-04-05 — Scatter Plots, Tables & Regression
+
+### Status: 🟢 Build clean | Deployed to Obsidian
+
+### What Was Done
+
+Implemented **@scatter**, **@table**, and regression curve fitting as the next tier-1 priority feature.
+
+#### New Triggers
+
+| Trigger | Description |
+|---------|-------------|
+| `@scatter` | Scatter plot (filled dots, auto-ranged from data) |
+| `@scatter lin` | Scatter + linear regression line |
+| `@scatter poly2` | Scatter + degree-2 polynomial regression |
+| `@scatter poly3` | Scatter + degree-3 polynomial regression |
+| `@scatter exp` | Scatter + exponential `y = a·e^(bx)` regression |
+| `@table` | Formatted HTML table widget with column stats (n, x̄, ȳ) |
+
+#### Example Syntax
+```latex
+$(1,2);(3,5);(5,9);(7,14) @scatter lin$   % dots + linear fit
+$(0,1);(1,2.7);(2,7.4);(3,20) @scatter exp$  % exponential fit
+$(1,2);(3,5);(5,9) @table$                % data table
+```
+
+#### Architecture
+
+- **ExprType "dataset"** — new scatter plot type in types.ts
+- **PlotMode "scatter" | "table"** — new modes
+- **PlotData.points** — raw `[x,y][]` data for scatter rendering
+- **PlotData.regressionType / regressionCoeffs / rSquared / label** — regression metadata
+- **engine/index.ts**: `buildScatterSpec()` method parses data, computes regression, auto-ranges
+- **engine/index.ts**: `parseDataPoints()` exported for TableWidget use
+- **Regression math**: least-squares via Gauss–Jordan elimination on normal equations — no external dependencies
+- **renderer2d.ts**: `drawScatter()` draws filled dots + optional dashed regression curve; `drawExpressionLabels()` uses `pd.label` for plain-text overlays
+- **editor/widgets.ts**: `TableWidget` renders an HTML table with summary bar; no graph canvas
+- **decorations.ts**: `@scatter` → `Graph2DWidget`, `@table` → `TableWidget`
+
+### Files Modified
+- `src/types.ts` — ExprType "dataset", PlotMode "scatter"/"table", PlotData regression fields
+- `src/editor/triggers.ts` — @scatter (captureArg), @table
+- `src/engine/index.ts` — buildScatterSpec, parseDataPoints, polyRegression, expRegression, gaussianElim, formatRegressionLabel, evalRegression helpers
+- `src/renderer/renderer2d.ts` — drawScatter(), "dataset" case in drawTraces, label uses pd.label
+- `src/editor/decorations.ts` — scatter/table widget routing, TableWidget import
+- `src/editor/widgets.ts` — TableWidget class + _parseDataPoints local helper
+- `styles.css` — .kcl-table-widget, .kcl-table, .kcl-table-summary styles
+
+### Next Session Priorities
+1. Animation export (GIF / slider animation)
+2. Mobile touch events for 2D pan/zoom
+3. Giac lazy loading (19MB startup cost)
+4. Color picker UI per curve
+
+---
+
 ## Session: 2026-03-24 (Part 2) — Tier 1 Competitive Features (3 parallel agents)
 
 ### What Was Done
