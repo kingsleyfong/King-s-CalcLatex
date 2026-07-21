@@ -1,8 +1,7 @@
 /**
  * King's CalcLatex v2 — Settings Tab
  *
- * Provides the plugin settings UI in Obsidian's settings panel.
- * Every change is persisted immediately via saveSettings().
+ * Provides split settings UI for Markdown Note features and Excalidraw OD features.
  */
 
 import { PluginSettingTab, Setting, App } from "obsidian";
@@ -21,14 +20,17 @@ export class KCLSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "King's CalcLatex v2" });
+    containerEl.createEl("h2", { text: "King's CalcLatex Settings" });
 
-    // ── 2D Default Range ─────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    //  SECTION 1: MARKDOWN NOTE FEATURES (.md)
+    // ══════════════════════════════════════════════════════════════
+    const mdHeader = containerEl.createEl("h3", { text: "Markdown Note Features (.md)" });
+    mdHeader.style.cssText = "color: var(--text-accent); margin-top: 1.5em; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 0.3em;";
+
     new Setting(containerEl)
       .setName("2D default range")
-      .setDesc(
-        "Default x/y axis range for 2D graphs. Format: min,max (e.g. -10,10)",
-      )
+      .setDesc("Default x/y axis range for 2D graphs in note code blocks. Format: min,max (e.g. -10,10)")
       .addText((text) =>
         text
           .setPlaceholder("-10,10")
@@ -42,12 +44,9 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── 3D Default Range ─────────────────────────────────────
     new Setting(containerEl)
       .setName("3D default range")
-      .setDesc(
-        "Default x/y/z axis range for 3D graphs. Format: min,max (e.g. -5,5)",
-      )
+      .setDesc("Default x/y/z axis range for 3D graphs in note code blocks. Format: min,max (e.g. -5,5)")
       .addText((text) =>
         text
           .setPlaceholder("-5,5")
@@ -61,10 +60,9 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── Numeric Precision ────────────────────────────────────
     new Setting(containerEl)
       .setName("Numeric precision")
-      .setDesc("Decimal places for approximate (\\approx) evaluations.")
+      .setDesc("Decimal places for approximate (\\approx) evaluations in markdown notes.")
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({
@@ -81,12 +79,9 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── Auto-Range ───────────────────────────────────────────
     new Setting(containerEl)
       .setName("Auto-range")
-      .setDesc(
-        "Automatically determine graph viewport from expression analysis.",
-      )
+      .setDesc("Automatically determine graph viewport from expression analysis.")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.autoRange)
@@ -96,12 +91,9 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── Graph Theme ──────────────────────────────────────────
     new Setting(containerEl)
       .setName("Graph theme")
-      .setDesc(
-        'Color scheme for graphs. "Auto" follows Obsidian\'s current theme.',
-      )
+      .setDesc('Color scheme for graphs in notes. "Auto" follows Obsidian\'s current theme.')
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({
@@ -111,21 +103,14 @@ export class KCLSettingTab extends PluginSettingTab {
           })
           .setValue(this.plugin.settings.graphTheme)
           .onChange(async (value) => {
-            this.plugin.settings.graphTheme = value as
-              | "auto"
-              | "light"
-              | "dark";
+            this.plugin.settings.graphTheme = value as "auto" | "light" | "dark";
             await this.plugin.saveSettings();
           }),
       );
 
-    // ── 3D Zoom Mode ──────────────────────────────────────────
     new Setting(containerEl)
       .setName("3D zoom mode")
-      .setDesc(
-        "Origin-centered: axes intersect at (0,0,0), zoom keeps ranges symmetric around 0. " +
-        "Range-centered: zoom scales around the midpoint of the current range.",
-      )
+      .setDesc("Origin-centered: axes intersect at (0,0,0). Range-centered: zoom scales around current midpoint.")
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({
@@ -134,20 +119,14 @@ export class KCLSettingTab extends PluginSettingTab {
           })
           .setValue(this.plugin.settings.zoom3dMode)
           .onChange(async (value) => {
-            this.plugin.settings.zoom3dMode = value as
-              | "origin"
-              | "range-center";
+            this.plugin.settings.zoom3dMode = value as "origin" | "range-center";
             await this.plugin.saveSettings();
           }),
       );
 
-    // ── 2D-on-3D Mode ──────────────────────────────────────────
     new Setting(containerEl)
       .setName("2D curves on 3D graphs")
-      .setDesc(
-        "How 2D equations (e.g. y=sin(x)) render when using @plot3d. " +
-        '"Curtain" extrudes as a vertical wall. "Plane curve" draws at z=0.',
-      )
+      .setDesc('How 2D equations render when using @plot3d. "Curtain" extrudes as wall, "Plane curve" draws at z=0.')
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({
@@ -156,20 +135,14 @@ export class KCLSettingTab extends PluginSettingTab {
           })
           .setValue(this.plugin.settings.plot3d2dMode)
           .onChange(async (value) => {
-            this.plugin.settings.plot3d2dMode = value as
-              | "curtain"
-              | "plane-curve";
+            this.plugin.settings.plot3d2dMode = value as "curtain" | "plane-curve";
             await this.plugin.saveSettings();
           }),
       );
 
-    // ── Vector Field Arrow Scale ──────────────────────────────────
     new Setting(containerEl)
       .setName("Vector field arrow scale")
-      .setDesc(
-        "Default arrow size for vector fields (1.0 = normal). " +
-        "Can be overridden per-expression with @vecfield 0.5 or @vecfield 2.0.",
-      )
+      .setDesc("Default arrow size for vector fields in markdown graphs (1.0 = normal).")
       .addText((text) =>
         text
           .setPlaceholder("1.0")
@@ -183,12 +156,9 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── Points of Interest ──────────────────────────────────────
     new Setting(containerEl)
       .setName("Points of interest")
-      .setDesc(
-        "Show roots, extrema, and intersections on 2D graphs.",
-      )
+      .setDesc("Show roots, extrema, and intersections on 2D note graphs.")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.showPOIs)
@@ -198,12 +168,9 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── 3D Axis Ticks ────────────────────────────────────────────
     new Setting(containerEl)
       .setName("3D axis tick marks")
-      .setDesc(
-        "Show tick marks and numeric labels along the X, Y, and Z axes of 3D graphs.",
-      )
+      .setDesc("Show tick marks and numeric labels along X, Y, and Z axes.")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.show3DAxisTicks)
@@ -213,13 +180,9 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── Auto-Scale Z (3D) ──────────────────────────────────────────
     new Setting(containerEl)
       .setName("Auto-scale Z axis (3D)")
-      .setDesc(
-        "Automatically fit the Z axis to the surface range for 3D explicit graphs (z=f(x,y)). " +
-        "When off, all three axes use the same range for 1:1:1 proportional scaling (like Desmos/GeoGebra).",
-      )
+      .setDesc("Automatically fit Z axis to surface range (breaks 1:1:1 proportional scaling).")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.autoScaleZ3d)
@@ -229,16 +192,12 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
-    // ── Giac CAS Engine ────────────────────────────────────────────
-    containerEl.createEl("h3", { text: "CAS Engine" });
-
     new Setting(containerEl)
-      .setName("Enable Giac WASM")
+      .setName("Enable Giac WASM CAS")
       .setDesc(
-        "Load Giac computer algebra system for advanced CAS operations " +
-        "(limits, Taylor series, partial fractions, expand, and improved " +
-        "differentiation/integration/solving). Requires giacwasm.js in the plugin folder. " +
-        "Status: " + (isGiacReady() ? "Loaded" : "Not loaded"),
+        `Load Giac computer algebra system for advanced operations (limits, Taylor, ODEs). Status: ${
+          isGiacReady() ? "Loaded" : "Not loaded"
+        }`,
       )
       .addToggle((toggle) =>
         toggle
@@ -248,13 +207,157 @@ export class KCLSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }),
       );
+
+    // ══════════════════════════════════════════════════════════════
+    //  SECTION 2: EXCALIDRAW OD FEATURES (CANVAS & MATH COMPANION)
+    // ══════════════════════════════════════════════════════════════
+    const exHeader = containerEl.createEl("h3", { text: "Excalidraw OD Features (Canvas & Math Companion)" });
+    exHeader.style.cssText = "color: var(--text-accent); margin-top: 2em; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 0.3em;";
+
+    new Setting(containerEl)
+      .setName("Enable Excalidraw OD Integration")
+      .setDesc("Enable math companion, snippet expansion, live preview tooltips, and plot placement on Excalidraw canvases.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableExcalidrawOD)
+          .onChange(async (value) => {
+            this.plugin.settings.enableExcalidrawOD = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("LaTeX Prompt Modal Window Position")
+      .setDesc("Choose default location for the Excalidraw LaTeX prompt edit window. Default: Near Bottom of Screen.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            bottom: "Near Bottom of Screen (Recommended)",
+            center: "Center of Screen",
+            top: "Top of Screen",
+            cursor: "Near Selection / Cursor",
+          })
+          .setValue(this.plugin.settings.latexModalPosition || "bottom")
+          .onChange(async (value) => {
+            this.plugin.settings.latexModalPosition = value as "bottom" | "center" | "top" | "cursor";
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Expanding Snippets in Textareas")
+      .setDesc("Enable LaTeX Suite snippet auto-expansion inside Excalidraw text editing overlays.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.excalidrawSnippetsEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.excalidrawSnippetsEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Live Math Preview Tooltip")
+      .setDesc("Display live MathJax SVG preview tooltip while typing math in Excalidraw textareas.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.excalidrawPreviewTooltipEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.excalidrawPreviewTooltipEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Preview Tooltip Position")
+      .setDesc("Position of the live MathJax preview tooltip relative to the editing textarea.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            below: "Below Textarea",
+            above: "Above Textarea",
+          })
+          .setValue(this.plugin.settings.excalidrawPreviewPosition || "below")
+          .onChange(async (value) => {
+            this.plugin.settings.excalidrawPreviewPosition = value as "above" | "below";
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Excalidraw Plot Width")
+      .setDesc("Default width in pixels for plots rendered and inserted into Excalidraw canvases.")
+      .addText((text) =>
+        text
+          .setPlaceholder("500")
+          .setValue(String(this.plugin.settings.excalidrawGraphWidth))
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            if (!isNaN(n) && n > 100) {
+              this.plugin.settings.excalidrawGraphWidth = n;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Excalidraw Plot Height")
+      .setDesc("Default height in pixels for plots rendered and inserted into Excalidraw canvases.")
+      .addText((text) =>
+        text
+          .setPlaceholder("350")
+          .setValue(String(this.plugin.settings.excalidrawGraphHeight))
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            if (!isNaN(n) && n > 100) {
+              this.plugin.settings.excalidrawGraphHeight = n;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+    new Setting(containerEl)
+      .setName("LaTeX Equation Edit Shortcut")
+      .setDesc("Enable keyboard shortcut (e.g. Ctrl + L) to quickly open the LaTeX prompt modal when an equation element is selected.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.latexEditorShortcutEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.latexEditorShortcutEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("LaTeX Shortcut Key & Modifier")
+      .setDesc("Configure modifier and trigger key for the LaTeX equation edit shortcut (Default: Ctrl + L).")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            ctrl: "Ctrl / Cmd",
+            alt: "Alt / Option",
+            shift: "Shift",
+          })
+          .setValue(this.plugin.settings.latexEditorShortcutModifier || "ctrl")
+          .onChange(async (value) => {
+            this.plugin.settings.latexEditorShortcutModifier = value as "ctrl" | "alt" | "shift";
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("l")
+          .setValue(this.plugin.settings.latexEditorShortcutKey || "l")
+          .onChange(async (value) => {
+            const key = value.trim().toLowerCase();
+            if (key) {
+              this.plugin.settings.latexEditorShortcutKey = key;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
   }
 }
 
-/**
- * Parse a "min,max" string into a [number, number] tuple.
- * Returns null if the format is invalid.
- */
 function parseRange(value: string): [number, number] | null {
   const parts = value.split(",").map((s) => s.trim());
   if (parts.length !== 2) return null;

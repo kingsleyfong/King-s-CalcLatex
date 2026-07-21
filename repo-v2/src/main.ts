@@ -15,10 +15,12 @@ import { create3DGraph, renderSnapshot } from "./renderer/renderer3d";
 import { KCLSettingTab } from "./settings";
 import { GraphInspectorView, GRAPH_INSPECTOR_VIEW } from "./views/inspector";
 import { initGiac, isGiacReady, terminateGiac } from "./engine/giac";
+import { ExcalidrawCompanionManager } from "./excalidraw/companion-manager";
 
 export default class KingsCalcLatexPlugin extends Plugin {
   settings!: KCLSettings;
   engine!: ExpressionEngine;
+  excalidrawCompanion!: ExcalidrawCompanionManager;
   inspectorState: InspectorState = {
     title: "",
     summary: "",
@@ -95,7 +97,13 @@ export default class KingsCalcLatexPlugin extends Plugin {
       },
     });
 
-    // 7. Initialize Giac WASM CAS (async, non-blocking)
+    // 7. Initialize Excalidraw On-Demand Companion
+    this.excalidrawCompanion = new ExcalidrawCompanionManager(this.app, this);
+    this.app.workspace.onLayoutReady(() => {
+      this.excalidrawCompanion.onload();
+    });
+
+    // 8. Initialize Giac WASM CAS (async, non-blocking)
     if (this.settings.enableGiac) {
       const basePath = (this.app.vault.adapter as any).basePath as string;
       const pluginDir = basePath + "/.obsidian/plugins/" + this.manifest.id;
@@ -106,11 +114,14 @@ export default class KingsCalcLatexPlugin extends Plugin {
       });
     }
 
-    // 8. Startup confirmation
+    // 9. Startup confirmation
     console.log("King's CalcLatex v2 loaded");
   }
 
   onunload(): void {
+    if (this.excalidrawCompanion) {
+      this.excalidrawCompanion.onunload();
+    }
     // Detach all Graph Inspector leaves to prevent orphaned views
     this.app.workspace.detachLeavesOfType(GRAPH_INSPECTOR_VIEW);
     // Terminate Giac WASM worker to prevent memory leaks across plugin reloads
