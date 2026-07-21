@@ -1,96 +1,87 @@
-import { EditorView, KeyBinding, keymap, ViewUpdate } from "@codemirror/view";
+import { EditorView, KeyBinding, keymap } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import type KingsCalcLatexPlugin from "../main";
 import { DEFAULT_LATEX_SUITE_SNIPPETS, RawSnippet } from "./default-snippets";
 
-let isExpandingSnippet = false;
-
 export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
-  const updateListener = EditorView.updateListener.of((update: ViewUpdate) => {
-    if (!plugin.settings.enableLaTeXSuite) return;
-    if (!update.docChanged || isExpandingSnippet) return;
+  const eventHandler = EditorView.domEventHandlers({
+    keydown(event: KeyboardEvent, view: EditorView) {
+      if (!plugin.settings.enableLaTeXSuite) return false;
+      if (event.ctrlKey || event.altKey || event.metaKey) return false;
 
-    const state = update.state;
-    const mainSel = state.selection.main;
-    if (!mainSel.empty) return;
+      // Only handle single printable character keys
+      if (event.key.length !== 1) return false;
 
-    const pos = mainSel.head;
-    const line = state.doc.lineAt(pos);
-    const lineText = line.text;
-    const col = pos - line.from;
+      const state = view.state;
+      const mainSel = state.selection.main;
+      if (!mainSel.empty) return false;
 
-    const textBefore = lineText.slice(0, col);
-    const inMath = isMathMode(state, pos);
+      const pos = mainSel.head;
+      const line = state.doc.lineAt(pos);
+      const lineText = line.text;
+      const col = pos - line.from;
 
-    // 1. Auto-subscript digits (e.g. x1 -> x_1, a2 -> a_2)
-    if (plugin.settings.enableAutoSubscript && inMath) {
-      const match = textBefore.match(/([a-zA-Z])(\d)$/);
-      if (match) {
-        const charBefore = match[1];
-        const digit = match[2];
-        const triggerLen = 2; // "x1"
-        const replaceFrom = pos - triggerLen;
-        const insertText = `${charBefore}_${digit}`;
+      const charTyped = event.key;
+      const textBefore = lineText.slice(0, col) + charTyped;
+      const inMath = isMathMode(state, pos);
 
-        isExpandingSnippet = true;
-        setTimeout(() => {
-          try {
-            update.view.dispatch({
-              changes: { from: replaceFrom, to: pos, insert: insertText },
-              selection: { anchor: replaceFrom + insertText.length, head: replaceFrom + insertText.length },
-            });
-          } finally {
-            isExpandingSnippet = false;
-          }
-        }, 0);
-        return;
-      }
-    }
+      // 1. Auto-subscript digits (e.g. x1 -> x_1, a2 -> a_2)
+      if (plugin.settings.enableAutoSubscript && inMath && /\d/.test(charTyped)) {
+        const prevChar = lineText.slice(col - 1, col);
+        if (/[a-zA-Z]/.test(prevChar)) {
+          const replaceFrom = pos - 1;
+          const insertText = `${prevChar}_${charTyped}`;
 
-    // 2. Custom & Default Snippets
-    const snippets = getActiveSnippetsList(plugin);
-
-    for (const s of snippets) {
-      const opts = s.options || "";
-      const isMathOnly = opts.includes("m");
-      const isTextOnly = opts.includes("t");
-      const autoExpand = opts.includes("A");
-
-      if (!autoExpand) continue;
-      if (isMathOnly && !inMath) continue;
-      if (isTextOnly && inMath) continue;
-
-      let trigger = s.trigger;
-      if (trigger === "mk" && plugin.settings.inlineMathTrigger) {
-        trigger = plugin.settings.inlineMathTrigger;
-      } else if (trigger === "dm" && plugin.settings.displayMathTrigger) {
-        trigger = plugin.settings.displayMathTrigger;
+          view.dispatch({
+            changes: { from: replaceFrom, to: pos, insert: insertText },
+            selection: { anchor: replaceFrom + insertText.length, head: replaceFrom + insertText.length },
+          });
+          event.preventDefault();
+          return true;
+        }
       }
 
-      if (textBefore.endsWith(trigger)) {
-        const triggerLen = trigger.length;
-        const replaceFrom = pos - triggerLen;
+      // 2. Custom & Default Snippets
+      const snippets = getActiveSnippetsList(plugin);
 
-        const { text: replacementText, cursorOffset } = parseSnippetReplacement(s.replacement);
+      for (const s of snippets) {
+        const opts = s.options || "";
+        const isMathOnly = opts.includes("m");
+        const isTextOnly = opts.includes("t");
+        const autoExpand = opts.includes("A");
 
-        isExpandingSnippet = true;
-        setTimeout(() => {
-          try {
-            update.view.dispatch({
-              changes: { from: replaceFrom, to: pos, insert: replacementText },
-              selection: { anchor: replaceFrom + cursorOffset, head: replaceFrom + cursorOffset },
-            });
-          } finally {
-            isExpandingSnippet = false;
-          }
-        }, 0);
-        return;
+        if (!autoExpand) continue;
+        if (isMathOnly && !inMath) continue;
+        if (isTextOnly && inMath) continue;
+
+        let trigger = s.trigger;
+        if (trigger === "mk" && plugin.settings.inlineMathTrigger) {
+          trigger = plugin.settings.inlineMathTrigger;
+        } else if (trigger === "dm" && plugin.settings.displayMathTrigger) {
+          trigger = plugin.settings.displayMathTrigger;
+        }
+
+        if (textBefore.endsWith(trigger)) {
+          const triggerLen = trigger.length;
+          const replaceFrom = pos - (triggerLen - 1);
+
+          const { text: replacementText, cursorOffset } = parseSnippetReplacement(s.replacement);
+
+          view.dispatch({
+            changes: { from: replaceFrom, to: pos, insert: replacementText },
+            selection: { anchor: replaceFrom + cursorOffset, head: replaceFrom + cursorOffset },
+          });
+          event.preventDefault();
+          return true;
+        }
       }
-    }
+
+      return false;
+    },
   });
 
-  // ── Tab Navigation & Tabout (Flowing around equations and field tabstops) ──
+  // ── Tab Navigation & Tabout ──
   const tabKeybinding: KeyBinding = {
     key: "Tab",
     run: (view: EditorView) => {
@@ -158,7 +149,7 @@ export function createLaTeXSnippetExtension(plugin: KingsCalcLatexPlugin) {
     },
   };
 
-  return [updateListener, keymap.of([tabKeybinding, shiftTabKeybinding])];
+  return [eventHandler, keymap.of([tabKeybinding, shiftTabKeybinding])];
 }
 
 function isMathMode(state: EditorState, pos: number): boolean {
