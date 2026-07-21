@@ -3,7 +3,11 @@ name: Release Obsidian Plugin
 on:
   push:
     tags:
+      - "v*"
       - "*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -26,7 +30,7 @@ jobs:
       - name: Copy build artifacts to repo root
         run: |
           cp repo-v2/main.js main.js
-          cp repo-v2/styles/main.css styles.css
+          cp repo-v2/styles.css styles.css
 
       - name: Create release
         env:
