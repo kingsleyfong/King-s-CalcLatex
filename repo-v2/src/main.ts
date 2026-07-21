@@ -17,6 +17,8 @@ import { GraphInspectorView, GRAPH_INSPECTOR_VIEW } from "./views/inspector";
 import { initGiac, isGiacReady, terminateGiac } from "./engine/giac";
 import { ExcalidrawCompanionManager } from "./excalidraw/companion-manager";
 
+import { createLaTeXSnippetExtension } from "./snippets/cm6-extension";
+
 export default class KingsCalcLatexPlugin extends Plugin {
   settings!: KCLSettings;
   engine!: ExpressionEngine;
@@ -64,6 +66,7 @@ export default class KingsCalcLatexPlugin extends Plugin {
     this.registerEditorExtension([
       createDecorationPlugin(this),
       createTabKeymap(this),
+      createLaTeXSnippetExtension(this),
     ]);
 
     // 6. Register commands
