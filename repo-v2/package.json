@@ -18,5 +18,8 @@
     "three": "^0.170.0",
     "tslib": "^2.7.0",
     "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "valibot": "^1.4.2"
   }
 }
