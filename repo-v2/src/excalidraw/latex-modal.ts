@@ -103,11 +103,7 @@ function buildBBox(content: string, opts: BBoxOptions): string {
   return `\\bbox[${parts.join(", ")}]{${content}}`;
 }
 
-function parseDocument(text: string): {
-  color: string | null;
-  box: BBoxOptions | null;
-  content: string;
-} {
+function parseDocument(text: string): { color: string | null; box: BBoxOptions | null; content: string } {
   let color: string | null = null;
   let content = text.trim();
 
@@ -134,11 +130,7 @@ function parseDocument(text: string): {
   }
 }
 
-function rebuildDocument(
-  color: string | null,
-  box: BBoxOptions | null,
-  content: string,
-): string {
+function rebuildDocument(color: string | null, box: BBoxOptions | null, content: string): string {
   let result = content;
   if (box && box.enabled) {
     result = buildBBox(result, box);
@@ -174,10 +166,6 @@ function getUpdatedCursor(
   }
 }
 
-/**
- * Intercepts and enhances Excalidraw's native LaTeX prompt modal window,
- * implementing custom position setting (defaulting to bottom of screen).
- */
 export class LaTexModalEnhancer {
   private observer: MutationObserver | null = null;
   private modalObserver: MutationObserver | null = null;
@@ -263,7 +251,6 @@ export class LaTexModalEnhancer {
       const cmContent = modalEl.querySelector(".cm-content");
       const editorView = (cmContent as any)?.cmView?.view;
 
-      // Apply modal positioning according to user settings (bottom default)
       this.applyModalPosition(modalEl);
 
       if (!editorView) return;
@@ -283,12 +270,17 @@ export class LaTexModalEnhancer {
         const editorRect = cmEditor.getBoundingClientRect();
         const tooltipRect = t.getBoundingClientRect();
 
-        const left = editorRect.left + (editorRect.width - tooltipRect.width) / 2;
-        const top = editorRect.top - tooltipRect.height - 12;
+        const left = Math.round(editorRect.left + (editorRect.width - tooltipRect.width) / 2);
+        const top = Math.round(editorRect.top - tooltipRect.height - 12);
+
+        const targetLeft = `${left}px`;
+        const targetTop = `${top}px`;
+
+        if (t.style.left === targetLeft && t.style.top === targetTop) return;
 
         t.style.setProperty("position", "fixed", "important");
-        t.style.setProperty("left", `${left}px`, "important");
-        t.style.setProperty("top", `${top}px`, "important");
+        t.style.setProperty("left", targetLeft, "important");
+        t.style.setProperty("top", targetTop, "important");
         t.style.setProperty("transform", "none", "important");
       };
 
@@ -332,35 +324,63 @@ export class LaTexModalEnhancer {
   }
 
   /**
-   * Position the Excalidraw LaTeX prompt modal dynamically based on setting.
-   * Modifies the outer .modal-container to keep all modal elements (title, input, color bar, buttons)
-   * as a single unified window.
+   * Position the Excalidraw LaTeX prompt modal dynamically relative to the active Excalidraw tab leaf.
+   * Default "bottom" positions the modal centered at the bottom of the Excalidraw tab ONLY.
    */
   private applyModalPosition(modalEl: HTMLElement): void {
     const pos = this.settings.latexModalPosition || "bottom";
 
-    const modalContainer = (modalEl.closest(".modal-container") || modalEl.parentElement) as HTMLElement;
     const actualModal = (modalEl.closest(".modal") || modalEl) as HTMLElement;
+    const modalContainer = (modalEl.closest(".modal-container") || modalEl.parentElement) as HTMLElement;
 
     if (modalContainer) {
-      modalContainer.classList.remove(
-        "kcl-modal-container-bottom",
-        "kcl-modal-container-top",
-        "kcl-modal-container-center",
-        "kcl-modal-container-cursor",
-      );
-      modalContainer.classList.add(`kcl-modal-container-${pos}`);
+      modalContainer.style.setProperty("display", "flex", "important");
+      modalContainer.style.setProperty("pointer-events", "none", "important");
+      modalContainer.style.setProperty("z-index", "1000", "important");
     }
 
-    // Reset inline overrides on inner elements so flex container rules apply cleanly
-    actualModal.style.top = "";
-    actualModal.style.bottom = "";
-    actualModal.style.transform = "";
-    actualModal.style.position = "";
-    modalEl.style.top = "";
-    modalEl.style.bottom = "";
-    modalEl.style.transform = "";
-    modalEl.style.position = "";
+    const app = (window as any).app;
+    const activeLeaf = app?.workspace?.activeLeaf;
+    const leafEl = activeLeaf?.view?.contentEl as HTMLElement;
+
+    if (leafEl && (pos === "bottom" || pos === "cursor")) {
+      const rect = leafEl.getBoundingClientRect();
+      const left = Math.round(rect.left + rect.width / 2);
+      const bottom = Math.round(window.innerHeight - rect.bottom + 40);
+
+      actualModal.style.setProperty("position", "fixed", "important");
+      actualModal.style.setProperty("bottom", `${Math.max(20, bottom)}px`, "important");
+      actualModal.style.setProperty("top", "auto", "important");
+      actualModal.style.setProperty("left", `${left}px`, "important");
+      actualModal.style.setProperty("transform", "translateX(-50%)", "important");
+      actualModal.style.setProperty("margin", "0", "important");
+      actualModal.style.setProperty("pointer-events", "auto", "important");
+      actualModal.style.setProperty("box-shadow", "0 8px 32px rgba(0, 0, 0, 0.4)", "important");
+      return;
+    }
+
+    if (pos === "top" && leafEl) {
+      const rect = leafEl.getBoundingClientRect();
+      const left = Math.round(rect.left + rect.width / 2);
+      const top = Math.round(rect.top + 60);
+
+      actualModal.style.setProperty("position", "fixed", "important");
+      actualModal.style.setProperty("top", `${top}px`, "important");
+      actualModal.style.setProperty("bottom", "auto", "important");
+      actualModal.style.setProperty("left", `${left}px`, "important");
+      actualModal.style.setProperty("transform", "translateX(-50%)", "important");
+      actualModal.style.setProperty("margin", "0", "important");
+      actualModal.style.setProperty("pointer-events", "auto", "important");
+      return;
+    }
+
+    // Default fallback: Center of screen
+    actualModal.style.setProperty("position", "fixed", "important");
+    actualModal.style.setProperty("top", "50%", "important");
+    actualModal.style.setProperty("left", "50%", "important");
+    actualModal.style.setProperty("transform", "translate(-50%, -50%)", "important");
+    actualModal.style.setProperty("margin", "0", "important");
+    actualModal.style.setProperty("pointer-events", "auto", "important");
   }
 
   private injectColorBar(modalEl: HTMLElement, editorView: any): void {
@@ -408,7 +428,7 @@ export class LaTexModalEnhancer {
         const parsed = parseDocument(currentText);
         const currentCursor = editorView.state.selection.main.head;
 
-        const newText = this.applyColor(currentText, color.latex);
+        const newText = rebuildDocument(color.latex, parsed.box, parsed.content);
         const cursor = getUpdatedCursor(currentText, newText, parsed.content, parsed.content, currentCursor);
 
         editorView.dispatch({
@@ -417,80 +437,385 @@ export class LaTexModalEnhancer {
         });
 
         refreshActiveState();
+
+        const syncFn = (modalEl as any)._kclSyncUI;
+        if (syncFn) syncFn();
+
+        editorView.focus();
       };
+
       dotsContainer.appendChild(dot);
     }
 
-    buttonBar.parentElement?.insertBefore(colorBar, buttonBar);
-    refreshActiveState();
-  }
-
-  private applyColor(text: string, newColor: string): string {
-    const parsed = parseDocument(text);
-    const targetColor = parsed.color === newColor ? null : newColor;
-    return rebuildDocument(targetColor, parsed.box, parsed.content);
-  }
-
-  private injectBoxPanel(modalEl: HTMLElement, editorView: any): void {
-    if (modalEl.querySelector(".kcl-latex-box-panel")) return;
-    const buttonBar = modalEl.querySelector(".excalidraw-prompt-buttonbar-bottom");
-    if (!buttonBar) return;
-
-    const panel = document.createElement("div");
-    panel.className = "kcl-latex-box-panel";
-    panel.style.cssText = "display:flex;align-items:center;gap:10px;margin-top:6px;font-size:12px;";
-
-    const label = document.createElement("span");
-    label.textContent = "Box:";
-    panel.appendChild(label);
-
-    const toggleBtn = document.createElement("button");
-    toggleBtn.type = "button";
-    toggleBtn.textContent = "Add \\bbox";
-    toggleBtn.className = "kcl-box-toggle-btn";
-
-    toggleBtn.onclick = () => {
+    const clearDot = document.createElement("div");
+    clearDot.className = "kcl-latex-color-clear";
+    clearDot.textContent = "×";
+    clearDot.title = "Clear Color";
+    clearDot.onclick = () => {
       const currentText = editorView.state.doc.toString();
       const parsed = parseDocument(currentText);
       const currentCursor = editorView.state.selection.main.head;
 
-      let newBox: BBoxOptions | null = null;
-      if (!parsed.box || !parsed.box.enabled) {
-        newBox = {
-          enabled: true,
-          padding: "6px",
-          borderThickness: "1.5px",
-          borderStyle: "solid",
-          borderColor: "sync",
-          background: "transparent",
-        };
-      }
-      const newText = rebuildDocument(parsed.color, newBox, parsed.content);
+      const newText = rebuildDocument(null, parsed.box, parsed.content);
       const cursor = getUpdatedCursor(currentText, newText, parsed.content, parsed.content, currentCursor);
 
       editorView.dispatch({
         changes: { from: 0, to: editorView.state.doc.length, insert: newText },
         selection: { anchor: cursor, head: cursor },
       });
+
+      refreshActiveState();
+
+      const syncFn = (modalEl as any)._kclSyncUI;
+      if (syncFn) syncFn();
+
+      editorView.focus();
+    };
+    colorBar.appendChild(clearDot);
+
+    buttonBar.parentNode?.insertBefore(colorBar, buttonBar);
+
+    refreshActiveState();
+
+    const cmContent = modalEl.querySelector(".cm-content");
+    if (cmContent) {
+      cmContent.addEventListener("keyup", refreshActiveState);
+      cmContent.addEventListener("input", refreshActiveState);
+    }
+  }
+
+  private injectBoxPanel(modalEl: HTMLElement, editorView: any): void {
+    if (modalEl.querySelector(".kcl-latex-box-panel")) return;
+
+    const buttonBar = modalEl.querySelector(".excalidraw-prompt-buttonbar-bottom");
+    if (!buttonBar) return;
+
+    const boxPanel = document.createElement("div");
+    boxPanel.className = "kcl-latex-box-panel";
+
+    const toggleRow = document.createElement("div");
+    toggleRow.className = "kcl-latex-box-toggle-row";
+
+    const toggleLabel = document.createElement("span");
+    toggleLabel.className = "kcl-latex-box-toggle-label";
+    toggleLabel.textContent = "Box Equation:";
+    toggleRow.appendChild(toggleLabel);
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "kcl-latex-box-toggle-btn";
+    toggleBtn.title = "Toggle Border Box";
+    toggleBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      </svg>
+    `;
+    toggleRow.appendChild(toggleBtn);
+    boxPanel.appendChild(toggleRow);
+
+    const settingsGrid = document.createElement("div");
+    settingsGrid.className = "kcl-latex-box-settings-grid";
+    boxPanel.appendChild(settingsGrid);
+
+    const createSettingsRow = (labelText: string, contentEl: HTMLElement) => {
+      const row = document.createElement("div");
+      row.className = "kcl-latex-box-row";
+      const label = document.createElement("span");
+      label.className = "kcl-latex-box-row-label";
+      label.textContent = labelText;
+      row.appendChild(label);
+      row.appendChild(contentEl);
+      return row;
     };
 
-    panel.appendChild(toggleBtn);
-    buttonBar.parentElement?.insertBefore(panel, buttonBar);
+    const borderColorContainer = document.createElement("div");
+    borderColorContainer.className = "kcl-border-colors-container";
+
+    const syncDot = document.createElement("div");
+    syncDot.className = "kcl-latex-border-color-dot is-sync";
+    syncDot.setAttribute("data-color", "sync");
+    syncDot.title = "Sync with Text Color";
+    syncDot.innerHTML = `
+      <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="3" fill="none">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+      </svg>
+    `;
+    borderColorContainer.appendChild(syncDot);
+
+    for (const color of COMMON_COLORS) {
+      const dot = document.createElement("div");
+      dot.className = "kcl-latex-border-color-dot";
+      dot.style.backgroundColor = color.hex;
+      dot.setAttribute("data-color", color.latex);
+      dot.title = `Border: ${color.name}`;
+      borderColorContainer.appendChild(dot);
+    }
+    settingsGrid.appendChild(createSettingsRow("Border Color:", borderColorContainer));
+
+    const bgColors = [
+      { name: "Transparent", hex: "transparent" },
+      { name: "Light Yellow", hex: "#feca5726" },
+      { name: "Light Red", hex: "#ff4d4d26" },
+      { name: "Light Green", hex: "#1dd1a126" },
+      { name: "Light Blue", hex: "#54a0ff26" },
+      { name: "Light Purple", hex: "#5f27cd26" },
+      { name: "Light Gray", hex: "#88888826" },
+    ];
+
+    const bgContainer = document.createElement("div");
+    bgContainer.className = "kcl-bg-colors-container";
+
+    for (const bg of bgColors) {
+      const dot = document.createElement("div");
+      dot.className = `kcl-latex-bg-dot${bg.hex === "transparent" ? " is-clear" : ""}`;
+      if (bg.hex !== "transparent") {
+        dot.style.backgroundColor = bg.hex;
+      }
+      dot.setAttribute("data-color", bg.hex);
+      dot.title = `Fill: ${bg.name}`;
+      bgContainer.appendChild(dot);
+    }
+    settingsGrid.appendChild(createSettingsRow("Background:", bgContainer));
+
+    const thicknessContainer = document.createElement("div");
+    thicknessContainer.className = "kcl-button-group kcl-thickness-group";
+    ["1px", "1.5px", "2px", "3px"].forEach((val) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "kcl-btn";
+      btn.setAttribute("data-value", val);
+      btn.textContent = val;
+      thicknessContainer.appendChild(btn);
+    });
+    settingsGrid.appendChild(createSettingsRow("Thickness:", thicknessContainer));
+
+    const styleContainer = document.createElement("div");
+    styleContainer.className = "kcl-button-group kcl-style-group";
+    ["solid", "dashed", "dotted"].forEach((val) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "kcl-btn";
+      btn.setAttribute("data-value", val);
+      btn.textContent = val;
+      styleContainer.appendChild(btn);
+    });
+    settingsGrid.appendChild(createSettingsRow("Style:", styleContainer));
+
+    const paddingContainer = document.createElement("div");
+    paddingContainer.className = "kcl-button-group kcl-padding-group";
+    ["2px", "4px", "6px", "8px"].forEach((val) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "kcl-btn";
+      btn.setAttribute("data-value", val);
+      btn.textContent = val;
+      paddingContainer.appendChild(btn);
+    });
+    settingsGrid.appendChild(createSettingsRow("Padding:", paddingContainer));
+
+    const syncModalUI = () => {
+      const text = editorView.state.doc.toString();
+      const parsed = parseDocument(text);
+
+      if (parsed.box && parsed.box.enabled) {
+        toggleBtn.classList.add("is-active");
+        settingsGrid.style.display = "flex";
+
+        const currentBorderColor = parsed.box.borderColor || "sync";
+        borderColorContainer.querySelectorAll(".kcl-latex-border-color-dot").forEach((dot) => {
+          if (dot.getAttribute("data-color") === currentBorderColor) {
+            dot.classList.add("is-active");
+          } else {
+            dot.classList.remove("is-active");
+          }
+        });
+
+        const currentBg = parsed.box.background || "transparent";
+        bgContainer.querySelectorAll(".kcl-latex-bg-dot").forEach((dot) => {
+          if (dot.getAttribute("data-color") === currentBg) {
+            dot.classList.add("is-active");
+          } else {
+            dot.classList.remove("is-active");
+          }
+        });
+
+        const currentThickness = parsed.box.borderThickness || "1.5px";
+        thicknessContainer.querySelectorAll(".kcl-btn").forEach((btn) => {
+          if (btn.getAttribute("data-value") === currentThickness) {
+            btn.classList.add("is-active");
+          } else {
+            btn.classList.remove("is-active");
+          }
+        });
+
+        const currentStyle = parsed.box.borderStyle || "solid";
+        styleContainer.querySelectorAll(".kcl-btn").forEach((btn) => {
+          if (btn.getAttribute("data-value") === currentStyle) {
+            btn.classList.add("is-active");
+          } else {
+            btn.classList.remove("is-active");
+          }
+        });
+
+        const currentPadding = parsed.box.padding || "6px";
+        paddingContainer.querySelectorAll(".kcl-btn").forEach((btn) => {
+          if (btn.getAttribute("data-value") === currentPadding) {
+            btn.classList.add("is-active");
+          } else {
+            btn.classList.remove("is-active");
+          }
+        });
+      } else {
+        toggleBtn.classList.remove("is-active");
+        settingsGrid.style.display = "none";
+      }
+    };
+
+    (modalEl as any)._kclSyncUI = syncModalUI;
+
+    const applyBoxChange = (mutator: (opts: BBoxOptions) => void) => {
+      const currentText = editorView.state.doc.toString();
+      const parsed = parseDocument(currentText);
+      const currentCursor = editorView.state.selection.main.head;
+
+      let boxOpts: BBoxOptions = parsed.box || {
+        enabled: true,
+        padding: "6px",
+        borderThickness: "1.5px",
+        borderStyle: "solid",
+        borderColor: "sync",
+        background: "transparent",
+      };
+
+      mutator(boxOpts);
+
+      const newText = rebuildDocument(parsed.color, boxOpts, parsed.content);
+      const cursor = getUpdatedCursor(currentText, newText, parsed.content, parsed.content, currentCursor);
+
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: newText },
+        selection: { anchor: cursor, head: cursor },
+      });
+
+      syncModalUI();
+      editorView.focus();
+    };
+
+    toggleBtn.onclick = () => {
+      const currentText = editorView.state.doc.toString();
+      const parsed = parseDocument(currentText);
+
+      if (parsed.box && parsed.box.enabled) {
+        applyBoxChange((opts) => {
+          opts.enabled = false;
+        });
+      } else {
+        applyBoxChange((opts) => {
+          opts.enabled = true;
+        });
+      }
+    };
+
+    borderColorContainer.addEventListener("click", (e) => {
+      const dot = (e.target as HTMLElement).closest(".kcl-latex-border-color-dot");
+      if (!dot) return;
+      const color = dot.getAttribute("data-color");
+      if (!color) return;
+      applyBoxChange((opts) => {
+        opts.borderColor = color;
+      });
+    });
+
+    bgContainer.addEventListener("click", (e) => {
+      const dot = (e.target as HTMLElement).closest(".kcl-latex-bg-dot");
+      if (!dot) return;
+      const color = dot.getAttribute("data-color");
+      if (!color) return;
+      applyBoxChange((opts) => {
+        opts.background = color;
+      });
+    });
+
+    thicknessContainer.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest(".kcl-btn");
+      if (!btn) return;
+      const val = btn.getAttribute("data-value");
+      if (!val) return;
+      applyBoxChange((opts) => {
+        opts.borderThickness = val;
+      });
+    });
+
+    styleContainer.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest(".kcl-btn");
+      if (!btn) return;
+      const val = btn.getAttribute("data-value");
+      if (!val) return;
+      applyBoxChange((opts) => {
+        opts.borderStyle = val;
+      });
+    });
+
+    paddingContainer.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest(".kcl-btn");
+      if (!btn) return;
+      const val = btn.getAttribute("data-value");
+      if (!val) return;
+      applyBoxChange((opts) => {
+        opts.padding = val;
+      });
+    });
+
+    buttonBar.parentNode?.insertBefore(boxPanel, buttonBar);
+
+    syncModalUI();
+
+    const cmContent = modalEl.querySelector(".cm-content");
+    if (cmContent) {
+      cmContent.addEventListener("keyup", syncModalUI);
+      cmContent.addEventListener("input", syncModalUI);
+    }
   }
 
   private setupAutoSave(modalEl: HTMLElement, initialText: string): void {
-    const closeBtn = modalEl.querySelector(".modal-close-button");
-    if (closeBtn) {
-      closeBtn.addEventListener("click", () => {
-        this.triggerSave(modalEl);
-      });
-    }
-  }
+    const cmContent = modalEl.querySelector(".cm-content");
+    const editorView = (cmContent as any)?.cmView?.view;
 
-  private triggerSave(modalEl: HTMLElement): void {
-    const submitBtn = modalEl.querySelector(".excalidraw-prompt-buttonbar-bottom button:last-child") as HTMLButtonElement;
-    if (submitBtn) {
-      submitBtn.click();
-    }
+    const commitAndClose = () => {
+      if (!editorView || !document.contains(modalEl)) return;
+      const currentText = editorView.state.doc.toString();
+      if (currentText !== initialText) {
+        const okButton = modalEl.querySelector(
+          ".excalidraw-prompt-buttonbar-bottom button.mod-cta",
+        ) as HTMLButtonElement;
+        if (okButton) {
+          okButton.click();
+        }
+      }
+    };
+
+    const handleGlobalClick = (e: MouseEvent) => {
+      if (!document.contains(modalEl)) {
+        window.removeEventListener("pointerdown", handleGlobalClick, true);
+        return;
+      }
+      if (!modalEl.contains(e.target as Node)) {
+        commitAndClose();
+      }
+    };
+    window.addEventListener("pointerdown", handleGlobalClick, true);
+
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (!document.contains(modalEl)) {
+        window.removeEventListener("keydown", handleKeydown, true);
+        return;
+      }
+      if (e.key === "Escape") {
+        window.removeEventListener("keydown", handleKeydown, true);
+        commitAndClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeydown, true);
   }
 }
