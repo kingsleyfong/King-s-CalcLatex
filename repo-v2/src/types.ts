@@ -266,5 +266,5 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   excalidrawGraphHeight: 350,
   latexEditorShortcutEnabled: true,
   latexEditorShortcutModifier: "ctrl",
-  latexEditorShortcutKey: "l",
+  latexEditorShortcutKey: "\\",
 };

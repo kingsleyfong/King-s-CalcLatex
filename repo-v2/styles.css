@@ -699,6 +699,229 @@
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.15);
 }
 
+.kcl-latex-color-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.kcl-latex-color-clear:hover {
+  transform: scale(1.25);
+  background: var(--background-modifier-error);
+  color: white;
+}
+
+/* ── LaTeX Equation Boxing Panel ── */
+
+.kcl-latex-box-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0 14px 0;
+  padding: 12px;
+  background: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.kcl-latex-box-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kcl-latex-box-toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.kcl-latex-box-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.kcl-latex-box-toggle-btn:hover {
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.kcl-latex-box-toggle-btn.is-active {
+  background: var(--text-accent-hover, var(--background-modifier-border-hover));
+  border-color: var(--interactive-accent, var(--text-accent));
+  color: var(--interactive-accent, var(--text-accent));
+  box-shadow: 0 0 4px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+/* Collapsible Settings Grid */
+.kcl-latex-box-settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--background-modifier-border);
+}
+
+.kcl-latex-box-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kcl-latex-box-row-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  width: 80px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.kcl-border-colors-container,
+.kcl-bg-colors-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kcl-latex-border-color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.kcl-latex-border-color-dot:hover {
+  transform: scale(1.2);
+}
+
+.kcl-latex-border-color-dot.is-active {
+  border-color: var(--text-accent);
+  transform: scale(1.1);
+}
+
+.kcl-latex-border-color-dot.is-sync {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.kcl-latex-border-color-dot.is-sync:hover {
+  color: var(--text-normal);
+}
+
+.kcl-latex-border-color-dot.is-sync.is-active {
+  border-color: var(--text-accent);
+  color: var(--text-accent);
+}
+
+.kcl-latex-bg-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.kcl-latex-bg-dot:hover {
+  transform: scale(1.2);
+}
+
+.kcl-latex-bg-dot.is-active {
+  border-color: var(--text-accent);
+  transform: scale(1.1);
+}
+
+.kcl-latex-bg-dot.is-clear {
+  position: relative;
+  background: var(--background-primary);
+  border: 1.5px solid var(--background-modifier-border);
+}
+
+.kcl-latex-bg-dot.is-clear::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--background-modifier-error);
+  transform: translateY(-50%) rotate(-45deg);
+}
+
+.kcl-latex-bg-dot.is-clear.is-active {
+  border-color: var(--text-accent);
+}
+
+.kcl-button-group {
+  display: flex;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+
+.kcl-button-group .kcl-btn {
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  border-radius: 0;
+  margin: 0;
+  height: auto;
+  box-shadow: none;
+}
+
+.kcl-button-group .kcl-btn:last-child {
+  border-right: none;
+}
+
+.kcl-button-group .kcl-btn:hover {
+  background: var(--background-secondary-alt);
+  color: var(--text-normal);
+}
+
+.kcl-button-group .kcl-btn.is-active {
+  background: var(--background-modifier-border-hover);
+  color: var(--text-accent);
+}
+
 /* Text Styles Underline Button */
 .kcl-text-styles-container {
   margin-top: 8px;

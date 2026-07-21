@@ -128,9 +128,13 @@ export class ExcalidrawCompanionManager {
 
     if (!modifierMatches) return;
 
-    if (e.key.toLowerCase() !== this.plugin.settings.latexEditorShortcutKey.toLowerCase()) {
-      return;
-    }
+    const targetKey = (this.plugin.settings.latexEditorShortcutKey || "\\").toLowerCase();
+    const pressedKey = e.key.toLowerCase();
+    const isKeyMatch =
+      pressedKey === targetKey ||
+      (targetKey === "\\" && (pressedKey === "\\" || e.code === "Backslash"));
+
+    if (!isKeyMatch) return;
 
     const activeLeaf = this.app.workspace.activeLeaf || (this.app.workspace as any).getActiveLeaf();
     if (!activeLeaf || activeLeaf.view?.getViewType?.() !== "excalidraw") return;
