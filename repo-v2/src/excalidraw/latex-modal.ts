@@ -323,10 +323,6 @@ export class LaTexModalEnhancer {
     }, 60);
   }
 
-  /**
-   * Position the Excalidraw LaTeX prompt modal dynamically relative to the active Excalidraw tab leaf.
-   * Default "bottom" positions the modal centered at the bottom of the Excalidraw tab ONLY.
-   */
   private applyModalPosition(modalEl: HTMLElement): void {
     const pos = this.settings.latexModalPosition || "bottom";
 
@@ -374,7 +370,6 @@ export class LaTexModalEnhancer {
       return;
     }
 
-    // Default fallback: Center of screen
     actualModal.style.setProperty("position", "fixed", "important");
     actualModal.style.setProperty("top", "50%", "important");
     actualModal.style.setProperty("left", "50%", "important");
@@ -553,14 +548,15 @@ export class LaTexModalEnhancer {
     }
     settingsGrid.appendChild(createSettingsRow("Border Color:", borderColorContainer));
 
+    // Valid MathJax background color specifications (rgba format prevents blackbox rendering bug)
     const bgColors = [
-      { name: "Transparent", hex: "transparent" },
-      { name: "Light Yellow", hex: "#feca5726" },
-      { name: "Light Red", hex: "#ff4d4d26" },
-      { name: "Light Green", hex: "#1dd1a126" },
-      { name: "Light Blue", hex: "#54a0ff26" },
-      { name: "Light Purple", hex: "#5f27cd26" },
-      { name: "Light Gray", hex: "#88888826" },
+      { name: "Transparent", mathjax: "transparent", displayHex: "transparent" },
+      { name: "Soft Yellow", mathjax: "rgba(254,202,87,0.22)", displayHex: "#feca57" },
+      { name: "Soft Red", mathjax: "rgba(255,77,77,0.22)", displayHex: "#ff4d4d" },
+      { name: "Soft Green", mathjax: "rgba(29,209,161,0.22)", displayHex: "#1dd1a1" },
+      { name: "Soft Blue", mathjax: "rgba(84,160,255,0.22)", displayHex: "#54a0ff" },
+      { name: "Soft Purple", mathjax: "rgba(95,39,205,0.22)", displayHex: "#5f27cd" },
+      { name: "Soft Gray", mathjax: "rgba(136,136,136,0.22)", displayHex: "#888888" },
     ];
 
     const bgContainer = document.createElement("div");
@@ -568,11 +564,11 @@ export class LaTexModalEnhancer {
 
     for (const bg of bgColors) {
       const dot = document.createElement("div");
-      dot.className = `kcl-latex-bg-dot${bg.hex === "transparent" ? " is-clear" : ""}`;
-      if (bg.hex !== "transparent") {
-        dot.style.backgroundColor = bg.hex;
+      dot.className = `kcl-latex-bg-dot${bg.mathjax === "transparent" ? " is-clear" : ""}`;
+      if (bg.mathjax !== "transparent") {
+        dot.style.backgroundColor = bg.displayHex;
       }
-      dot.setAttribute("data-color", bg.hex);
+      dot.setAttribute("data-color", bg.mathjax);
       dot.title = `Fill: ${bg.name}`;
       bgContainer.appendChild(dot);
     }
@@ -633,7 +629,8 @@ export class LaTexModalEnhancer {
 
         const currentBg = parsed.box.background || "transparent";
         bgContainer.querySelectorAll(".kcl-latex-bg-dot").forEach((dot) => {
-          if (dot.getAttribute("data-color") === currentBg) {
+          const attr = dot.getAttribute("data-color");
+          if (attr === currentBg || (currentBg === "transparent" && attr === "transparent")) {
             dot.classList.add("is-active");
           } else {
             dot.classList.remove("is-active");
@@ -791,7 +788,18 @@ export class LaTexModalEnhancer {
         ) as HTMLButtonElement;
         if (okButton) {
           okButton.click();
+          return;
         }
+      } else {
+        const cancelButton = modalEl.querySelector(
+          ".modal-close-button, .excalidraw-prompt-buttonbar-bottom button:not(.mod-cta)",
+        ) as HTMLButtonElement;
+        if (cancelButton) {
+          cancelButton.click();
+          return;
+        }
+        const modalContainer = modalEl.closest(".modal-container");
+        if (modalContainer) modalContainer.remove();
       }
     };
 
