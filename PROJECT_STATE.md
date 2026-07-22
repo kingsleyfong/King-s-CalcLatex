@@ -8,13 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Resolved Default Snippet Array CSP Import Block, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Direct CTO Answer on 100% Git Clone & Bundled Execution Parity, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, uncovered exact physical root cause of empty extension array:
-- **Root Cause Identified**: `parseSnippets` passed `DEFAULT_SNIPPETS` (which is ALREADY a pre-compiled JS array object) to `importRaw(DEFAULT_SNIPPETS, "snippets.js")`. `importRaw` attempted to stringify `DEFAULT_SNIPPETS` into a Blob URL and dynamically `import(blobUrl)`. Chromium's Content Security Policy in Obsidian blocked Blob URL imports, throwing a runtime `SyntaxError` / CSP exception that returned `[]`.
-- **The Resolution**: Created `parseRawSnippetArray` in `parse.ts` to parse `DEFAULT_SNIPPETS` directly as a JavaScript array object without Blob URL stringification. All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) now parse synchronously into the extension array before editor registration.
-- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, provided direct explanation answering user query on git clone vs runtime bundler behavior:
+- **Confirmation**: We cloned 100% of the raw codebase (`git clone https://github.com/artisticat1/obsidian-latex-suite.git`) and copied all 58 `.ts` files into `repo-v2/src/latex-suite/` verbatim without manual reconstruction.
+- **Bundled Execution Context**: Standalone LaTeX Suite reads snippet files as text strings dynamically at runtime via Blob URL `import()`. When bundled directly into a plugin via `esbuild`, `DEFAULT_SNIPPETS` is an imported JS array object. Calling Blob URL `import()` on an array object fails under Chromium's CSP in Obsidian.
+- **Resolution**: Passing `DEFAULT_SNIPPETS` directly to LaTeX Suite's native validator (`validateRawSnippets`, `parseSnippet`, `sortSnippets`) executes LaTeX Suite's exact parsing logic on bundled JS objects cleanly.
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
 ```

@@ -1,5 +1,18 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 29) — Direct CTO Answer: Git Clone vs Bundled Execution Context
+
+### Status: 🟢 Direct Answer Delivered | Local Dev Active
+
+### What Was Done
+
+1. **Direct Answer to User Query**:
+   - Confirmed that we executed `git clone https://github.com/artisticat1/obsidian-latex-suite.git` and copied all 58 source files 100% verbatim into `repo-v2/src/latex-suite/`.
+   - Explained why dynamic `import(blobUrl)` failed when bundled: standalone LaTeX Suite reads external text files dynamically from disk via Blob URLs. When bundled into King's CalcLatex, `DEFAULT_SNIPPETS` is a pre-bundled JS array object. Calling Blob URL `import()` on an array object fails under Chromium's Content Security Policy in Obsidian.
+   - Feeding `DEFAULT_SNIPPETS` directly into LaTeX Suite's native validator (`validateRawSnippets`, `parseSnippet`, `sortSnippets`) executes LaTeX Suite's exact parser without triggering Blob URL CSP blocks.
+
+---
+
 ## Session: 2026-07-22 (Part 28) — Forensic Resolution: Direct JS Snippet Parsing (`parseRawSnippetArray`)
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Snippets Parsed 100%
