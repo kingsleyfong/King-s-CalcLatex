@@ -1,5 +1,19 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 3) — Display Math ($$) Blur Trim & SVG Equation Conversion Fix
+
+### Status: 🟢 Build clean | Force-copied to Vault | Display Math ($$) Fixed
+
+### What Was Done
+
+1. **Excalidraw Display Math (`$$`) Blur Conversion Fix (`interceptor.ts`)**:
+   - Added a capture-phase `blur` event listener in `handleAttach` inside `interceptor.ts`.
+   - When `dm` expands into `$$\n ... \n$$`, any trailing newlines or whitespace after closing `$$` are trimmed synchronously (`val.trim()`) before Excalidraw's own blur handler runs.
+   - Synchronized `appState.editingElement.text` and `originalText` directly via `excalidrawAPI`.
+   - Typing display math (`$$ ... $$`) in an Excalidraw textarea and clicking off (blurring) now cleanly converts the text into a rendered LaTeX SVG equation element!
+
+---
+
 ## Session: 2026-07-22 (Part 2) — Excalidraw OD Snippet Engine Population & SVG Equation Render Fix
 
 ### Status: 🟢 Build clean | Force-copied to Vault | Excalidraw OD Fixed

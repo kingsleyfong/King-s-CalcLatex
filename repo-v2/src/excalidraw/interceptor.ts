@@ -101,13 +101,42 @@ export class TextareaInterceptor {
     this.onAttach(textarea, view);
 
     const handleBlur = () => {
+      // Synchronously clean & sync value before Excalidraw processes blur
+      if (textarea && textarea.value) {
+        const val = textarea.value;
+        const trimmed = val.trim();
+        if (
+          (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 4) ||
+          (trimmed.startsWith("$") && trimmed.endsWith("$") && trimmed.length > 2) ||
+          (trimmed.startsWith("\\(") && trimmed.endsWith("\\)")) ||
+          (trimmed.startsWith("\\[") && trimmed.endsWith("\\]"))
+        ) {
+          if (val !== trimmed) {
+            setTextareaValue(textarea, trimmed);
+          }
+          try {
+            const api = view.excalidrawAPI || (view.ea?.getExcalidrawAPI ? view.ea.getExcalidrawAPI() : null);
+            if (api) {
+              const appState = api.getAppState();
+              if (appState?.editingElement) {
+                appState.editingElement.text = trimmed;
+                appState.editingElement.originalText = trimmed;
+              }
+            }
+          } catch {
+            /* Graceful fallback */
+          }
+        }
+      }
+
       setTimeout(() => {
         if (this.activeTextarea === textarea) {
           this.handleDetach();
         }
       }, 0);
     };
-    textarea.addEventListener("blur", handleBlur, { once: true });
+
+    textarea.addEventListener("blur", handleBlur, { capture: true, once: true });
   }
 
   private handleDetach(): void {
