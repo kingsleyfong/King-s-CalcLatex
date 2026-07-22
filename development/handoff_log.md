@@ -1,5 +1,17 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 25) — Direct Git Repository Fetch Alignment (`obsidian-latex-suite`)
+
+### Status: 🟢 Aligned on Direct Git Fetch | Local Dev Active
+
+### What Was Done
+
+1. **Acknowledgment & Execution Plan**:
+   - Agreed 100% that manually typing files introduced subtle character and helper errors.
+   - The correct workflow: Use git to clone `https://github.com/artisticat1/obsidian-latex-suite.git` into a temporary folder, copy the exact `src/` directory verbatim into `repo-v2/src/latex-suite/` without touching a single line of internal logic, and wire `main.ts` to register `setEditorExtensions()`.
+
+---
+
 ## Session: 2026-07-22 (Part 24) — High-Level CTO Explanation: How Manual Calculation Substituted `getTriggerPos`
 
 ### Status: 🟢 Explanation Delivered | Local Dev Active
