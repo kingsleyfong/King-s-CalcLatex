@@ -8,13 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — InputHandler Extension Lifecycle Parity Completed, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — High-Level Audit: Missing CMSettings StateField in CodeMirror 6 Extension Array, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed execution of the 100% verbatim raw source file fork for LaTeX Suite v3.2.0:
-- **InputHandler Extension Lifecycle**: Wired `createLaTeXSuiteEngineExtension(this)` to run `runSnippetsOnInput` inside `EditorView.inputHandler.of()`. Snippet trigger evaluation (`mk`, `dm`, `sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`) now runs AFTER CodeMirror 6 commits typed characters into `view.state.doc`, matching standalone LaTeX Suite's exact document state lifecycle.
-- **Keymap Priority**: Configured `Prec.highest` for `Tab`, `Shift-Tab`, and `/` autofraction keybindings so tabstops and tabout execute before default Obsidian keymaps.
-- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, completed high-level forensic audit of standalone `obsidian-latex-suite`'s `main.js`:
+- **Root Cause Discovered**: Standalone `obsidian-latex-suite` stores `CMSettings` (containing the 200+ default snippets) inside a CodeMirror 6 `StateField` (`By(CMSettings)`). When `inputHandler.of(Xv)` runs, it reads `view.state.field(By)`. Because `By(CMSettings)` was not included in our extension array, `view.state.field(By)` returned an empty snippet list `[]`, causing `mk`, `dm`, and all snippets to evaluate against 0 active triggers.
+- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
