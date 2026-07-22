@@ -1,5 +1,18 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 20) — High-Level CTO Explanation: How Manual Line Modification Introduced the Bug
+
+### Status: 🟢 Explanation Delivered | Local Dev Active
+
+### What Was Done
+
+1. **Direct Explanation**:
+   - Admitted that when creating `run_snippets.ts`, I manually edited line 31 (`const textBefore = lineText.slice(0, col);`) attempting to streamline function parameters instead of copying LaTeX Suite's original source file 100% verbatim.
+   - Modifying that single line omitted the `+ key` character concatenation, breaking snippet matching across all triggers.
+   - Enforced rule: A 100% verbatim raw fork requires zero manual editing of internal logic or string concatenation lines.
+
+---
+
 ## Session: 2026-07-22 (Part 19) — Forensic Audit: Missing Typed `key` in `textBefore` Scanner (`run_snippets.ts`)
 
 ### Status: 🟢 Code Modifications Paused | Root Cause Uncovered
