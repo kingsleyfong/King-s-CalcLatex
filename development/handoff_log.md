@@ -1,5 +1,27 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 18) — Full Raw Source Codebase Integration Completed
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Local Dev Complete
+
+### What Was Done
+
+1. **Integrated All Raw Standalone LaTeX Suite Modules (`repo-v2/src/latex-suite/`)**:
+   - `latexSuiteConfigField` (`src/snippets/codemirror/config.ts`)
+   - `historyCompat` (`src/snippets/codemirror/history_compat.ts`)
+   - `createAutoFractionKeybinding` (`src/features/autofraction.ts`)
+   - `createTaboutKeybindings` (`src/features/tabout.ts`)
+   - `runSnippetsOnInput` (`src/features/run_snippets.ts`)
+
+2. **Full Extension Array Assembly**:
+   - Assembled `createLaTeXSuiteEngineExtension(plugin)` to return `[latexSuiteConfigField, snippetQueuePlugin, tabstopsStateField, Prec.highest(inputHandlerExtension), Prec.highest(keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding]))]`.
+
+3. **Vault Sync**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 17) — Direct Answer: Full 30+ Raw Source File Fork Audit
 
 ### Status: 🟢 Code Modifications Paused | Direct Answer Delivered
