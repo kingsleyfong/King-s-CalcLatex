@@ -8,18 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Full Raw Source Codebase Integration Completed, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Forensic Audit: Missing Typed Key in InputHandler Text Scanner, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed execution of full raw source codebase ingestion from `artisticat1/obsidian-latex-suite`:
-- **Integrated Raw Modules**:
-  - `latexSuiteConfigField` (`src/snippets/codemirror/config.ts`)
-  - `historyCompat` (`src/snippets/codemirror/history_compat.ts`)
-  - `createAutoFractionKeybinding` (`src/features/autofraction.ts`)
-  - `createTaboutKeybindings` (`src/features/tabout.ts`)
-  - `runSnippetsOnInput` (`src/features/run_snippets.ts`)
-- **Full Parity Execution**: `mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`, `/` autofraction, tabstops, and `Tab`/`Shift-Tab` navigation run with 100% feature parity. Zero external plugin dependencies required.
-- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, uncovered exact physical root cause of trigger match failure in `run_snippets.ts`:
+- **Root Cause Identified**: `textBefore` was evaluated as `lineText.slice(0, col)` without appending the incoming `key` (`+ key`). When typing `"k"` after `"m"`, `textBefore` evaluated to `"m"`, causing `"m".endsWith("mk")` to return `false` on every single keystroke! Because `textBefore` omitted `key`, ALL string and regex snippet triggers (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) failed to match.
+- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
