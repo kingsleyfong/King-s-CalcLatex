@@ -1,5 +1,6 @@
 import { Snippet, SnippetType } from "./snippets";
-import { SnippetTabstopOnlyNode } from "./luasnip_api/node";
+import { SnippetTabstopOnlyNode, emptyInsertOptions } from "./luasnip_api/node";
+import { tabstopSpecsToTabstopGroups, TabstopGroup } from "./tabstop";
 
 export const DEFAULT_SNIPPET_VARIABLES: Record<string, string> = {
   "${GREEK}": "(?:alpha|beta|gamma|Gamma|delta|Delta|epsilon|varepsilon|zeta|eta|theta|vartheta|Theta|iota|kappa|lambda|Lambda|mu|nu|xi|omicron|pi|rho|varrho|sigma|Sigma|tau|upsilon|Upsilon|phi|varphi|Phi|chi|psi|omega|Omega)",
@@ -81,6 +82,23 @@ export function parseRawSnippets(raw: any[]): Snippet<SnippetType>[] {
   }
 
   return result;
+}
+
+export function computeSnippetExpansion(replacementRaw: string): { text: string; initialCursorOffset: number; tabstopGroups: TabstopGroup[] } {
+  const snippetNode = new SnippetTabstopOnlyNode(replacementRaw);
+  const { insert: text, tabstops: rawSpecs } = snippetNode.applyInsert(emptyInsertOptions);
+
+  const tabstopGroups = tabstopSpecsToTabstopGroups(rawSpecs);
+
+  let initialCursorOffset = text.length;
+  if (tabstopGroups.length > 0) {
+    const firstGroup = tabstopGroups[0];
+    if (firstGroup.ranges.length > 0) {
+      initialCursorOffset = firstGroup.ranges[0].from;
+    }
+  }
+
+  return { text, initialCursorOffset, tabstopGroups };
 }
 
 function escapeRegExp(str: string): string {
