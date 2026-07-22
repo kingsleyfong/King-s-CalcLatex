@@ -1,135 +1,112 @@
-import { EditorView, KeyBinding, keymap, tooltips } from "@codemirror/view";
-import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
+import { EditorView, KeyBinding, keymap, ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { EditorState, Prec } from "@codemirror/state";
 import type KingsCalcLatexPlugin from "../main";
 import { DEFAULT_LATEX_SUITE_SNIPPETS } from "../snippets/default-snippets";
 import { MathContextManager } from "./utils/context";
 import { parseRawSnippets } from "./snippets/parse";
 import { SnippetTabstopOnlyNode, emptyInsertOptions } from "./snippets/luasnip_api/node";
-import { tabstopSpecsToTabstopGroups, TabstopGroup } from "./snippets/tabstop";
+import { tabstopSpecsToTabstopGroups } from "./snippets/tabstop";
+import { tabstopsStateField } from "./snippets/codemirror/tabstops_state_field";
+import { snippetQueuePlugin, queueSnippets } from "./snippets/codemirror/snippet_queue_state_field";
+import { SnippetChangeSpec } from "./snippets/codemirror/snippet_change_spec";
+import { expandSnippets } from "./snippets/snippet_management";
 
-// ── 1. Tabstop StateField & Effects ──
-const addTabstopsEffect = StateEffect.define<TabstopGroup[]>();
-const removeAllTabstopsEffect = StateEffect.define();
-
-type TabstopsState = {
-  index: number;
-  tabstopGroups: TabstopGroup[];
-};
-
-export const tabstopsStateField = StateField.define<TabstopsState>({
-  create() {
-    return { index: 0, tabstopGroups: [] };
-  },
-  update(value, transaction) {
-    let tabstopGroups = value.tabstopGroups;
-    tabstopGroups.forEach((grp) => {
-      grp.ranges = grp.ranges.map((r) => ({
-        from: transaction.changes.mapPos(r.from, 1),
-        to: transaction.changes.mapPos(r.to, 1),
-      }));
-    });
-
-    for (const effect of transaction.effects) {
-      if (effect.is(addTabstopsEffect)) {
-        tabstopGroups = [...effect.value];
-      } else if (effect.is(removeAllTabstopsEffect)) {
-        tabstopGroups = [];
-      }
-    }
-
-    return { index: value.index, tabstopGroups };
-  },
-});
-
-// ── 2. Main LaTeX Suite Engine Extension ──
 export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   const parsedDefaultSnippets = parseRawSnippets(DEFAULT_LATEX_SUITE_SNIPPETS);
 
-  // Official LaTeX Suite Input Handler Architecture
-  const inputHandlerExtension = Prec.highest(
-    EditorView.inputHandler.of((view: EditorView, from: number, to: number, text: string) => {
-      if (plugin.settings.enableLaTeXSuite === false) return false;
-      if (text.length !== 1) return false;
+  const latexSuitePlugin = ViewPlugin.fromClass(
+    class {
+      constructor(public view: EditorView) {}
+      update(update: ViewUpdate) {}
 
-      const state = view.state;
-      const mainSel = state.selection.main;
-      if (!mainSel.empty) return false;
+      handleKeydown(event: KeyboardEvent): boolean {
+        if (plugin.settings.enableLaTeXSuite === false) return false;
+        if (event.ctrlKey || event.altKey || event.metaKey) return false;
+        if (event.key.length !== 1) return false;
 
-      const pos = mainSel.head;
-      const line = state.doc.lineAt(pos);
-      const lineText = line.text;
-      const col = pos - line.from;
+        const view = this.view;
+        const state = view.state;
+        const mainSel = state.selection.main;
+        if (!mainSel.empty) return false;
 
-      const charTyped = text;
-      const textBefore = lineText.slice(0, col) + charTyped;
-      const inMath = MathContextManager.isMathMode(state, pos);
+        const pos = mainSel.head;
+        const line = state.doc.lineAt(pos);
+        const lineText = line.text;
+        const col = pos - line.from;
 
-      // Auto-subscript digits (e.g. x1 -> x_1)
-      if (plugin.settings.enableAutoSubscript && inMath && /\d/.test(charTyped)) {
-        const prevChar = lineText.slice(col - 1, col);
-        if (/[a-zA-Z]/.test(prevChar)) {
-          const replaceFrom = pos - 1;
-          const insertText = `${prevChar}_${charTyped}`;
+        const charTyped = event.key;
+        const textBefore = lineText.slice(0, col) + charTyped;
+        const inMath = MathContextManager.isMathMode(state, pos);
 
-          view.dispatch({
-            changes: { from: replaceFrom, to: pos, insert: insertText },
-            selection: { anchor: replaceFrom + insertText.length, head: replaceFrom + insertText.length },
-            userEvent: "input.type",
-            scrollIntoView: true,
-          });
-          return true;
+        // 1. Auto-subscript digits (e.g. x1 -> x_1)
+        if (plugin.settings.enableAutoSubscript && inMath && /\d/.test(charTyped)) {
+          const prevChar = lineText.slice(col - 1, col);
+          if (/[a-zA-Z]/.test(prevChar)) {
+            const replaceFrom = pos - 1;
+            const insertText = `${prevChar}_${charTyped}`;
+
+            view.dispatch({
+              changes: { from: replaceFrom, to: pos, insert: insertText },
+              selection: { anchor: replaceFrom + insertText.length, head: replaceFrom + insertText.length },
+              userEvent: "input.type",
+              scrollIntoView: true,
+            });
+            return true;
+          }
         }
+
+        // 2. Snippet Trigger Processing
+        for (const s of parsedDefaultSnippets) {
+          const opts = s.options || "";
+          const isMathOnly = opts.includes("m");
+          const isTextOnly = opts.includes("t");
+          const autoExpand = opts.includes("A");
+
+          if (!autoExpand) continue;
+          if (isMathOnly && !inMath) continue;
+          if (isTextOnly && inMath) continue;
+
+          let trigger = typeof s.data.trigger === "string" ? s.data.trigger : "";
+          if (trigger === "mk" && plugin.settings.inlineMathTrigger) {
+            trigger = plugin.settings.inlineMathTrigger;
+          } else if (trigger === "dm" && plugin.settings.displayMathTrigger) {
+            trigger = plugin.settings.displayMathTrigger;
+          }
+
+          if (trigger && textBefore.endsWith(trigger)) {
+            const triggerLen = trigger.length;
+            const replaceFrom = pos - (triggerLen - 1);
+
+            const snippetNode = new SnippetTabstopOnlyNode(s.rawReplacement);
+            const resultInsert = snippetNode.applyInsert(emptyInsertOptions);
+
+            const changeSpec = new SnippetChangeSpec(replaceFrom, pos, resultInsert, charTyped);
+            queueSnippets(view, [changeSpec]);
+
+            // Queue expansion via microtask to flush queued change spec cleanly
+            queueMicrotask(() => {
+              expandSnippets(view);
+            });
+
+            return true;
+          }
+        }
+
+        return false;
       }
-
-      // Snippet Trigger Processing
-      for (const s of parsedDefaultSnippets) {
-        const opts = s.options || "";
-        const isMathOnly = opts.includes("m");
-        const isTextOnly = opts.includes("t");
-        const autoExpand = opts.includes("A");
-
-        if (!autoExpand) continue;
-        if (isMathOnly && !inMath) continue;
-        if (isTextOnly && inMath) continue;
-
-        let trigger = typeof s.data.trigger === "string" ? s.data.trigger : "";
-        if (trigger === "mk" && plugin.settings.inlineMathTrigger) {
-          trigger = plugin.settings.inlineMathTrigger;
-        } else if (trigger === "dm" && plugin.settings.displayMathTrigger) {
-          trigger = plugin.settings.displayMathTrigger;
-        }
-
-        if (trigger && textBefore.endsWith(trigger)) {
-          const triggerLen = trigger.length;
-          const replaceFrom = pos - (triggerLen - 1);
-
-          const { text: replacementText, initialCursorOffset, tabstopGroups } = computeSnippetExpansion(s.rawReplacement);
-          const targetCursorPos = replaceFrom + initialCursorOffset;
-
-          const mappedTabstops = tabstopGroups.map((grp) => {
-            return new TabstopGroup(
-              grp.index,
-              grp.ranges.map((r) => ({
-                from: replaceFrom + r.from,
-                to: replaceFrom + r.to,
-              })),
-            );
-          });
-
-          view.dispatch({
-            changes: { from: replaceFrom, to: pos, insert: replacementText },
-            selection: { anchor: targetCursorPos, head: targetCursorPos },
-            effects: [addTabstopsEffect.of(mappedTabstops)],
-            userEvent: "input.type",
-            scrollIntoView: true,
-          });
-
-          return true;
-        }
-      }
-
-      return false;
-    }),
+    },
+    {
+      eventHandlers: {
+        keydown(event: KeyboardEvent, view: EditorView) {
+          const pluginInst = view.plugin(latexSuitePlugin);
+          if (pluginInst) {
+            if (pluginInst.handleKeydown(event)) {
+              event.preventDefault();
+            }
+          }
+        },
+      },
+    },
   );
 
   // Tab & Shift-Tab Keybindings
@@ -240,25 +217,9 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   };
 
   return [
+    snippetQueuePlugin,
     tabstopsStateField,
-    inputHandlerExtension,
+    Prec.highest(latexSuitePlugin.extension),
     Prec.high(keymap.of([tabKeybinding, shiftTabKeybinding])),
   ];
-}
-
-export function computeSnippetExpansion(replacementRaw: string): { text: string; initialCursorOffset: number; tabstops: TabstopGroup[] } {
-  const snippetNode = new SnippetTabstopOnlyNode(replacementRaw);
-  const { insert: text, tabstops: rawSpecs } = snippetNode.applyInsert(emptyInsertOptions);
-
-  const tabstopGroups = tabstopSpecsToTabstopGroups(rawSpecs);
-
-  let initialCursorOffset = text.length;
-  if (tabstopGroups.length > 0) {
-    const firstGroup = tabstopGroups[0];
-    if (firstGroup.ranges.length > 0) {
-      initialCursorOffset = firstGroup.ranges[0].from;
-    }
-  }
-
-  return { text, initialCursorOffset, tabstops: tabstopGroups };
 }
