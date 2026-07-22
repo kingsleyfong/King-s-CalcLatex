@@ -134,6 +134,7 @@ export function setTextareaValue(
   }
 
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  textarea.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 export function updateTextarea(
@@ -160,6 +161,7 @@ export function updateTextarea(
   }
 
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  textarea.dispatchEvent(new Event("change", { bubbles: true }));
 
   for (const delay of [0, 10, 30]) {
     setTimeout(() => {

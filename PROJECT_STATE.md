@@ -8,13 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — LaTeX Suite Isolated Feature Toggle, 100% Verbatim Engine, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Excalidraw OD Snippet Engine & SVG Blur Event Sync Fixed, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed integration of LaTeX Suite into **King's CalcLatex** v3.2.0 with complete feature isolation and setting toggles:
-- **LaTeX Suite Feature Toggle (`enableLaTeXSuite`)**: Added master settings toggle in plugin Settings Tab. When set to `false`, `createLaTeXSuiteEngineExtension(this)` returns `[]` (empty extension array), completely disabling and isolating all LaTeX Suite snippet handlers and keybindings.
-- **100% Non-Conflicting Core Features**: Verified that King's CalcLatex's CAS solving, Giac WASM engine, 2D/3D graphing, and Excalidraw Companion operate 100% independently without conflict.
-- **Mandatory Per-Cycle Doc Hook**: Added automatic per-cycle doc update rule to `CLAUDE.md` and `SESSION_START.md` requiring project state, handoff logs, and antipatterns to be updated after every turn.
+On 2026-07-22, diagnosed and resolved Excalidraw OD textarea snippet expansion and SVG equation rendering issues:
+- **Full 200+ Snippet Database in Excalidraw**: Populated Excalidraw's `SnippetEngine` with all 200+ raw default snippets from `DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING` (`sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`, regex subscripts, and visual selection wrappers).
+- **Blur Event & React State Synchronization**: Updated `setTextareaValue` and `updateTextarea` in `interceptor.ts` to dispatch both `input` and `change` events. This ensures Excalidraw's React state syncs the updated text before blur, allowing clicking off an Excalidraw textbox to render LaTeX text (`$ ... $`) into an SVG equation element.
 
 ### v2.0 Architecture
 ```
