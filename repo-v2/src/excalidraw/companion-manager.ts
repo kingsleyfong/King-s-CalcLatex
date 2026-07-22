@@ -6,6 +6,9 @@ import { PreviewTooltip } from "./preview-tooltip";
 import { LaTexModalEnhancer } from "./latex-modal";
 import { SidebarStyleEnhancer } from "./sidebar-enhancer";
 import { GraphInjector } from "./graph-injector";
+import { DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING } from "../snippets/default-snippets";
+import { parseRawSnippetsFromStr } from "../latex-suite/snippets/parse";
+import type { SnippetDef } from "./types";
 
 export class ExcalidrawCompanionManager {
   private interceptor: TextareaInterceptor | null = null;
@@ -25,6 +28,30 @@ export class ExcalidrawCompanionManager {
     if (!this.plugin.settings.enableExcalidrawOD) return;
 
     this.snippetEngine = new SnippetEngine();
+
+    // Populate Excalidraw SnippetEngine with full 200+ raw default snippets from LaTeX Suite
+    const parsedRaw = parseRawSnippetsFromStr(DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING);
+    const convertedSnippets: SnippetDef[] = parsedRaw.map((s) => {
+      const opts = s.options || "";
+      return {
+        trigger: s.data.trigger as string | RegExp,
+        replacement: s.rawReplacement,
+        options: opts,
+        description: s.description,
+        priority: s.priority,
+        flags: {
+          math: opts.includes("m"),
+          text: opts.includes("t"),
+          display: opts.includes("d"),
+          auto: opts.includes("A"),
+          regex: opts.includes("r") || s.data.trigger instanceof RegExp,
+          word: opts.includes("w"),
+          visual: s.rawReplacement.includes("${VISUAL}"),
+        },
+      };
+    });
+    this.snippetEngine.setSnippets(convertedSnippets);
+
     this.tooltip = new PreviewTooltip(this.plugin.settings);
     this.modalEnhancer = new LaTexModalEnhancer(this.plugin.settings);
     this.sidebarEnhancer = new SidebarStyleEnhancer(this.plugin);
@@ -42,7 +69,7 @@ export class ExcalidrawCompanionManager {
       () => this.onTextareaDetach(),
     );
 
-    // Register global keydown listener for Ctrl+L LaTeX prompt shortcut
+    // Register global keydown listener for Ctrl+\ LaTeX prompt shortcut
     this.handleKeydownBound = (e: KeyboardEvent) => this.handleLaTeXShortcut(e);
     window.addEventListener("keydown", this.handleKeydownBound, true);
 
@@ -101,7 +128,7 @@ export class ExcalidrawCompanionManager {
   }
 
   /**
-   * Keyboard shortcut (default Ctrl+L) to edit the selected Excalidraw LaTeX equation / PNG element.
+   * Keyboard shortcut (default Ctrl+\) to edit the selected Excalidraw LaTeX equation / PNG element.
    */
   private handleLaTeXShortcut(e: KeyboardEvent): void {
     if (!this.plugin.settings.latexEditorShortcutEnabled) return;

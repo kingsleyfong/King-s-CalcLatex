@@ -1,8 +1,24 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 2) — Excalidraw OD Snippet Engine Population & SVG Equation Render Fix
+
+### Status: 🟢 Build clean | Force-copied to Vault | Excalidraw OD Fixed
+
+### What Was Done
+
+1. **Excalidraw Textbox SVG Equation Rendering Fix (`interceptor.ts`)**:
+   - Updated `setTextareaValue` and `updateTextarea` to dispatch both `Event("input")` and `Event("change")`.
+   - Fixed the issue where clicking off (blurring) an Excalidraw textbox failed to trigger Excalidraw's `tex2svg` equation renderer due to stale React state. Now typing `$ ... $` in an Excalidraw textarea and clicking off converts the text element into a rendered LaTeX SVG equation element!
+
+2. **Full 200+ Snippet Database Population (`companion-manager.ts`)**:
+   - Ingested all 200+ raw default snippets from `DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING` into Excalidraw's `SnippetEngine`.
+   - Restored `sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`, regex subscripts (`x1` $\rightarrow$ `x_1`), and `${VISUAL}` wrappers inside Excalidraw textareas and modification modals.
+
+---
+
 ## Session: 2026-07-22 — 100% Verbatim LaTeX Suite Ingestion, Isolated Feature Toggle (v3.2.0) & Per-Cycle Agentic Hook
 
-### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | GitHub Tag v3.2.0 Pushed
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Git Commit `3b87f64` Committed
 
 ### What Was Done
 
@@ -16,8 +32,9 @@
    - Added `enableLaTeXSuite` check at top of `createLaTeXSuiteEngineExtension(this)`. When toggled `false`, it returns `[]` (empty extension array), 100% isolating and disabling all LaTeX Suite handlers and keybindings.
    - Verified that King's CalcLatex core features (Giac WASM CAS solving, 2D/3D graphing, Excalidraw Companion) function 100% independently without conflict.
 
-3. **Mandatory Per-Cycle Agentic Documentation Hook**:
+3. **Mandatory Per-Cycle Agentic Documentation Hook Active**:
    - Added automatic per-cycle doc update rule to `CLAUDE.md` and `SESSION_START.md` requiring `PROJECT_STATE.md`, `development/handoff_log.md`, and `repo-v2/CLAUDE.md` to be updated after every single prompt & response cycle.
+   - Committed changes in git commit `3b87f64`.
 
 ---
 
