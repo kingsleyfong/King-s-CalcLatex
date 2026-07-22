@@ -8,11 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — High-Level CTO Explanation of Missing StateField in Extension Bundle, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Full 30+ Raw Source File Ingestion Plan, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, provided direct CTO explanation of why built-in LaTeX Suite snippets weren't expanding:
-- **Root Cause**: `createLaTeXSuiteEngineExtension` returned extensions without registering the CodeMirror 6 `CMSettings` `StateField`. Because `inputHandler` expects to read `view.state.field(CMSettingsField)` on every keystroke to pull active snippets, omitting `CMSettingsField` caused `inputHandler` to evaluate text against an empty snippet array.
+On 2026-07-22, acknowledged user query explaining why partial file copying failed complete feature parity:
+- **Root Cause**: Instead of copying all 30+ raw `.ts` source files from `artisticat1/obsidian-latex-suite` verbatim (including default snippet tables, settings state fields, conceal, tabout, and bracket colorizers), we attempted to copy a subset of files. This omitted critical state field modules and default snippet processors.
+- **Corrective Action**: Copy all 30+ raw TypeScript source files from `artisticat1/obsidian-latex-suite` directly into `repo-v2/src/latex-suite/` 100% verbatim.
 - **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
