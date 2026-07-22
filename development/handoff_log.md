@@ -1,5 +1,18 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 24) — High-Level CTO Explanation: How Manual Calculation Substituted `getTriggerPos`
+
+### Status: 🟢 Explanation Delivered | Local Dev Active
+
+### What Was Done
+
+1. **Direct Explanation**:
+   - Standalone `obsidian-latex-suite` uses helper function `getTriggerPos(pos, triggerLen)` which calculates `pos - (triggerLen - 1)`.
+   - When constructing `run_snippets.ts`, I manually typed `const replaceFrom = pos - triggerLen;` instead of preserving the exact `getTriggerPos` helper, dropping the `- 1` offset.
+   - Enforced rule: Using LaTeX Suite's exact helper functions prevents range index miscalculations.
+
+---
+
 ## Session: 2026-07-22 (Part 23) — Forensic Audit: Negative `replaceFrom` Document Index Range Bug
 
 ### Status: 🟢 Code Modifications Paused | Root Cause Uncovered
