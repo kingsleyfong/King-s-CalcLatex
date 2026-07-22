@@ -8,12 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Resolved Tolerant Snippet Schema Validation, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Resolved onInput Keyboard Event Guard Condition, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, forensically audited `validateRawSnippets` in `parse.ts`:
-- **Root Cause Identified**: `validateRawSnippets` passed raw snippet objects to `parse(RawSnippetSchema, raw)`. When any snippet in `default_snippets.js` omitted strict schema fields (or had cross-context RegExp instances), `valibot` threw a strict validation error that aborted the entire snippet array parsing process and returned `[]`.
-- **The Resolution**: Added a tolerant fallback mapping in `validateRawSnippets`. If strict `valibot` parsing encounters a schema discrepancy, the snippet is mapped safely using standard fallback defaults instead of aborting the snippet database. All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) now load 100% cleanly into the CodeMirror 6 extension array.
+On 2026-07-22, forensically audited inputHandler execution pipeline in `latex_suite.ts`:
+- **Root Cause Identified**: In `latex_suite.ts`, line 85 contained `if (text.length == 1 && lastKeyboardEvent)`. For standard keyboard typing (English letters like `"m"` and `"k"`), `keyboardEventPlugin` set `lastKeyboardEvent = null`. `if (lastKeyboardEvent)` evaluated to `false`, causing `onInput` to return `false` on every single typed character without invoking `handleKeydown`.
+- **The Resolution**: Updated `onInput` in `latex_suite.ts` to allow single typed characters (`text.length == 1`) to execute `handleKeydown(text, ...)` regardless of IME composition state. `onInput("k")` now invokes `runSnippets`, matching `"m" + "k"` $\rightarrow$ `"mk"` $\rightarrow$ `$ $` and `"d" + "m"` $\rightarrow$ `"dm"` $\rightarrow$ `$$\n\t\n$$`.
 - **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture

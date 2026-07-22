@@ -82,12 +82,12 @@ export const onInput = (view: EditorView, _from: number, _to: number, text: stri
 	}
 	const lastKeyboardEvent = view.plugin(keyboardEventPlugin)?.lastKeyboardEvent;
 	if (text === "\0\0") return true;
-	if (text.length == 1 && lastKeyboardEvent) {
+	if (text.length == 1) {
 		if (text === "\t") text = "Tab";
 		const success = handleKeydown(
 			text,
-			lastKeyboardEvent.ctrlKey || lastKeyboardEvent.metaKey,
-			isComposing(view, lastKeyboardEvent),
+			lastKeyboardEvent ? (lastKeyboardEvent.ctrlKey || lastKeyboardEvent.metaKey) : false,
+			lastKeyboardEvent ? isComposing(view, lastKeyboardEvent) : false,
 			view
 		);
 		if (success) {
