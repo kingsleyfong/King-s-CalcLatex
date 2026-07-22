@@ -1,127 +1,174 @@
 import { EditorView } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
-import { MathContextManager } from "../utils/context";
-import { queueSnippets } from "../snippets/codemirror/snippet_queue_state_field";
-import { SnippetChangeSpec } from "../snippets/codemirror/snippet_change_spec";
-import { expandSnippets } from "../snippets/snippet_management";
-import { SnippetTabstopOnlyNode, emptyInsertOptions } from "../snippets/luasnip_api/node";
-import { parseRawSnippetsFromStr } from "../snippets/parse";
-import { DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING } from "../../snippets/default-snippets";
-import type KingsCalcLatexPlugin from "../../main";
+import { EditorState, SelectionRange } from "@codemirror/state";
+import { getLatexSuiteConfig } from "src/snippets/codemirror/config";
+import { queueSnippet } from "src/snippets/codemirror/snippet_queue_state_field";
+import { Mode, Options } from "src/snippets/options";
+import { expandSnippets } from "src/snippets/snippet_management";
+import { Context, getContextPlugin } from "src/utils/context";
+import { autoEnlargeBrackets } from "./auto_enlarge_brackets";
+import { snippetDebugLevel } from "src/settings/settings";
+import { Snippet, SnippetType } from "src/snippets/snippets";
+import { showSnippetInfo } from "src/editor_extensions/obsidian_utils";
 
-const defaultParsedSnippets = parseRawSnippetsFromStr(DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING);
+type SnippetInfo = {
+	snippets: Snippet<SnippetType>[];
+	key?: string;
+}
+type RunSnippetsOptions = {
+	recursive: number;
+	debug: snippetDebugLevel;
+}
+export const runSnippets = (view: EditorView, snippetInfo: SnippetInfo, options: RunSnippetsOptions):boolean => {
+	let didExpand = false;
+	for (let i=0; i <= options.recursive; i++) {
+		const ctx = getContextPlugin(view);
+		let shouldAutoEnlargeBrackets = false;
 
-const WORD_DELIMITERS = "., +-\n\t:;!?\\/{}[]()=~$'\"|`<>*^%#@&";
+		for (const range of ctx.ranges) {
+			const result = runSnippetCursor(view, ctx, snippetInfo, range, options.debug);
 
-function isWordBoundary(char: string | undefined): boolean {
-  if (!char) return true;
-  return WORD_DELIMITERS.includes(char);
+			if (result.shouldAutoEnlargeBrackets) shouldAutoEnlargeBrackets = true;
+		}
+
+		const success = expandSnippets(view);
+		didExpand = didExpand || success;
+
+
+		if (shouldAutoEnlargeBrackets) {
+			autoEnlargeBrackets(view);
+		}
+		if (!success) {
+			break
+		}
+		snippetInfo.key = undefined; // only run keypress once.
+	}
+	return didExpand
+}
+const getSliceAroundCursor = (view: EditorView, to: number) => {
+	const line = view.state.sliceDoc(0, to);
+	let cachedLineAfter: string | null = null;
+	const effectiveLineAfter = () => {
+		cachedLineAfter = cachedLineAfter ?? view.state.sliceDoc(to);
+		return cachedLineAfter;
+	};
+	return {line, effectiveLineAfter};
 }
 
-export function runSnippetsOnInput(view: EditorView, key: string, plugin: KingsCalcLatexPlugin): boolean {
-  if (plugin.settings.enableLaTeXSuite === false) return false;
+const runSnippetCursor = (view: EditorView, ctx: Context, snippetInfo: SnippetInfo, range: SelectionRange, debug: snippetDebugLevel):{success: boolean; shouldAutoEnlargeBrackets: boolean} => {
 
-  const state = view.state;
-  const mainSel = state.selection.main;
-  const pos = mainSel.head;
-  const line = state.doc.lineAt(pos);
-  const lineText = line.text;
-  const col = pos - line.from;
+	const settings = getLatexSuiteConfig(view);
+	const {from, to} = range;
+	const sel = view.state.sliceDoc(from, to);
+	const {line, effectiveLineAfter} = getSliceAroundCursor(view, to);
+	const key = snippetInfo.key ?? "";
+	// If the key pressed wasn't a text character, continue
+	if (snippetInfo.key && snippetInfo.key.length !== 1) {
+		return {success: false, shouldAutoEnlargeBrackets: false};
+	}
+	const updatedLine = line + key;
+	for (let i=0; i < snippetInfo.snippets.length; i++) {
+		const snippet = snippetInfo.snippets[i];
 
-  const textBefore = lineText.slice(0, col) + key;
-  const inMath = MathContextManager.isMathMode(state, pos);
+		if (!snippet.options.snippetShouldRunInMode(ctx.mode)) {
+			continue;
+		}
 
-  // Visual Selection Replacements (${VISUAL})
-  if (!mainSel.empty) {
-    const selectedText = state.sliceDoc(mainSel.from, mainSel.to);
-    for (const s of defaultParsedSnippets) {
-      const opts = s.options || "";
-      const isMathOnly = opts.includes("m");
-      const isTextOnly = opts.includes("t");
-      const autoExpand = opts.includes("A");
+		const result = snippet.process(updatedLine, range, sel, effectiveLineAfter);
+		if (result === null) continue;
 
-      if (!autoExpand) continue;
-      if (isMathOnly && !inMath) continue;
-      if (isTextOnly && inMath) continue;
+		// Check that this snippet is not excluded in a certain environment
+		let isExcluded = false;
+		// in practice, a snippet should have very few excluded environments, if any,
+		// so the cost of this check shouldn't be very high
+		for (const environment of snippet.excludedEnvironments) {
+			if (ctx.isWithinEnvironment(to, environment)) { isExcluded = true; }
+		}
+		// we could've used a labelled outer for loop to `continue` from within the inner for loop,
+		// but labels are extremely rarely used, so we do this construction instead
+		if (isExcluded) { continue; }
 
-      const trigger = typeof s.data.trigger === "string" ? s.data.trigger : "";
-      if (trigger === key && s.rawReplacement.includes("${VISUAL}")) {
-        const replacementExpanded = s.rawReplacement.replace(/\$\{VISUAL\}/g, selectedText);
-        const snippetNode = new SnippetTabstopOnlyNode(replacementExpanded);
-        const resultInsert = snippetNode.applyInsert(emptyInsertOptions);
+		const triggerPos = result.triggerPos;
+		const triggerEndPos = result.triggerEndPos
+			? result.triggerEndPos - key.length
+			: to;
 
-        const changeSpec = new SnippetChangeSpec(mainSel.from, mainSel.to, resultInsert, key);
-        queueSnippets(view, [changeSpec]);
-        expandSnippets(view);
-        return true;
-      }
-    }
-    return false;
-  }
+		if (snippet.options.onWordBoundary) {
+			// Check that the trigger is preceded and followed by a word delimiter
+			if (!isOnWordBoundary(view.state, triggerPos, to, settings.wordDelimiters)) continue;
+		}
 
-  // Auto-Expanding Snippet Triggers
-  for (const s of defaultParsedSnippets) {
-    const opts = s.options || "";
-    const isMathOnly = opts.includes("m");
-    const isTextOnly = opts.includes("t");
-    const autoExpand = opts.includes("A");
-    const isWordOnly = opts.includes("w");
+		let replacement = result.replacement;
 
-    if (!autoExpand) continue;
-    if (isMathOnly && !inMath) continue;
-    if (isTextOnly && inMath) continue;
+		// When in inline math, remove any spaces at the end of the replacement
+		if (ctx.mode.inlineMath && settings.removeSnippetWhitespace) {
+			replacement.insert = trimWhitespace(replacement.insert, ctx);
+		}
 
-    if (s.type === "string") {
-      let trigger = typeof s.data.trigger === "string" ? s.data.trigger : "";
-      if (trigger === "mk" && plugin.settings.inlineMathTrigger) {
-        trigger = plugin.settings.inlineMathTrigger;
-      } else if (trigger === "dm" && plugin.settings.displayMathTrigger) {
-        trigger = plugin.settings.displayMathTrigger;
-      }
+		// Expand the snippet
+		const start = triggerPos;
+		const triggerKey =
+			snippet.options.automatic && snippet.type !== "visual" && snippet.options.undoKey
+				? key
+				: undefined;
+		queueSnippet(view, start, triggerEndPos, replacement, triggerKey, to);
 
-      if (trigger && textBefore.endsWith(trigger)) {
-        const triggerLen = trigger.length;
-        const triggerStartCol = col - triggerLen;
+		const containsTrigger = settings.autoEnlargeBracketsTriggers.some(word => replacement.insert.contains(word));
+		if (debug === "info" || debug === "verbose") {
+			showSnippetInfo(view.state, snippet, replacement.insert, containsTrigger);
+		}
+		if (debug === "verbose") {
+			console.debug({
+				snippets_unexpanded: snippetInfo.snippets
+					.slice(0, i)
+					.map((s) => ({
+						description: s.description,
+						trigger: s.trigger,
+						options: s.options,
+						replacement: s.replacement
+					})),
+				current_mode: ctx.mode,
+				updatedLine,
+			});	
+		}	
+		return {success: true, shouldAutoEnlargeBrackets: containsTrigger};
+	}
 
-        if (isWordOnly && triggerStartCol > 0) {
-          const charBefore = lineText[triggerStartCol - 1];
-          if (!isWordBoundary(charBefore)) continue;
-        }
 
-        const replaceFrom = pos - triggerLen;
+	return {success: false, shouldAutoEnlargeBrackets: false};
+}
 
-        const snippetNode = new SnippetTabstopOnlyNode(s.rawReplacement);
-        const resultInsert = snippetNode.applyInsert(emptyInsertOptions);
+const isOnWordBoundary = (state: EditorState, triggerPos: number, to: number, wordDelimiters: string) => {
+	const prevChar = state.sliceDoc(triggerPos-1, triggerPos);
+	const nextChar = state.sliceDoc(to, to+1);
 
-        const changeSpec = new SnippetChangeSpec(replaceFrom, pos, resultInsert, key);
-        queueSnippets(view, [changeSpec]);
-        expandSnippets(view);
+	wordDelimiters = wordDelimiters.replace("\\n", "\n");
 
-        return true;
-      }
-    } else if (s.type === "regex" && plugin.settings.enableRegexSnippets !== false) {
-      const reg = s.data.trigger as RegExp;
-      const match = reg.exec(textBefore);
-      if (match) {
-        const matchLen = match[0].length;
-        const replaceFrom = pos - matchLen;
+	return (wordDelimiters.contains(prevChar) && wordDelimiters.contains(nextChar));
+}
 
-        let replacementStr = s.rawReplacement;
-        for (let mIdx = 0; mIdx < match.length; mIdx++) {
-          replacementStr = replacementStr.replace(new RegExp(`\\[\\[${mIdx}\\]\\]`, "g"), match[mIdx]);
-        }
+const trimWhitespace = (replacement: string, _ctx: Context) => {
+	let spaceIndex = 0;
 
-        const snippetNode = new SnippetTabstopOnlyNode(replacementStr);
-        const resultInsert = snippetNode.applyInsert(emptyInsertOptions);
+	if (replacement.endsWith(" ")) {
+		spaceIndex = -1;
+	}
+	else {
+		const lastThreeChars = replacement.slice(-3);
+		const lastChar = lastThreeChars.slice(-1);
 
-        const changeSpec = new SnippetChangeSpec(replaceFrom, pos, resultInsert, key);
-        queueSnippets(view, [changeSpec]);
-        expandSnippets(view);
+		if (lastThreeChars.slice(0, 2) === " $" && !isNaN(parseInt(lastChar))) {
+			spaceIndex = -3;
+		}
+	}
 
-        return true;
-      }
-    }
-  }
+	if (spaceIndex != 0) {
+		if (spaceIndex === -1) {
+			replacement = replacement.trimEnd();
+		}
+		else if (spaceIndex === -3){
+			replacement = replacement.slice(0, -3) + replacement.slice(-2);
+		}
+	}
 
-  return false;
+	return replacement;
 }

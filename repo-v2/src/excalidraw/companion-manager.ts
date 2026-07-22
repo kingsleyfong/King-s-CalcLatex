@@ -6,8 +6,9 @@ import { PreviewTooltip } from "./preview-tooltip";
 import { LaTexModalEnhancer } from "./latex-modal";
 import { SidebarStyleEnhancer } from "./sidebar-enhancer";
 import { GraphInjector } from "./graph-injector";
-import { DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING } from "../snippets/default-snippets";
-import { parseRawSnippetsFromStr } from "../latex-suite/snippets/parse";
+import DEFAULT_SNIPPETS from "../latex-suite/default_snippets.js";
+import DEFAULT_SNIPPET_VARIABLES from "../latex-suite/default_snippet_variables.js";
+import { parseSnippets, parseSnippetVariables } from "../latex-suite/snippets/parse";
 import type { SnippetDef } from "./types";
 
 export class ExcalidrawCompanionManager {
@@ -24,34 +25,37 @@ export class ExcalidrawCompanionManager {
     private plugin: KingsCalcLatexPlugin,
   ) {}
 
-  onload(): void {
+  async onload(): Promise<void> {
     if (!this.plugin.settings.enableExcalidrawOD) return;
 
     this.snippetEngine = new SnippetEngine();
 
-    // Populate Excalidraw SnippetEngine: ONLY "mk" math mode trigger (EXCLUDE "dm")
-    const parsedRaw = parseRawSnippetsFromStr(DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING);
+    // Populate Excalidraw SnippetEngine using forked latex-suite parser
+    const variables = await parseSnippetVariables(DEFAULT_SNIPPET_VARIABLES, "snippet-variables.js");
+    const parsedRaw = await parseSnippets(DEFAULT_SNIPPETS, variables, "snippets.js");
+
     const convertedSnippets: SnippetDef[] = parsedRaw
       .filter((s) => {
-        const tr = typeof s.data.trigger === "string" ? s.data.trigger : "";
+        const tr = typeof s.trigger === "string" ? s.trigger : "";
         return tr !== "dm"; // Exclude dm snippet in Excalidraw textareas
       })
       .map((s) => {
-        const opts = s.options || "";
+        const optsStr = s.options ? String(s.options) : "";
+        const rawRepl = typeof s.replacement === "string" ? s.replacement : "";
         return {
-          trigger: s.data.trigger as string | RegExp,
-          replacement: s.rawReplacement,
-          options: opts,
-          description: s.description,
-          priority: s.priority,
+          trigger: s.trigger as string | RegExp,
+          replacement: rawRepl,
+          options: optsStr,
+          description: s.description || "",
+          priority: s.priority || 0,
           flags: {
-            math: opts.includes("m"),
-            text: opts.includes("t"),
-            display: opts.includes("d"),
-            auto: opts.includes("A"),
-            regex: opts.includes("r") || s.data.trigger instanceof RegExp,
-            word: opts.includes("w"),
-            visual: s.rawReplacement.includes("${VISUAL}"),
+            math: optsStr.includes("m"),
+            text: optsStr.includes("t"),
+            display: optsStr.includes("d"),
+            auto: optsStr.includes("A"),
+            regex: optsStr.includes("r") || s.trigger instanceof RegExp,
+            word: optsStr.includes("w"),
+            visual: rawRepl.includes("${VISUAL}"),
           },
         };
       });

@@ -1,103 +1,120 @@
-import { EditorView, KeyBinding } from "@codemirror/view";
-import { MathContextManager } from "../utils/context";
-import { computeSnippetExpansion } from "../snippets/parse";
-import { TabstopGroup } from "../snippets/tabstop";
-import { addTabstopsEffect } from "../snippets/codemirror/tabstops_state_field";
-import type KingsCalcLatexPlugin from "../../main";
+import { EditorView } from "@codemirror/view";
+import { SelectionRange } from "@codemirror/state";
+import { findMatchingBracket, getOpenBracket } from "src/utils/editor_utils";
+import { queueSnippet } from "src/snippets/codemirror/snippet_queue_state_field";
+import { expandSnippets } from "src/snippets/snippet_management";
+import { autoEnlargeBrackets } from "./auto_enlarge_brackets";
+import { Context } from "src/utils/context";
+import { getLatexSuiteConfig } from "src/snippets/codemirror/config";
+import { ArrayNode, emptyInsertOptions, TabstopNode, TextNode } from "src/snippets/luasnip_api/node";
 
-export function createAutoFractionKeybinding(plugin: KingsCalcLatexPlugin): KeyBinding {
-  return {
-    key: "/",
-    run: (view: EditorView) => {
-      if (plugin.settings.enableLaTeXSuite === false || plugin.settings.enableAutoFraction === false) return false;
-      const state = view.state;
-      const mainSel = state.selection.main;
-      const pos = mainSel.head;
-      const inMath = MathContextManager.isMathMode(state, pos);
-      if (!inMath) return false;
 
-      // Handle visual selection on "/"
-      if (!mainSel.empty) {
-        const selectedText = state.sliceDoc(mainSel.from, mainSel.to);
-        const { text: replacementText, initialCursorOffset, tabstopGroups } = computeSnippetExpansion(`\\frac{${selectedText}}{$0}`);
-        const targetCursorPos = mainSel.from + initialCursorOffset;
+export const runAutoFraction = (view: EditorView, ctx: Context): boolean => {
 
-        const mappedTabstops = tabstopGroups.map((grp) => {
-          return new TabstopGroup(
-            grp.index,
-            grp.ranges.map((r) => ({
-              from: mainSel.from + r.from,
-              to: mainSel.from + r.to,
-            })),
-          );
-        });
+	for (const range of ctx.ranges) {
+		runAutoFractionCursor(view, ctx, range);
+	}
 
-        view.dispatch({
-          changes: { from: mainSel.from, to: mainSel.to, insert: replacementText },
-          selection: { anchor: targetCursorPos, head: targetCursorPos },
-          effects: [addTabstopsEffect.of(mappedTabstops)],
-          userEvent: "input.type",
-          scrollIntoView: true,
-        });
+	const success = expandSnippets(view);
+	
+	if (success) {
+		autoEnlargeBrackets(view);
+	}
 
-        return true;
-      }
+	return success;
+}
 
-      // Handle normal "/" fraction numerator scanning
-      const line = state.doc.lineAt(pos);
-      const lineText = line.text;
-      const col = pos - line.from;
 
-      if (col === 0) return false;
+const greek = "alpha|beta|gamma|Gamma|delta|Delta|epsilon|varepsilon|zeta|eta|theta|Theta|iota|kappa|lambda|Lambda|mu|nu|omicron|xi|Xi|pi|Pi|rho|sigma|Sigma|tau|upsilon|Upsilon|varphi|phi|Phi|chi|psi|Psi|omega|Omega";
+const regex = new RegExp("(" + greek + ") ([^ ])", "g");
 
-      let startCol = col;
-      let depth = 0;
-      for (let i = col - 1; i >= 0; i--) {
-        const ch = lineText[i];
-        if (ch === "}" || ch === ")" || ch === "]") {
-          depth++;
-        } else if (ch === "{" || ch === "(" || ch === "[") {
-          depth--;
-          if (depth < 0) {
-            startCol = i + 1;
-            break;
-          }
-        } else if (depth === 0 && (ch === " " || ch === "+" || ch === "-" || ch === "=" || ch === "$" || ch === "\t")) {
-          startCol = i + 1;
-          break;
-        } else if (i === 0) {
-          startCol = 0;
-        }
-      }
+export const runAutoFractionCursor = (view: EditorView, ctx: Context, range: SelectionRange):boolean => {
 
-      if (startCol >= col) return false;
+	const settings = getLatexSuiteConfig(view);
+	const {from, to} = range;
 
-      const numerator = lineText.slice(startCol, col);
-      const replaceFrom = line.from + startCol;
-      const replaceTo = pos;
+	// Don't run autofraction in excluded environments
+	for (const env of settings.autofractionExcludedEnvs) {
+		if (ctx.isWithinEnvironment(to, env)) {
+			return false;
+		}
+	}
 
-      const { text: replacementText, initialCursorOffset, tabstopGroups } = computeSnippetExpansion(`\\frac{${numerator}}{$0}`);
-      const targetCursorPos = replaceFrom + initialCursorOffset;
+	// Get the bounds of the equation
+	const result = ctx.getBounds();
+	if (!result) return false;
+	const eqnStart = result.inner_start;
 
-      const mappedTabstops = tabstopGroups.map((grp) => {
-        return new TabstopGroup(
-          grp.index,
-          grp.ranges.map((r) => ({
-            from: replaceFrom + r.from,
-            to: replaceFrom + r.to,
-          })),
-        );
-      });
 
-      view.dispatch({
-        changes: { from: replaceFrom, to: replaceTo, insert: replacementText },
-        selection: { anchor: targetCursorPos, head: targetCursorPos },
-        effects: [addTabstopsEffect.of(mappedTabstops)],
-        userEvent: "input.type",
-        scrollIntoView: true,
-      });
+	let curLine = view.state.sliceDoc(eqnStart, to);
+	let start = eqnStart;
 
-      return true;
-    },
-  };
+	if (from != to) {
+		// We have a selection
+		// Set start to the beginning of the selection
+
+		start = from;
+	}
+	else {
+		// Find the contents of the fraction
+		// Match everything except spaces and +-, but allow these characters in brackets
+
+		// Also, allow spaces after greek letters
+		// By replacing spaces after greek letters with a dummy character (#)
+		regex.lastIndex = 0;
+		curLine = curLine.replace(regex, "$1#$2");
+
+
+		for (let i = curLine.length - 1; i >= 0; i--) {
+			const curChar = curLine.charAt(i)
+
+			if ([")", "]", "}"].contains(curChar)) {
+				const closeBracket = curChar;
+				const openBracket = getOpenBracket(closeBracket);
+
+				const j = findMatchingBracket(curLine, i, openBracket, closeBracket, true);
+
+				if (j === null) return false;
+
+				// Skip to the beginnning of the bracket
+				i = j;
+			}
+
+
+			if (" $([{\n".concat(settings.autofractionBreakingChars).contains(curChar)) {
+				start = i + 1 + eqnStart;
+				break;
+			}
+		}
+	}
+
+	// Don't run on an empty line
+	if (start === to) { return false; }
+
+	// Run autofraction
+	let numerator = view.state.sliceDoc(start, to);
+
+	// Remove unnecessary outer parentheses
+	if (numerator.at(0) === "(" && numerator.at(-1) === ")") {
+		const closing = findMatchingBracket(numerator, 0, "(", ")", false);
+		if (closing === numerator.length - 1) {
+			numerator = numerator.slice(1, -1);
+		}
+	}
+
+	const snippet = new ArrayNode([
+		new TextNode(settings.autofractionSymbol + "{"),
+		// If the content inside parentheses is empty, the numerator would be empty and that's rarely desired.
+		numerator === "" ? new TabstopNode(0) : new TextNode(numerator),
+		new TextNode("}{"),
+		new TabstopNode(1),
+		new TextNode("}"),
+		new TabstopNode(2),
+	]);
+	// The keypressed shouldn't be inserted back in after an undo, if we have a selection.
+	const keyPressed = from != to ? undefined : "/";
+
+	queueSnippet(view, start, to, snippet.applyInsert(emptyInsertOptions), keyPressed);
+
+	return true;
 }
