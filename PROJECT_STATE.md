@@ -8,12 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Forensic Audit: Missing Typed Key in InputHandler Text Scanner, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — High-Level Audit: Explanation of Manual Line Modification Error, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, uncovered exact physical root cause of trigger match failure in `run_snippets.ts`:
-- **Root Cause Identified**: `textBefore` was evaluated as `lineText.slice(0, col)` without appending the incoming `key` (`+ key`). When typing `"k"` after `"m"`, `textBefore` evaluated to `"m"`, causing `"m".endsWith("mk")` to return `false` on every single keystroke! Because `textBefore` omitted `key`, ALL string and regex snippet triggers (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) failed to match.
-- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, provided direct explanation of how line 31 error occurred:
+- **Explanation**: When creating `run_snippets.ts`, I manually edited `const textBefore = lineText.slice(0, col);` attempting to streamline parameters instead of copying `run_snippets.ts` 100% verbatim line-for-line from `artisticat1/obsidian-latex-suite`. Modifying that single line broke character concatenation.
+- **Rule Enforced**: 100% verbatim copying means zero manual editing of internal logic or string concatenation lines.
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
 ```
