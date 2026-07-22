@@ -1,6 +1,5 @@
 import { EditorView, KeyBinding, keymap, tooltips, Tooltip } from "@codemirror/view";
 import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
-import { renderMath, finishRenderMath } from "obsidian";
 import type KingsCalcLatexPlugin from "../main";
 import { DEFAULT_LATEX_SUITE_SNIPPETS } from "../snippets/default-snippets";
 import { MathContextManager } from "./utils/context";
@@ -42,40 +41,7 @@ export const tabstopsStateField = StateField.define<TabstopsState>({
   },
 });
 
-// ── 2. Math Preview Tooltip StateField ──
-const setMathPreviewEffect = StateEffect.define<Tooltip[]>();
-
-export const mathPreviewStateField = StateField.define<Tooltip[]>({
-  create() {
-    return [];
-  },
-  update(value, transaction) {
-    for (const effect of transaction.effects) {
-      if (effect.is(setMathPreviewEffect)) {
-        return effect.value;
-      }
-    }
-    return value;
-  },
-  provide: (field) => tooltips.computeN([field], (state) => state.field(field)),
-});
-
-const mathPreviewTheme = EditorView.baseTheme({
-  ".cm-tooltip.cm-tooltip-cursor": {
-    backgroundColor: "var(--background-secondary)",
-    color: "var(--text-normal)",
-    border: "1px solid var(--background-modifier-border-hover)",
-    padding: "4px 8px",
-    borderRadius: "6px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-    fontSize: "14px",
-    zIndex: "100",
-    "& p": { margin: "0px" },
-    "& mjx-container": { padding: "2px !important" },
-  },
-});
-
-// ── 3. Main LaTeX Suite Engine Extension ──
+// ── 2. Main LaTeX Suite Engine Extension ──
 export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   const parsedDefaultSnippets = parseRawSnippets(DEFAULT_LATEX_SUITE_SNIPPETS);
 
@@ -298,75 +264,10 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
     },
   };
 
-  // Math Preview Update Listener
-  const mathPreviewUpdateListener = EditorView.updateListener.of((update) => {
-    if (!plugin.settings.enableLaTeXSuite) return;
-    if (!update.docChanged && !update.selectionSet) return;
-
-    const view = update.view;
-    const state = view.state;
-    const pos = state.selection.main.head;
-    const inMath = MathContextManager.isMathMode(state, pos);
-
-    if (!inMath) {
-      if (state.field(mathPreviewStateField).length > 0) {
-        view.dispatch({ effects: [setMathPreviewEffect.of([])] });
-      }
-      return;
-    }
-
-    const docStr = state.doc.toString();
-    let startPos = pos;
-    while (startPos > 0 && docStr[startPos - 1] !== "$") {
-      startPos--;
-    }
-    let endPos = pos;
-    while (endPos < docStr.length && docStr[endPos] !== "$") {
-      endPos++;
-    }
-
-    const rawMathText = docStr.slice(startPos, endPos).trim();
-    if (!rawMathText) {
-      view.dispatch({ effects: [setMathPreviewEffect.of([])] });
-      return;
-    }
-
-    const relCursor = Math.max(0, Math.min(pos - startPos, rawMathText.length));
-    const mathWithCursor = rawMathText.slice(0, relCursor) + "▶" + rawMathText.slice(relCursor);
-    const isDisplay = docStr.slice(Math.max(0, startPos - 2), startPos) === "$$";
-
-    const tooltip: Tooltip = {
-      pos: startPos,
-      above: true,
-      strictSide: true,
-      arrow: true,
-      create: () => {
-        const container = document.createElement("div");
-        container.className = "cm-tooltip-cursor cm-tooltip-above";
-
-        try {
-          const renderedEl = renderMath(mathWithCursor, isDisplay);
-          container.appendChild(renderedEl);
-          finishRenderMath();
-        } catch (e) {
-          container.textContent = rawMathText;
-        }
-
-        return { dom: container };
-      },
-    };
-
-    view.dispatch({ effects: [setMathPreviewEffect.of([tooltip])] });
-  });
-
   return [
     tabstopsStateField,
-    mathPreviewStateField,
-    mathPreviewTheme,
-    tooltips({ position: "absolute" }),
     keydownExtension,
     Prec.high(keymap.of([tabKeybinding, shiftTabKeybinding])),
-    mathPreviewUpdateListener,
   ];
 }
 
