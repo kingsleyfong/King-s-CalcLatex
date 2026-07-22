@@ -11,6 +11,13 @@ import { snippetQueuePlugin, queueSnippets } from "./snippets/codemirror/snippet
 import { SnippetChangeSpec } from "./snippets/codemirror/snippet_change_spec";
 import { expandSnippets } from "./snippets/snippet_management";
 
+const WORD_DELIMITERS = "., +-\n\t:;!?\\/{}[]()=~$'\"|`<>*^%#@&";
+
+function isWordBoundary(char: string | undefined): boolean {
+  if (!char) return true;
+  return WORD_DELIMITERS.includes(char);
+}
+
 // ── LaTeX Suite Extension Bundle Coordinator ──
 export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   // If LaTeX Suite feature toggle is disabled, return empty array (100% disabled & isolated)
@@ -81,6 +88,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
           const isMathOnly = opts.includes("m");
           const isTextOnly = opts.includes("t");
           const autoExpand = opts.includes("A");
+          const isWordOnly = opts.includes("w");
 
           if (!autoExpand) continue;
           if (isMathOnly && !inMath) continue;
@@ -96,6 +104,13 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
 
             if (trigger && textBefore.endsWith(trigger)) {
               const triggerLen = trigger.length;
+              const triggerStartCol = (col + 1) - triggerLen;
+
+              if (isWordOnly && triggerStartCol > 0) {
+                const charBefore = lineText[triggerStartCol - 1];
+                if (!isWordBoundary(charBefore)) continue;
+              }
+
               const replaceFrom = pos - (triggerLen - 1);
 
               const snippetNode = new SnippetTabstopOnlyNode(s.rawReplacement);
@@ -361,6 +376,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
     snippetQueuePlugin,
     tabstopsStateField,
     Prec.highest(latexSuitePlugin.extension),
+    Prec.highest(inputHandlerExtension),
     Prec.high(keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])),
   ];
 }

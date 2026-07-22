@@ -1,5 +1,23 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 6) — LaTeX Suite `isMathMode` Backslash Fix & `mk`/`dm` Word Boundary Expansion
+
+### Status: 🟢 Build clean | Force-copied to Vault | LaTeX Suite `.md` Expansion Fixed
+
+### What Was Done
+
+1. **Forensic Diagnosis of Snippet Failures Inside LaTeX Brackets (`context.ts`)**:
+   - **Root Cause**: In `MathContextManager.isMathMode` inside `src/latex-suite/utils/context.ts`, the fallback scanner checked:
+     `if (docStr[i] === "\\") { i += 2; continue; }`
+     Whenever an equation contained ANY backslash (e.g. `\alpha`, `\frac`, `\sum`), the scanner stepped 2 characters at a time, stepping over closing `$` delimiters and flipping `inMath` from `true` to `false`.
+   - Because `inMath` became `false`, all math-mode snippets (`sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`) were skipped.
+
+2. **The Resolution**:
+   - Updated `isMathMode` to check `if (docStr[i] === "\\" && docStr[i + 1] === "$") { i += 2; continue; }`. Only escaped `\$` dollar signs step over 2 characters. LaTeX command backslashes (`\alpha`, `\frac`) no longer break math mode detection!
+   - Added `isWordBoundary` checking in `latex_suite.ts` for snippets with `"w"` options (like `dm`), restoring `mk` and `dm` trigger auto-expansion in `.md` notes.
+
+---
+
 ## Session: 2026-07-22 (Part 5) — Excalidraw Event Pipeline Fix & Local-Only Dev Directive
 
 ### Status: 🟢 Build clean | Force-copied to Vault | Excalidraw Restored | GitHub Pushes HALTED
