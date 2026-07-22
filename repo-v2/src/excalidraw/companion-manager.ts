@@ -29,27 +29,32 @@ export class ExcalidrawCompanionManager {
 
     this.snippetEngine = new SnippetEngine();
 
-    // Populate Excalidraw SnippetEngine with full 200+ raw default snippets from LaTeX Suite
+    // Populate Excalidraw SnippetEngine: ONLY "mk" math mode trigger (EXCLUDE "dm")
     const parsedRaw = parseRawSnippetsFromStr(DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING);
-    const convertedSnippets: SnippetDef[] = parsedRaw.map((s) => {
-      const opts = s.options || "";
-      return {
-        trigger: s.data.trigger as string | RegExp,
-        replacement: s.rawReplacement,
-        options: opts,
-        description: s.description,
-        priority: s.priority,
-        flags: {
-          math: opts.includes("m"),
-          text: opts.includes("t"),
-          display: opts.includes("d"),
-          auto: opts.includes("A"),
-          regex: opts.includes("r") || s.data.trigger instanceof RegExp,
-          word: opts.includes("w"),
-          visual: s.rawReplacement.includes("${VISUAL}"),
-        },
-      };
-    });
+    const convertedSnippets: SnippetDef[] = parsedRaw
+      .filter((s) => {
+        const tr = typeof s.data.trigger === "string" ? s.data.trigger : "";
+        return tr !== "dm"; // Exclude dm snippet in Excalidraw textareas
+      })
+      .map((s) => {
+        const opts = s.options || "";
+        return {
+          trigger: s.data.trigger as string | RegExp,
+          replacement: s.rawReplacement,
+          options: opts,
+          description: s.description,
+          priority: s.priority,
+          flags: {
+            math: opts.includes("m"),
+            text: opts.includes("t"),
+            display: opts.includes("d"),
+            auto: opts.includes("A"),
+            regex: opts.includes("r") || s.data.trigger instanceof RegExp,
+            word: opts.includes("w"),
+            visual: s.rawReplacement.includes("${VISUAL}"),
+          },
+        };
+      });
     this.snippetEngine.setSnippets(convertedSnippets);
 
     this.tooltip = new PreviewTooltip(this.plugin.settings);
@@ -69,7 +74,7 @@ export class ExcalidrawCompanionManager {
       () => this.onTextareaDetach(),
     );
 
-    // Register global keydown listener for Ctrl+\ LaTeX prompt shortcut
+    // Register global keydown listener for Ctrl+\ / Ctrl+Click LaTeX prompt shortcut
     this.handleKeydownBound = (e: KeyboardEvent) => this.handleLaTeXShortcut(e);
     window.addEventListener("keydown", this.handleKeydownBound, true);
 
@@ -128,7 +133,7 @@ export class ExcalidrawCompanionManager {
   }
 
   /**
-   * Keyboard shortcut (default Ctrl+\) to edit the selected Excalidraw LaTeX equation / PNG element.
+   * Keyboard shortcut (default Ctrl+\) / Ctrl+Click to edit selected Excalidraw LaTeX equation / PNG element.
    */
   private handleLaTeXShortcut(e: KeyboardEvent): void {
     if (!this.plugin.settings.latexEditorShortcutEnabled) return;

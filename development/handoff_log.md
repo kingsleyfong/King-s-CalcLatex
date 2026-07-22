@@ -1,5 +1,25 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 4) — Excalidraw `mk`-Only Trigger, Live Preview Plugin Alias & Ctrl+Click Shortcut
+
+### Status: 🟢 Build clean | Force-copied to Vault | Excalidraw OD Optimized
+
+### What Was Done
+
+1. **Excalidraw Math Trigger (`mk`-Only)**:
+   - Filtered out `dm` in `companion-manager.ts` when populating Excalidraw's `SnippetEngine`.
+   - In Excalidraw canvas textboxes, typing `mk` expands into inline math (`$ $`). `dm` is completely disabled inside Excalidraw canvas textboxes.
+
+2. **LaTeX Modification Modal Live Preview Notice Fix (`main.ts`)**:
+   - Added `(this.app as any).plugins.plugins["obsidian-latex-suite"] = this` in `src/main.ts`.
+   - Satisfied Excalidraw's built-in check for `obsidian-latex-suite`, removing the notice *"LaTeX Suite required to be installed to enable live preview"* and activating native live math preview directly inside Excalidraw's LaTeX modification modal.
+
+3. **Ctrl + Click LaTeX SVG Element Shortcut Preserved**:
+   - Verified and preserved `handleLaTeXShortcut` in `companion-manager.ts`.
+   - `Ctrl + Click` or selecting a LaTeX SVG element in Excalidraw brings up the equation modification modal popup.
+
+---
+
 ## Session: 2026-07-22 (Part 3) — Display Math ($$) Blur Trim & SVG Equation Conversion Fix
 
 ### Status: 🟢 Build clean | Force-copied to Vault | Display Math ($$) Fixed
