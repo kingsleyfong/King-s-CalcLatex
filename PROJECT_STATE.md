@@ -8,13 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Forensic Audit: Negative replaceFrom Range Index Bug in InputHandler, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — High-Level Audit: Explanation of Manual getTriggerPos Offset Error, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, uncovered exact physical cause of `mk` and `dm` expansion failure in `run_snippets.ts`:
-- **Root Cause Identified**: `replaceFrom` was calculated as `pos - triggerLen`. In CodeMirror 6's `inputHandler`, `pos` is the cursor position BEFORE the incoming `key` is written (`pos = 1` after typing `"m"`). For a 2-character trigger `"mk"`, `replaceFrom = 1 - 2 = -1` (a negative document index!).
-- **Effect**: Passing `from = -1` to `ChangeSpec` threw a CodeMirror 6 RangeError, silently aborting `expandSnippets`.
-- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, provided direct explanation of how negative `replaceFrom` index error occurred:
+- **Explanation**: Standalone `obsidian-latex-suite` uses helper function `getTriggerPos(pos, triggerLen)` which calculates `pos - (triggerLen - 1)`. When constructing `run_snippets.ts`, I manually typed `const replaceFrom = pos - triggerLen;` instead of preserving the exact `getTriggerPos` helper, dropping the `- 1` offset.
+- **Rule Enforced**: Preserving exact helper functions prevents index calculation mismatches.
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
 ```
