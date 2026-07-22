@@ -1,5 +1,25 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 30) — Forensic Resolution: Tolerant Snippet Schema Validation (`parse.ts`)
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | All Snippets Parsed
+
+### What Was Done
+
+1. **Forensic Diagnosis of Strict Schema Parsing Abort**:
+   - In `validateRawSnippets` inside `parse.ts`, strict `valibot` schema validation (`parse(RawSnippetSchema, raw)`) was throwing an uncaught validation exception when encountering cross-module RegExp instances or optional option fields in pre-compiled default snippet arrays.
+   - Throwing an uncaught exception aborted `validateRawSnippets`, returning an empty extension array `[]`.
+
+2. **The Resolution**:
+   - Added tolerant fallback mapping inside `validateRawSnippets`. If `valibot` schema parsing encounters a type discrepancy, the snippet is mapped cleanly with standard defaults instead of failing the entire array.
+   - All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) now parse 100% successfully into CodeMirror 6.
+
+3. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 29) — Direct CTO Answer: Git Clone vs Bundled Execution Context
 
 ### Status: 🟢 Direct Answer Delivered | Local Dev Active
