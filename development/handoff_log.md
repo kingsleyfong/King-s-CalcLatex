@@ -1,5 +1,18 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 14) — Forensic Audit: Missing `CMSettings` CodeMirror 6 StateField
+
+### Status: 🟢 Code Modifications Paused | Diagnostic Audit Complete
+
+### What Was Done
+
+1. **Forensic Audit of Standalone `obsidian-latex-suite` (`main.js`)**:
+   - In standalone `obsidian-latex-suite`, `CMSettings` (which holds the parsed list of 200+ default snippets) is passed to CodeMirror 6 as a **`StateField`** (`By(this.CMSettings)`).
+   - When `inputHandler.of(Xv)` runs in standalone LaTeX Suite, `Xv` calls `B(n)` to retrieve `CMSettings` from `view.state.field(By)`.
+   - Without `By(CMSettings)` registered in CodeMirror 6's editor extensions, `view.state.field(By)` returned `undefined`, causing `inputHandler` to operate against an empty snippet array `[]`.
+
+---
+
 ## Session: 2026-07-22 (Part 13) — `inputHandler` Extension Lifecycle Parity & Vault Deployment
 
 ### Status: 🟢 Build clean | Force-copied to Vault | 1:1 Parity Applied
