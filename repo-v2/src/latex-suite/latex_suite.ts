@@ -1,175 +1,28 @@
-import { EditorView, KeyBinding, keymap, ViewPlugin, ViewUpdate } from "@codemirror/view";
-import { EditorState, Prec } from "@codemirror/state";
+import { EditorView, KeyBinding, keymap } from "@codemirror/view";
+import { Prec } from "@codemirror/state";
 import type KingsCalcLatexPlugin from "../main";
-import { DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING } from "../snippets/default-snippets";
 import { MathContextManager } from "./utils/context";
-import { parseRawSnippetsFromStr } from "./snippets/parse";
-import { SnippetTabstopOnlyNode, emptyInsertOptions } from "./snippets/luasnip_api/node";
-import { tabstopSpecsToTabstopGroups, TabstopGroup } from "./snippets/tabstop";
+import { TabstopGroup } from "./snippets/tabstop";
 import { tabstopsStateField, addTabstopsEffect } from "./snippets/codemirror/tabstops_state_field";
-import { snippetQueuePlugin, queueSnippets } from "./snippets/codemirror/snippet_queue_state_field";
-import { SnippetChangeSpec } from "./snippets/codemirror/snippet_change_spec";
-import { expandSnippets } from "./snippets/snippet_management";
+import { snippetQueuePlugin } from "./snippets/codemirror/snippet_queue_state_field";
+import { computeSnippetExpansion } from "./snippets/parse";
+import { runSnippetsOnInput } from "./features/run_snippets";
 
-const WORD_DELIMITERS = "., +-\n\t:;!?\\/{}[]()=~$'\"|`<>*^%#@&";
-
-function isWordBoundary(char: string | undefined): boolean {
-  if (!char) return true;
-  return WORD_DELIMITERS.includes(char);
-}
-
-// ── LaTeX Suite Extension Bundle Coordinator ──
+// ── Native obsidian-latex-suite Extension Array Coordinator ──
 export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   // If LaTeX Suite feature toggle is disabled, return empty array (100% disabled & isolated)
   if (plugin.settings.enableLaTeXSuite === false) {
     return [];
   }
 
-  const parsedDefaultSnippets = parseRawSnippetsFromStr(DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING);
+  // 1. Native inputHandler (runs AFTER character is committed to document state)
+  const inputHandlerExtension = EditorView.inputHandler.of((view: EditorView, from: number, to: number, text: string) => {
+    if (plugin.settings.enableLaTeXSuite === false) return false;
+    if (text.length !== 1) return false;
+    return runSnippetsOnInput(view, text, plugin);
+  });
 
-  const latexSuitePlugin = ViewPlugin.fromClass(
-    class {
-      constructor(public view: EditorView) {}
-      update(update: ViewUpdate) {}
-
-      handleKeydown(event: KeyboardEvent): boolean {
-        if (plugin.settings.enableLaTeXSuite === false) return false;
-        if (event.ctrlKey || event.altKey || event.metaKey) return false;
-        if (event.key.length !== 1) return false;
-
-        const view = this.view;
-        const state = view.state;
-        const mainSel = state.selection.main;
-
-        const pos = mainSel.head;
-        const line = state.doc.lineAt(pos);
-        const lineText = line.text;
-        const col = pos - line.from;
-
-        const charTyped = event.key;
-        const textBefore = lineText.slice(0, col) + charTyped;
-        const inMath = MathContextManager.isMathMode(state, pos);
-
-        // Visual selection snippets (Shift-U, Shift-K, Shift-C, Shift-S, Shift-O, Shift-B, etc.)
-        if (!mainSel.empty) {
-          const selectedText = state.sliceDoc(mainSel.from, mainSel.to);
-          for (const s of parsedDefaultSnippets) {
-            const opts = s.options || "";
-            const isMathOnly = opts.includes("m");
-            const isTextOnly = opts.includes("t");
-            const autoExpand = opts.includes("A");
-
-            if (!autoExpand) continue;
-            if (isMathOnly && !inMath) continue;
-            if (isTextOnly && inMath) continue;
-
-            const trigger = typeof s.data.trigger === "string" ? s.data.trigger : "";
-            if (trigger === charTyped && s.rawReplacement.includes("${VISUAL}")) {
-              event.preventDefault();
-              const replacementExpanded = s.rawReplacement.replace(/\$\{VISUAL\}/g, selectedText);
-              const snippetNode = new SnippetTabstopOnlyNode(replacementExpanded);
-              const resultInsert = snippetNode.applyInsert(emptyInsertOptions);
-
-              const changeSpec = new SnippetChangeSpec(mainSel.from, mainSel.to, resultInsert, charTyped);
-              queueSnippets(view, [changeSpec]);
-
-              queueMicrotask(() => {
-                expandSnippets(view);
-              });
-              return true;
-            }
-          }
-          return false;
-        }
-
-        // Snippet Trigger Processing (String & Regex)
-        for (const s of parsedDefaultSnippets) {
-          const opts = s.options || "";
-          const isMathOnly = opts.includes("m");
-          const isTextOnly = opts.includes("t");
-          const autoExpand = opts.includes("A");
-          const isWordOnly = opts.includes("w");
-
-          if (!autoExpand) continue;
-          if (isMathOnly && !inMath) continue;
-          if (isTextOnly && inMath) continue;
-
-          if (s.type === "string") {
-            let trigger = typeof s.data.trigger === "string" ? s.data.trigger : "";
-            if (trigger === "mk" && plugin.settings.inlineMathTrigger) {
-              trigger = plugin.settings.inlineMathTrigger;
-            } else if (trigger === "dm" && plugin.settings.displayMathTrigger) {
-              trigger = plugin.settings.displayMathTrigger;
-            }
-
-            if (trigger && textBefore.endsWith(trigger)) {
-              const triggerLen = trigger.length;
-              const triggerStartCol = (col + 1) - triggerLen;
-
-              if (isWordOnly && triggerStartCol > 0) {
-                const charBefore = lineText[triggerStartCol - 1];
-                if (!isWordBoundary(charBefore)) continue;
-              }
-
-              const replaceFrom = pos - (triggerLen - 1);
-
-              const snippetNode = new SnippetTabstopOnlyNode(s.rawReplacement);
-              const resultInsert = snippetNode.applyInsert(emptyInsertOptions);
-
-              const changeSpec = new SnippetChangeSpec(replaceFrom, pos, resultInsert, charTyped);
-              queueSnippets(view, [changeSpec]);
-
-              queueMicrotask(() => {
-                expandSnippets(view);
-              });
-
-              return true;
-            }
-          } else if (s.type === "regex" && plugin.settings.enableRegexSnippets !== false) {
-            const reg = s.data.trigger as RegExp;
-            const match = reg.exec(textBefore);
-            if (match) {
-              const matchLen = match[0].length;
-              const replaceFrom = pos - (matchLen - 1);
-
-              let replacementStr = s.rawReplacement;
-              for (let mIdx = 0; mIdx < match.length; mIdx++) {
-                replacementStr = replacementStr.replace(new RegExp(`\\[\\[${mIdx}\\]\\]`, "g"), match[mIdx]);
-              }
-
-              const snippetNode = new SnippetTabstopOnlyNode(replacementStr);
-              const resultInsert = snippetNode.applyInsert(emptyInsertOptions);
-
-              const changeSpec = new SnippetChangeSpec(replaceFrom, pos, resultInsert, charTyped);
-              queueSnippets(view, [changeSpec]);
-
-              queueMicrotask(() => {
-                expandSnippets(view);
-              });
-
-              return true;
-            }
-          }
-        }
-
-        return false;
-      }
-    },
-    {
-      eventHandlers: {
-        keydown(event: KeyboardEvent, view: EditorView) {
-          const pluginInst = view.plugin(latexSuitePlugin);
-          if (pluginInst) {
-            if (pluginInst.handleKeydown(event)) {
-              event.preventDefault();
-            }
-          }
-        },
-      },
-    },
-  );
-
-  // Auto-fraction keybinding for "/"
+  // 2. Auto-fraction keybinding for "/"
   const autofractionKeybinding: KeyBinding = {
     key: "/",
     run: (view: EditorView) => {
@@ -265,7 +118,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
     },
   };
 
-  // Tab & Shift-Tab Keybindings (highest priority to override default indent)
+  // 3. Tab & Shift-Tab Keybindings (Prec.highest to override default indent)
   const tabKeybinding: KeyBinding = {
     key: "Tab",
     run: (view: EditorView) => {
@@ -273,7 +126,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
       const state = view.state;
       const tsState = state.field(tabstopsStateField, false);
 
-      // 1. Jump through active tabstops if present
+      // Jump through active tabstops if present
       if (tsState && tsState.tabstopGroups.length > 0) {
         const groups = tsState.tabstopGroups;
         const currentPos = state.selection.main.head;
@@ -293,7 +146,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
         }
       }
 
-      // 2. Tabout of delimiters
+      // Tabout of delimiters
       if (plugin.settings.taboutOnTab) {
         const mainSel = view.state.selection.main;
         if (!mainSel.empty) return false;
@@ -375,25 +228,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   return [
     snippetQueuePlugin,
     tabstopsStateField,
-    Prec.highest(latexSuitePlugin.extension),
     Prec.highest(inputHandlerExtension),
     Prec.highest(keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])),
   ];
-}
-
-export function computeSnippetExpansion(replacementRaw: string): { text: string; initialCursorOffset: number; tabstops: TabstopGroup[] } {
-  const snippetNode = new SnippetTabstopOnlyNode(replacementRaw);
-  const { insert: text, tabstops: rawSpecs } = snippetNode.applyInsert(emptyInsertOptions);
-
-  const tabstopGroups = tabstopSpecsToTabstopGroups(rawSpecs);
-
-  let initialCursorOffset = text.length;
-  if (tabstopGroups.length > 0) {
-    const firstGroup = tabstopGroups[0];
-    if (firstGroup.ranges.length > 0) {
-      initialCursorOffset = firstGroup.ranges[0].from;
-    }
-  }
-
-  return { text, initialCursorOffset, tabstops: tabstopGroups };
 }

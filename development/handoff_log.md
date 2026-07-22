@@ -1,5 +1,24 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 13) — `inputHandler` Extension Lifecycle Parity & Vault Deployment
+
+### Status: 🟢 Build clean | Force-copied to Vault | 1:1 Parity Applied
+
+### What Was Done
+
+1. **`EditorView.inputHandler` Lifecycle Execution (`run_snippets.ts` & `latex_suite.ts`)**:
+   - Replaced DOM keydown evaluation with `EditorView.inputHandler.of()`.
+   - Snippet triggers (`mk`, `dm`, `sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`) now evaluate AFTER CodeMirror 6 commits typed characters into `view.state.doc`. Matches standalone LaTeX Suite's exact inputHandler document lifecycle.
+
+2. **Keymap Precedence**:
+   - Configured `Prec.highest` for `Tab`, `Shift-Tab`, and `/` autofraction keybindings so tabstop navigation and tabout execute before default Obsidian keymaps.
+
+3. **Vault Sync**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 12) — Elimination of All Custom Wrapper References & Alignment on 100% Raw Fork
 
 ### Status: 🟢 Aligned on 100% Raw Fork | Zero Custom Wrappers
