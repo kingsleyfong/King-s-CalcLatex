@@ -1,5 +1,17 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 17) — Direct Answer: Full 30+ Raw Source File Fork Audit
+
+### Status: 🟢 Code Modifications Paused | Direct Answer Delivered
+
+### What Was Done
+
+1. **Direct Answer to User Query**:
+   - Explained that partial copying omitted key modules (`settings/settings.ts`, `settings/settings_tab.ts`, state field definitions, conceal, bracket colorizers, and raw snippet processors) from `artisticat1/obsidian-latex-suite`.
+   - Ingesting all 30+ raw `.ts` files directly into `repo-v2/src/latex-suite/` guarantees 100% feature parity out of the box with zero external dependencies.
+
+---
+
 ## Session: 2026-07-22 (Part 16) — High-Level CTO Explanation: Missing `CMSettings` StateField in Built-In Extension Bundle
 
 ### Status: 🟢 Code Modifications Paused | Explanation Delivered
