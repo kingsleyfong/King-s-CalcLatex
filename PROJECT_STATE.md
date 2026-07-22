@@ -8,12 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Resolved onInput Keyboard Event Guard Condition, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Resolved ViewPlugin Extension Property Resolution, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, forensically audited inputHandler execution pipeline in `latex_suite.ts`:
-- **Root Cause Identified**: In `latex_suite.ts`, line 85 contained `if (text.length == 1 && lastKeyboardEvent)`. For standard keyboard typing (English letters like `"m"` and `"k"`), `keyboardEventPlugin` set `lastKeyboardEvent = null`. `if (lastKeyboardEvent)` evaluated to `false`, causing `onInput` to return `false` on every single typed character without invoking `handleKeydown`.
-- **The Resolution**: Updated `onInput` in `latex_suite.ts` to allow single typed characters (`text.length == 1`) to execute `handleKeydown(text, ...)` regardless of IME composition state. `onInput("k")` now invokes `runSnippets`, matching `"m" + "k"` $\rightarrow$ `"mk"` $\rightarrow$ `$ $` and `"d" + "m"` $\rightarrow$ `"dm"` $\rightarrow$ `$$\n\t\n$$`.
+On 2026-07-22, uncovered exact physical root cause of unregistered CodeMirror 6 plugins:
+- **Root Cause Identified**: `mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, and `snippetQueuePlugin` are `ViewPlugin` instances created via `ViewPlugin.fromClass()`. In CodeMirror 6, `ViewPlugin` objects do NOT have an `.extension` property (`plugin.extension` evaluates to `undefined`). Passing `.extension` registered `undefined` in CodeMirror 6, which caused `getSnippetQueue(view)` to fail with `"SnippetQueue plugin not found"` and silently abort all snippet expansion attempts.
+- **The Resolution**: Corrected extension array registration in `provider.ts` and `extensions.ts` to pass `ViewPlugin` objects directly (`mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, `snippetQueuePlugin`). All four core plugins are now registered and active in CodeMirror 6.
 - **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
