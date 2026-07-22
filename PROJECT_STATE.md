@@ -8,14 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Excalidraw Event Handlers Restored, Local-Only Dev Active, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — LaTeX Suite isMathMode Backslash Bug & Word Boundary Expansion Fixed, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, forensically audited and resolved Excalidraw SVG equation modification and event handler failures:
-- **Root Cause Identified**: The global assignment `app.plugins.plugins["obsidian-latex-suite"] = this` in `main.ts` caused Excalidraw's internal LaTeX context menu, shortcuts, and equation handlers to throw TypeErrors expecting standalone `obsidian-latex-suite` properties, crashing Excalidraw's equation event pipeline.
-- **Removed Plugin Alias**: Removed the invalid `plugins.plugins["obsidian-latex-suite"] = this` assignment from `main.ts` and cleaned `handleBlur` in `interceptor.ts`.
-- **Excalidraw SVG Editing Restored**: Restored right-click "Edit LaTeX formula", double-click equation modification, `Ctrl + \` / `Ctrl + Click` modal shortcut, and `tex2svg` equation blur transformation.
-- **GitHub CI/CD Halted**: Remote GitHub pushes are 100% halted as directed. All development is strictly local inside the Obsidian Vault.
+On 2026-07-22, forensically audited and resolved LaTeX Suite snippet expansion failures in `.md` notes:
+- **Root Cause Identified (`MathContextManager.isMathMode`)**: The fallback document scanner in `context.ts` checked `if (docStr[i] === "\\") i += 2`. When an equation contained ANY backslash (`\alpha`, `\frac`, `\sum`), the scanner stepped over 2 characters at a time, miscounting closing `$` delimiters and inverting `inMath` to `false`. Because `inMath` evaluated to `false`, all math-mode snippets (`sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`) were skipped.
+- **Fixed `isMathMode`**: Updated scanner to check `if (docStr[i] === "\\" && docStr[i + 1] === "$") i += 2` so ONLY escaped `\$` dollar signs skip characters. Normal LaTeX backslashes no longer break math mode detection.
+- **Added Word Boundary Support (`w`)**: Added `isWordBoundary` checking in `latex_suite.ts` for snippets with `"w"` options (like `dm`), restoring `mk` and `dm` trigger auto-expansion in `.md` notes.
+- **Local Dev Only**: Built bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain halted.
 
 ### v2.0 Architecture
 ```

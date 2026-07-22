@@ -1,5 +1,4 @@
 import { EditorState } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 
 export class MathContextManager {
@@ -10,9 +9,11 @@ export class MathContextManager {
       while (node) {
         const name: string = node.name || "";
         if (
+          name.includes("math") ||
           name.includes("formatting-math") ||
           name.includes("math-inline") ||
           name.includes("math-block") ||
+          name.includes("HyperMD-mathblock") ||
           name.includes("katex") ||
           name.includes("Formula")
         ) {
@@ -23,13 +24,14 @@ export class MathContextManager {
       }
     } catch {}
 
-    // Fallback: document-level scanner
+    // Fallback: Precise document-level dollar sign scanner
     const docStr = state.doc.toString();
     let inInline = false;
     let inDisplay = false;
     let i = 0;
     while (i < pos) {
-      if (docStr[i] === "\\" && i + 1 < pos) {
+      // Escaped \$ sign - skip both characters so literal \$ doesn't toggle math mode
+      if (docStr[i] === "\\" && i + 1 < docStr.length && docStr[i + 1] === "$") {
         i += 2;
         continue;
       }
