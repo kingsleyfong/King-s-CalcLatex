@@ -2,7 +2,7 @@ import { Extension, Prec } from "@codemirror/state";
 import { EditorView, keymap, tooltips } from "@codemirror/view";
 import type KingsCalcLatexPlugin from "../main";
 import { DEFAULT_SETTINGS, processLatexSuiteSettings } from "./settings/settings";
-import { parseSnippetVariables, parseSnippets } from "./snippets/parse";
+import { SnippetVariables, parseRawSnippetArray } from "./snippets/parse";
 import DEFAULT_SNIPPETS from "./default_snippets.js";
 import DEFAULT_SNIPPET_VARIABLES from "./default_snippet_variables.js";
 
@@ -17,7 +17,7 @@ import { contextPlugin, mathBoundsPlugin } from "./utils/context";
 let cachedExtensions: Extension[] = [];
 let isInitialized = false;
 
-export async function initLaTeXSuiteEngine(plugin: KingsCalcLatexPlugin): Promise<Extension[]> {
+export function initLaTeXSuiteEngine(plugin: KingsCalcLatexPlugin): Extension[] {
   if (plugin.settings.enableLaTeXSuite === false) {
     cachedExtensions = [];
     isInitialized = true;
@@ -25,8 +25,8 @@ export async function initLaTeXSuiteEngine(plugin: KingsCalcLatexPlugin): Promis
   }
 
   try {
-    const snippetVariables = await parseSnippetVariables(DEFAULT_SNIPPET_VARIABLES, "snippet-variables.js");
-    const snippets = await parseSnippets(DEFAULT_SNIPPETS, snippetVariables, "snippets.js");
+    const snippetVariables = (DEFAULT_SNIPPET_VARIABLES || {}) as SnippetVariables;
+    const snippets = parseRawSnippetArray(DEFAULT_SNIPPETS as any[], snippetVariables);
     const CMSettings = processLatexSuiteSettings(snippets, DEFAULT_SETTINGS);
 
     const editorExtensions: Extension[] = [
@@ -59,5 +59,8 @@ export async function initLaTeXSuiteEngine(plugin: KingsCalcLatexPlugin): Promis
 }
 
 export function getLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin): Extension[] {
+  if (!isInitialized) {
+    initLaTeXSuiteEngine(plugin);
+  }
   return cachedExtensions;
 }

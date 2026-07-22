@@ -51,7 +51,7 @@ export default class KingsCalcLatexPlugin extends Plugin {
     await this.loadSettings();
 
     // 2. Initialize built-in LaTeX Suite engine
-    await initLaTeXSuiteEngine(this);
+    initLaTeXSuiteEngine(this);
 
     // 3. Initialize the expression engine
     this.engine = new ExpressionEngine(this.settings);
