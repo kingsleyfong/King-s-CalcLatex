@@ -1,5 +1,18 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 15) — Hard Confirmation: 100% Built-In LaTeX Suite Fork inside King's CalcLatex
+
+### Status: 🟢 Confirmed Architectural Goal | Zero External Plugin Dependencies
+
+### What Was Done
+
+1. **Clarified Architecture**:
+   - Confirmed that King's CalcLatex contains the LaTeX Suite engine **100% built-in**.
+   - Standalone `obsidian-latex-suite` does **NOT** need to be installed or enabled in Obsidian.
+   - All snippet parsing, state fields, inputHandlers, and keymaps operate 100% self-contained inside King's CalcLatex.
+
+---
+
 ## Session: 2026-07-22 (Part 14) — Forensic Audit: Missing `CMSettings` CodeMirror 6 StateField
 
 ### Status: 🟢 Code Modifications Paused | Diagnostic Audit Complete
