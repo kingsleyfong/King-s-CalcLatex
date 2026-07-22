@@ -8,13 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Resolved ViewPlugin Extension Property Resolution, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Direct Explanation of ViewPlugin Property Access Discrepancy, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, uncovered exact physical root cause of unregistered CodeMirror 6 plugins:
-- **Root Cause Identified**: `mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, and `snippetQueuePlugin` are `ViewPlugin` instances created via `ViewPlugin.fromClass()`. In CodeMirror 6, `ViewPlugin` objects do NOT have an `.extension` property (`plugin.extension` evaluates to `undefined`). Passing `.extension` registered `undefined` in CodeMirror 6, which caused `getSnippetQueue(view)` to fail with `"SnippetQueue plugin not found"` and silently abort all snippet expansion attempts.
-- **The Resolution**: Corrected extension array registration in `provider.ts` and `extensions.ts` to pass `ViewPlugin` objects directly (`mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, `snippetQueuePlugin`). All four core plugins are now registered and active in CodeMirror 6.
-- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, provided direct explanation answering user query on why a cloned codebase encountered CodeMirror 6 plugin resolution failures:
+- **Direct Answer**: Standalone `obsidian-latex-suite` source referenced `mathBoundsPlugin.extension`, `contextPlugin.extension`, and `snippetQueuePlugin.extension`. In CodeMirror 6, `ViewPlugin` objects created via `ViewPlugin.fromClass()` do not have an `.extension` property (`plugin.extension` evaluates to `undefined`).
+- **Effect**: Passing `undefined` into `registerEditorExtension` prevented CodeMirror from instantiating `snippetQueuePlugin`. When typing `mk` or `dm`, `getSnippetQueue(view)` threw `"SnippetQueue plugin not found"`, silently aborting text replacement.
+- **Resolution**: Passing `ViewPlugin` instances directly allows CodeMirror 6 to instantiate all core plugins.
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
 ```
