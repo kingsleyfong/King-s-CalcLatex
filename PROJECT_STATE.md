@@ -8,14 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — LaTeX Suite isMathMode Backslash Bug & Word Boundary Expansion Fixed, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — High-Level CTO Audit: 100% Verbatim Source File Ingestion Plan, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, forensically audited and resolved LaTeX Suite snippet expansion failures in `.md` notes:
-- **Root Cause Identified (`MathContextManager.isMathMode`)**: The fallback document scanner in `context.ts` checked `if (docStr[i] === "\\") i += 2`. When an equation contained ANY backslash (`\alpha`, `\frac`, `\sum`), the scanner stepped over 2 characters at a time, miscounting closing `$` delimiters and inverting `inMath` to `false`. Because `inMath` evaluated to `false`, all math-mode snippets (`sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`) were skipped.
-- **Fixed `isMathMode`**: Updated scanner to check `if (docStr[i] === "\\" && docStr[i + 1] === "$") i += 2` so ONLY escaped `\$` dollar signs skip characters. Normal LaTeX backslashes no longer break math mode detection.
-- **Added Word Boundary Support (`w`)**: Added `isWordBoundary` checking in `latex_suite.ts` for snippets with `"w"` options (like `dm`), restoring `mk` and `dm` trigger auto-expansion in `.md` notes.
-- **Local Dev Only**: Built bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain halted.
+On 2026-07-22, conducted high-level CTO audit explaining why custom wrapper classes failed parity with standalone LaTeX Suite:
+- **Root Cause**: Custom TypeScript wrapper classes (`latex_suite.ts`, `context.ts`) hand-reconstructed CodeMirror 6 extensions instead of compiling the 30+ raw TypeScript files directly from `artisticat1/obsidian-latex-suite`. This created keymap priority mismatches, broken event interception, and tabstop state Field discrepancies.
+- **Action Plan**: Ingest the exact 30+ un-compiled `.ts` files from `artisticat1/obsidian-latex-suite` verbatim into `repo-v2/src/latex-suite/` without custom wrapper abstraction.
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
 ```

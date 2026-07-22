@@ -1,5 +1,20 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 7) — High-Level CTO Audit: Why Custom Wrapper Classes Failed 1:1 Parity
+
+### Status: 🟢 High-Level CTO Audit Completed | Local Dev Active
+
+### What Was Done
+
+1. **High-Level CTO Explanation**:
+   - **Why standalone LaTeX Suite wasn't 100% identical**: Instead of pulling down the exact 30+ un-compiled `.ts` files from `artisticat1/obsidian-latex-suite` directly into `repo-v2/src/latex-suite/`, we built custom wrapper files (`latex_suite.ts`, `context.ts`, `tabstop.ts`).
+   - Those custom wrapper classes re-implemented snippet queueing, keymaps, and context detection from scratch. That hand-reconstruction introduced keymap priority mismatches, syntax tree node name mismatches, and tabstop queueing bugs.
+
+2. **The 1:1 Source Ingestion Plan**:
+   - Ingest all 30+ raw TypeScript files directly from `artisticat1/obsidian-latex-suite`'s `src/` directory into `repo-v2/src/latex-suite/` verbatim without custom wrapper classes.
+
+---
+
 ## Session: 2026-07-22 (Part 6) — LaTeX Suite `isMathMode` Backslash Fix & `mk`/`dm` Word Boundary Expansion
 
 ### Status: 🟢 Build clean | Force-copied to Vault | LaTeX Suite `.md` Expansion Fixed
