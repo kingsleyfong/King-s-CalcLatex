@@ -1,5 +1,26 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 28) — Forensic Resolution: Direct JS Snippet Parsing (`parseRawSnippetArray`)
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Snippets Parsed 100%
+
+### What Was Done
+
+1. **Forensic Diagnosis of Blob URL CSP Import Failure**:
+   - In LaTeX Suite's `parse.ts`, `parseSnippets` takes a snippet string, turns it into a `Blob` URL, and calls dynamic `import(blobUrl)`.
+   - In Obsidian's desktop environment, dynamic `import(blobUrl)` is blocked by Content Security Policy (CSP), throwing a runtime exception that caused `initLaTeXSuiteEngine` to fail silently and return `[]`.
+   - Furthermore, `DEFAULT_SNIPPETS` is ALREADY a pre-compiled JS array object (`export default [...]`). Stringifying it to `"[object Object],..."` and passing it to Blob `import()` caused a `SyntaxError`.
+
+2. **The Resolution**:
+   - Added `parseRawSnippetArray` to `parse.ts` to parse `DEFAULT_SNIPPETS` directly as a JavaScript array object without Blob URL stringification.
+   - Updated `provider.ts` to parse `DEFAULT_SNIPPETS` directly into `processLatexSuiteSettings`. All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) now load cleanly into CodeMirror 6 before editor registration.
+
+3. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 27) — Forensic Fix: Async Snippet Parsing Initialization (`provider.ts` & `main.ts`)
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Snippet Engine Active

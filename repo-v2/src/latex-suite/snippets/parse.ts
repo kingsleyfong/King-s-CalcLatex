@@ -86,6 +86,19 @@ declare global {
 	var __latex_suite_require: ReturnType<typeof latex_suite_require>;
 }
 
+export function parseRawSnippetArray(rawSnippetsInput: any[], snippetVariables: SnippetVariables = {}) {
+	window.__latex_suite_require = latex_suite_require(snippetVariables);
+	const rawValidatedSnippets = validateRawSnippets(rawSnippetsInput);
+	const parsedSnippets = rawValidatedSnippets.map((raw) => {
+		try {
+			return parseSnippet(raw, snippetVariables);
+		} catch (e) {
+			throw new Error(`${e}\nErroring snippet:\n${serializeSnippetLike(raw)}`);
+		}
+	});
+	return sortSnippets(parsedSnippets);
+}
+
 export async function parseSnippets(snippetsStr: string, snippetVariables: SnippetVariables, identifier: string) {
 	window.__latex_suite_require = latex_suite_require(snippetVariables);
 	const rawSnippets = await importRaw(snippetsStr + preamble, identifier);

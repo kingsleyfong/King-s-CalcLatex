@@ -8,12 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Resolved Async Snippet Parsing Initialization, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Resolved Default Snippet Array CSP Import Block, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, forensically audited engine extension initialization and resolved runtime failure:
-- **Root Cause Identified**: `parseSnippetVariables` and `parseSnippets` in LaTeX Suite's `parse.ts` return Promises (`Promise<SnippetVariables>` & `Promise<Snippet[]>`). Calling them synchronously passed pending `Promise` objects to `processLatexSuiteSettings`, which threw a TypeError, caught silently by `try {} catch`, returning an empty extension array `[]`.
-- **The Resolution**: Updated `provider.ts` with `async initLaTeXSuiteEngine(plugin)` and called `await initLaTeXSuiteEngine(this)` in `main.ts` `onload()`. The 200+ default snippets and extension array now initialize cleanly before registering extensions.
+On 2026-07-22, uncovered exact physical root cause of empty extension array:
+- **Root Cause Identified**: `parseSnippets` passed `DEFAULT_SNIPPETS` (which is ALREADY a pre-compiled JS array object) to `importRaw(DEFAULT_SNIPPETS, "snippets.js")`. `importRaw` attempted to stringify `DEFAULT_SNIPPETS` into a Blob URL and dynamically `import(blobUrl)`. Chromium's Content Security Policy in Obsidian blocked Blob URL imports, throwing a runtime `SyntaxError` / CSP exception that returned `[]`.
+- **The Resolution**: Created `parseRawSnippetArray` in `parse.ts` to parse `DEFAULT_SNIPPETS` directly as a JavaScript array object without Blob URL stringification. All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) now parse synchronously into the extension array before editor registration.
 - **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
