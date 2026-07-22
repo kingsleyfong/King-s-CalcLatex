@@ -7,6 +7,16 @@ export const DEFAULT_SNIPPET_VARIABLES: Record<string, string> = {
   "${MORE_SYMBOLS}": "(?:leq|geq|neq|gg|ll|equiv|sim|propto|rightarrow|leftarrow|Rightarrow|Leftarrow|leftrightarrow|to|mapsto|cap|cup|in|sum|prod|exp|ln|log|det|dots|vdots|ddots|pm|mp|int|iint|iiint|oint)",
 };
 
+export function parseRawSnippetsFromStr(snippetsStr: string): Snippet<SnippetType>[] {
+  try {
+    const raw = new Function("return " + snippetsStr)();
+    return parseRawSnippets(raw);
+  } catch (e) {
+    console.error("Failed to parse raw snippets string:", e);
+    return [];
+  }
+}
+
 export function parseRawSnippets(raw: any[]): Snippet<SnippetType>[] {
   const result: Snippet<SnippetType>[] = [];
 
@@ -17,7 +27,7 @@ export function parseRawSnippets(raw: any[]): Snippet<SnippetType>[] {
     const opts = item.options || "";
     const rawReplacement = typeof item.replacement === "string" ? item.replacement : "";
 
-    // Substitute variables
+    // Substitute variables if trigger is a string
     if (typeof trigger === "string") {
       for (const [varName, varVal] of Object.entries(DEFAULT_SNIPPET_VARIABLES)) {
         if (trigger.includes(varName)) {
@@ -32,7 +42,20 @@ export function parseRawSnippets(raw: any[]): Snippet<SnippetType>[] {
       : item.replacement;
 
     if (isRegex) {
-      const reg = trigger instanceof RegExp ? trigger : new RegExp(trigger + "$");
+      let reg: RegExp;
+      if (trigger instanceof RegExp) {
+        reg = trigger;
+      } else {
+        // Substitute variables in regex pattern string
+        let pattern = trigger;
+        for (const [varName, varVal] of Object.entries(DEFAULT_SNIPPET_VARIABLES)) {
+          if (pattern.includes(varName)) {
+            pattern = pattern.replace(new RegExp(escapeRegExp(varName), "g"), varVal);
+          }
+        }
+        reg = new RegExp(pattern + "$");
+      }
+
       result.push(
         new Snippet(
           "regex",
