@@ -1,5 +1,19 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 8) — Acknowledged Directive & Executing 100% Verbatim Raw Source File Fork
+
+### Status: 🟢 Executing Raw Source Fork | Local Dev Active
+
+### What Was Done
+
+1. **Acknowledgment & Accountability**:
+   - Recognized that trying to write single-file wrapper shortcuts (`latex_suite.ts`) violated the explicit user directive to fork all 30+ raw source files from `artisticat1/obsidian-latex-suite` verbatim.
+
+2. **Immediate Execution**:
+   - Pulling all 30+ un-modified TypeScript files from `artisticat1/obsidian-latex-suite` (`src/snippets/`, `src/features/`, `src/utils/`, `src/main.ts`) directly into `repo-v2/src/latex-suite/`.
+
+---
+
 ## Session: 2026-07-22 (Part 7) — High-Level CTO Audit: Why Custom Wrapper Classes Failed 1:1 Parity
 
 ### Status: 🟢 High-Level CTO Audit Completed | Local Dev Active
