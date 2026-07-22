@@ -8,12 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Display Math $$ Blur Trim & SVG Equation Conversion Fixed, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Excalidraw mk-Only Trigger, Plugin Alias for Live Modal Preview, Ctrl+Click SVG Preserved, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, resolved Excalidraw display math (`$$ ... $$`) blur conversion to SVG equation image elements:
-- **Capture-Phase Blur Whitespace Trimming**: Updated `handleAttach` in `interceptor.ts` to attach a capture-phase `blur` listener. When `dm` expands into `$$\n ... \n$$`, any trailing newlines or whitespace after closing `$$` are trimmed synchronously before Excalidraw processes the blur event.
-- **Direct `editingElement.text` Synchronization**: Updated `interceptor.ts` to synchronize `appState.editingElement.text = trimmed` directly via `excalidrawAPI`. Clicking off an Excalidraw textarea containing `$$ ... $$` now triggers Excalidraw's `tex2svg` equation renderer and converts the text into an SVG equation element.
+On 2026-07-22, completed parallel Excalidraw OD and LaTeX Suite updates:
+- **Excalidraw Math Trigger (`mk`-Only)**: Filtered out `dm` in `companion-manager.ts` so that in Excalidraw textareas, ONLY `mk` expands into inline math (`$ $`). Display math `dm` is completely disabled in Excalidraw canvas textboxes as requested.
+- **LaTeX Modification Modal Live Preview Notice Fix**: Registered `(this.app as any).plugins.plugins["obsidian-latex-suite"] = this` in `src/main.ts`. Excalidraw's built-in equation modal now recognizes LaTeX Suite capabilities, removes the `"LaTeX Suite required to be installed"` notice, and turns on native live math preview.
+- **Ctrl + Click LaTeX SVG Element Modal Shortcut**: Verified and preserved the shortcut in `companion-manager.ts` allowing `Ctrl + Click` / selecting a LaTeX SVG element in Excalidraw to bring up the equation modification modal.
 
 ### v2.0 Architecture
 ```
