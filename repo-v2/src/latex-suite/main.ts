@@ -137,7 +137,10 @@ export default class LatexSuitePlugin extends Plugin implements LatexSuitePlugin
 
 	async getSettingsSnippets(snippetVariables: SnippetVariables) {
 		try {
-			return await parseSnippets(this.settings.snippets, snippetVariables, "snippets.js");
+			if (Array.isArray(this.settings.snippets)) {
+				return parseRawSnippetArray(this.settings.snippets, snippetVariables);
+			}
+			return await parseSnippets(this.settings.snippets as string, snippetVariables, "snippets.js");
 		} catch (e) {
 			new Notice(`Failed to load snippets from settings: ${e}`);
 			console.error(`Failed to load snippets from settings: ${e}`);
@@ -191,10 +194,10 @@ export default class LatexSuitePlugin extends Plugin implements LatexSuitePlugin
 
 		// Compulsory extensions
 		this.editorExtensions.push([
-			Prec.highest(mathBoundsPlugin.extension),
-			Prec.highest(contextPlugin.extension),
+			Prec.highest(mathBoundsPlugin),
+			Prec.highest(contextPlugin),
 			getLatexSuiteConfigExtension(this.CMSettings),
-			Prec.highest(keyboardEventPlugin.extension),
+			Prec.highest(keyboardEventPlugin),
 			Prec.highest(EditorView.inputHandler.of(onInput)),
 			EditorView.updateListener.of(handleUpdate),
 			snippetExtensions,
@@ -210,7 +213,7 @@ export default class LatexSuitePlugin extends Plugin implements LatexSuitePlugin
 		if (this.CMSettings.colorPairedBracketsEnabled)
 			this.editorExtensions.push(colorPairedBracketsPluginLowestPrec);
 		if (this.CMSettings.highlightCursorBracketsEnabled)
-			this.editorExtensions.push(highlightCursorBracketsPlugin.extension);
+			this.editorExtensions.push(highlightCursorBracketsPlugin);
 		if (this.CMSettings.mathPreviewEnabled)
 			this.editorExtensions.push([
 				cursorTooltipField.extension,
