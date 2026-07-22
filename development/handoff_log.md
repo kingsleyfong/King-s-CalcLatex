@@ -1,5 +1,17 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 16) — High-Level CTO Explanation: Missing `CMSettings` StateField in Built-In Extension Bundle
+
+### Status: 🟢 Code Modifications Paused | Explanation Delivered
+
+### What Was Done
+
+1. **Explanation of Failure Point**:
+   - In `createLaTeXSuiteEngineExtension`, we registered `inputHandler`, `snippetQueuePlugin`, and `tabstopsStateField`, but we did NOT register the `CMSettings` `StateField` (`StateField.define(...)`).
+   - `inputHandler` relies on `view.state.field(CMSettingsField)` to retrieve the 200+ default snippets dynamically on every keystroke. Because `CMSettingsField` was missing from the extension bundle, `inputHandler` evaluated against 0 triggers.
+
+---
+
 ## Session: 2026-07-22 (Part 15) — Hard Confirmation: 100% Built-In LaTeX Suite Fork inside King's CalcLatex
 
 ### Status: 🟢 Confirmed Architectural Goal | Zero External Plugin Dependencies

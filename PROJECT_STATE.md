@@ -8,11 +8,11 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Built-In Standalone LaTeX Suite Fork Execution Plan, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — High-Level CTO Explanation of Missing StateField in Extension Bundle, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, confirmed core architectural requirement:
-- **Zero External Plugin Dependency**: King's CalcLatex contains the forked LaTeX Suite engine 100% built-in. Standalone `obsidian-latex-suite` does NOT need to be installed in Obsidian.
+On 2026-07-22, provided direct CTO explanation of why built-in LaTeX Suite snippets weren't expanding:
+- **Root Cause**: `createLaTeXSuiteEngineExtension` returned extensions without registering the CodeMirror 6 `CMSettings` `StateField`. Because `inputHandler` expects to read `view.state.field(CMSettingsField)` on every keystroke to pull active snippets, omitting `CMSettingsField` caused `inputHandler` to evaluate text against an empty snippet array.
 - **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
