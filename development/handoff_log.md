@@ -1,5 +1,27 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 32) — Forensic Resolution: `ViewPlugin` Extension Registration (`provider.ts` & `extensions.ts`)
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | All Plugins Registered & Active
+
+### What Was Done
+
+1. **Forensic Diagnosis of Unregistered ViewPlugins**:
+   - `mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, and `snippetQueuePlugin` are `ViewPlugin` objects instantiated with `ViewPlugin.fromClass()`.
+   - In CodeMirror 6, `ViewPlugin` objects do NOT have a `.extension` property (`ViewPlugin.extension` evaluates to `undefined`).
+   - Accessing `.extension` registered `undefined` into CodeMirror 6's extension array.
+   - When `queueSnippet` attempted to retrieve `view.plugin(snippetQueuePlugin)`, it returned `null` and threw `"SnippetQueue plugin not found"`, silently aborting snippet replacements.
+
+2. **The Resolution**:
+   - Updated `provider.ts` and `extensions.ts` to pass `ViewPlugin` instances directly (`mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, `snippetQueuePlugin`).
+   - `getSnippetQueue(view)` and `getContextPlugin(view)` now resolve active plugin instances cleanly in CodeMirror 6.
+
+3. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 31) — Forensic Resolution: `onInput` Keyboard Event Guard Condition (`latex_suite.ts`)
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Snippet Trigger Engine Active

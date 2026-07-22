@@ -30,10 +30,10 @@ export function initLaTeXSuiteEngine(plugin: KingsCalcLatexPlugin): Extension[] 
     const CMSettings = processLatexSuiteSettings(snippets, DEFAULT_SETTINGS);
 
     const editorExtensions: Extension[] = [
-      Prec.highest(mathBoundsPlugin.extension),
-      Prec.highest(contextPlugin.extension),
+      Prec.highest(mathBoundsPlugin),
+      Prec.highest(contextPlugin),
       getLatexSuiteConfigExtension(CMSettings),
-      Prec.highest(keyboardEventPlugin.extension),
+      Prec.highest(keyboardEventPlugin),
       Prec.highest(EditorView.inputHandler.of(onInput)),
       EditorView.updateListener.of(handleUpdate),
       snippetExtensions,
