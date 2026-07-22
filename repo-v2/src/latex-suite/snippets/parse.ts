@@ -15,6 +15,7 @@ export function parseRawSnippets(raw: any[]): Snippet<SnippetType>[] {
 
     let trigger = item.trigger;
     const opts = item.options || "";
+    const rawReplacement = typeof item.replacement === "string" ? item.replacement : "";
 
     // Substitute variables
     if (typeof trigger === "string") {
@@ -39,6 +40,7 @@ export function parseRawSnippets(raw: any[]): Snippet<SnippetType>[] {
           opts,
           item.description || "",
           item.priority || 0,
+          rawReplacement,
         ),
       );
     } else {
@@ -49,6 +51,7 @@ export function parseRawSnippets(raw: any[]): Snippet<SnippetType>[] {
           opts,
           item.description || "",
           item.priority || 0,
+          rawReplacement,
         ),
       );
     }
