@@ -1,5 +1,26 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 31) — Forensic Resolution: `onInput` Keyboard Event Guard Condition (`latex_suite.ts`)
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Snippet Trigger Engine Active
+
+### What Was Done
+
+1. **Forensic Diagnosis of Disabled `onInput` Key Handler**:
+   - Line 85 of `latex_suite.ts` contained `if (text.length == 1 && lastKeyboardEvent)`.
+   - On non-IME keyboards, `keyboardEventPlugin` sets `lastKeyboardEvent = null` for all standard alphanumeric keystrokes (`m`, `k`, `d`).
+   - Because `lastKeyboardEvent` was `null`, `if (text.length == 1 && lastKeyboardEvent)` evaluated to `false`, causing `onInput` to return `false` on 100% of typed characters without invoking `handleKeydown`.
+
+2. **The Resolution**:
+   - Updated `onInput` in `latex_suite.ts` to execute `handleKeydown` whenever `text.length == 1`, passing `lastKeyboardEvent` modifier flags safely if present.
+   - Keystrokes `"m" + "k"` $\rightarrow$ `"mk"` $\rightarrow$ `$ $` and `"d" + "m"` $\rightarrow$ `"dm"` $\rightarrow$ `$$\n\t\n$$` now expand immediately.
+
+3. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 30) — Forensic Resolution: Tolerant Snippet Schema Validation (`parse.ts`)
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | All Snippets Parsed
