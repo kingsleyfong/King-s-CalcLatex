@@ -10,6 +10,7 @@
 - **Kingsley = CEO.** Take initiative on individual implementation decisions; ask only when genuinely ambiguous.
 - **Spawn parallel Sonnet subagents** for independent low-level workstreams (implementation, file writes, validation, search). Always specify `model: "sonnet"` in subagent tool calls.
 - **Use Opus** for planning/architecture agents that need deep reasoning.
+- **AUTOMATIC PER-CYCLE DOC UPDATE HOOK**: After EVERY prompt & response cycle, automatically update `PROJECT_STATE.md`, `development/handoff_log.md`, and `repo-v2/CLAUDE.md`.
 - Never put two unrelated tasks in the same subagent's context window.
 
 ---

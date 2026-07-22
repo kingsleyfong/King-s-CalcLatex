@@ -1,6 +1,25 @@
 # Handoff Log: King's CalcLatex Session Summary
 
-## Session: 2026-07-21 (Part 2) — Excalidraw OD Integration, UI/UX Settings Restructure & Modal Placement
+## Session: 2026-07-22 — 100% Verbatim LaTeX Suite Ingestion, Isolated Feature Toggle (v3.2.0) & Per-Cycle Agentic Hook
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | GitHub Tag v3.2.0 Pushed
+
+### What Was Done
+
+1. **100% Raw Source Ingestion of LaTeX Suite (`repo-v2/src/latex-suite/`)**:
+   - Ingested the complete 200+ raw snippet database from `artisticat1/obsidian-latex-suite`'s `data.json`.
+   - Ingested regex snippet evaluation engine (`/([A-Za-z])(\d)/` for `x1` $\rightarrow$ `x_1`, `/([^\\\\])(arcsin|sin|cos|tan|log|ln)/` for trig backslashes).
+   - Ingested visual selection wrappers (`Shift-U`, `Shift-K`, `Shift-C`, `Shift-S`, `Shift-O`, `Shift-B`) using `${VISUAL}` text replacement.
+   - Ingested visual fraction `/` keybinding.
+
+2. **Complete Feature Isolation & Settings Toggle (`enableLaTeXSuite`)**:
+   - Added `enableLaTeXSuite` check at top of `createLaTeXSuiteEngineExtension(this)`. When toggled `false`, it returns `[]` (empty extension array), 100% isolating and disabling all LaTeX Suite handlers and keybindings.
+   - Verified that King's CalcLatex core features (Giac WASM CAS solving, 2D/3D graphing, Excalidraw Companion) function 100% independently without conflict.
+
+3. **Mandatory Per-Cycle Agentic Documentation Hook**:
+   - Added automatic per-cycle doc update rule to `CLAUDE.md` and `SESSION_START.md` requiring `PROJECT_STATE.md`, `development/handoff_log.md`, and `repo-v2/CLAUDE.md` to be updated after every single prompt & response cycle.
+
+---
 
 ### Status: 🟢 Build clean | Deployed to Obsidian Vault (v2.2.0)
 
