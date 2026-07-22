@@ -1,5 +1,25 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 5) — Excalidraw Event Pipeline Fix & Local-Only Dev Directive
+
+### Status: 🟢 Build clean | Force-copied to Vault | Excalidraw Restored | GitHub Pushes HALTED
+
+### What Was Done
+
+1. **Forensic Diagnosis of Excalidraw SVG Modification Failure**:
+   - **Root Cause**: Setting `(this.app as any).plugins.plugins["obsidian-latex-suite"] = this` in `main.ts` caused Excalidraw's internal LaTeX context menu, shortcuts, and equation converters to call methods expecting standalone `obsidian-latex-suite` properties (`CMSettings`).
+   - When these method calls returned `undefined`, Excalidraw threw uncaught TypeErrors inside its click and context menu event handlers, completely breaking right-click "Edit LaTeX formula", equation shortcuts, and equation blur conversion.
+
+2. **The Resolution**:
+   - Removed `plugins.plugins["obsidian-latex-suite"] = this` from `repo-v2/src/main.ts`.
+   - Cleaned up `handleBlur` in `repo-v2/src/excalidraw/interceptor.ts`.
+   - Restored right-click "Edit LaTeX formula", double-click equation editing, `Ctrl + \` / `Ctrl + Click` modal shortcut, and `tex2svg` equation blur transformation.
+
+3. **CI/CD Status**:
+   - GitHub CI/CD releases and pushes are **100% HALTED**. Development is strictly local.
+
+---
+
 ## Session: 2026-07-22 (Part 4) — Excalidraw `mk`-Only Trigger, Live Preview Plugin Alias & Ctrl+Click Shortcut
 
 ### Status: 🟢 Build clean | Force-copied to Vault | Excalidraw OD Optimized

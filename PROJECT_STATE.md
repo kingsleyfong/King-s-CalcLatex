@@ -8,13 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Excalidraw mk-Only Trigger, Plugin Alias for Live Modal Preview, Ctrl+Click SVG Preserved, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Excalidraw Event Handlers Restored, Local-Only Dev Active, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed parallel Excalidraw OD and LaTeX Suite updates:
-- **Excalidraw Math Trigger (`mk`-Only)**: Filtered out `dm` in `companion-manager.ts` so that in Excalidraw textareas, ONLY `mk` expands into inline math (`$ $`). Display math `dm` is completely disabled in Excalidraw canvas textboxes as requested.
-- **LaTeX Modification Modal Live Preview Notice Fix**: Registered `(this.app as any).plugins.plugins["obsidian-latex-suite"] = this` in `src/main.ts`. Excalidraw's built-in equation modal now recognizes LaTeX Suite capabilities, removes the `"LaTeX Suite required to be installed"` notice, and turns on native live math preview.
-- **Ctrl + Click LaTeX SVG Element Modal Shortcut**: Verified and preserved the shortcut in `companion-manager.ts` allowing `Ctrl + Click` / selecting a LaTeX SVG element in Excalidraw to bring up the equation modification modal.
+On 2026-07-22, forensically audited and resolved Excalidraw SVG equation modification and event handler failures:
+- **Root Cause Identified**: The global assignment `app.plugins.plugins["obsidian-latex-suite"] = this` in `main.ts` caused Excalidraw's internal LaTeX context menu, shortcuts, and equation handlers to throw TypeErrors expecting standalone `obsidian-latex-suite` properties, crashing Excalidraw's equation event pipeline.
+- **Removed Plugin Alias**: Removed the invalid `plugins.plugins["obsidian-latex-suite"] = this` assignment from `main.ts` and cleaned `handleBlur` in `interceptor.ts`.
+- **Excalidraw SVG Editing Restored**: Restored right-click "Edit LaTeX formula", double-click equation modification, `Ctrl + \` / `Ctrl + Click` modal shortcut, and `tex2svg` equation blur transformation.
+- **GitHub CI/CD Halted**: Remote GitHub pushes are 100% halted as directed. All development is strictly local inside the Obsidian Vault.
 
 ### v2.0 Architecture
 ```
