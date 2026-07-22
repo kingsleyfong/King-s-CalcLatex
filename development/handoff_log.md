@@ -1,5 +1,20 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 23) — Forensic Audit: Negative `replaceFrom` Document Index Range Bug
+
+### Status: 🟢 Code Modifications Paused | Root Cause Uncovered
+
+### What Was Done
+
+1. **Exact Mathematical Root Cause Uncovered (`run_snippets.ts`)**:
+   - In `inputHandler`, `pos` represents the cursor position BEFORE the incoming key is committed to `state.doc`.
+   - When typing `"k"` after `"m"`, `pos` = 1 (after `"m"`).
+   - Trigger `"mk"` has `triggerLen = 2`.
+   - The code calculated `replaceFrom = pos - triggerLen` = `1 - 2 = -1`!
+   - Passing `from = -1` to CodeMirror 6's `ChangeSpec` threw an out-of-bounds RangeError (`from < 0`), causing `expandSnippets` to crash silently and abort text replacement.
+
+---
+
 ## Session: 2026-07-22 (Part 22) — Rigorous Module-by-Module Codebase Audit Completed
 
 ### Status: 🟢 Codebase Verified Clean | 100% Standalone Functionality Validated

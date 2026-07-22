@@ -8,20 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Complete Codebase Audit Verified for All LaTeX Suite Modules, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Forensic Audit: Negative replaceFrom Range Index Bug in InputHandler, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed a rigorous module-by-module audit of all 15 source files in `repo-v2/src/latex-suite/`:
-- **Modules Audited & Verified**:
-  - `utils/context.ts` (SyntaxTree + `$` dollar scanner)
-  - `snippets/snippets.ts` (Snippet type contracts)
-  - `snippets/parse.ts` (Greek & symbol variable substitution, snippet string parser)
-  - `features/run_snippets.ts` (InputHandler trigger matcher, visual selection, string/regex triggers, options `mAtw`)
-  - `features/autofraction.ts` (Fraction `/` numerator scanner)
-  - `features/tabout.ts` (`Tab`/`Shift-Tab` tabstop traversal & delimiter tabouts)
-  - `snippets/codemirror/config.ts` (`latexSuiteConfigField` StateField)
-  - `latex_suite.ts` (CodeMirror 6 extension bundle coordinator)
-- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are 100% halted.
+On 2026-07-22, uncovered exact physical cause of `mk` and `dm` expansion failure in `run_snippets.ts`:
+- **Root Cause Identified**: `replaceFrom` was calculated as `pos - triggerLen`. In CodeMirror 6's `inputHandler`, `pos` is the cursor position BEFORE the incoming `key` is written (`pos = 1` after typing `"m"`). For a 2-character trigger `"mk"`, `replaceFrom = 1 - 2 = -1` (a negative document index!).
+- **Effect**: Passing `from = -1` to `ChangeSpec` threw a CodeMirror 6 RangeError, silently aborting `expandSnippets`.
+- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
