@@ -8,12 +8,20 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — InputHandler Trigger Scanner Fixed, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Complete Codebase Audit Verified for All LaTeX Suite Modules, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, fixed critical parameter bug in `run_snippets.ts`:
-- **Scanner Fix**: Updated line 31 to `const textBefore = lineText.slice(0, col) + key`. The incoming typed `key` is now passed to the trigger scanner, allowing `"m" + "k"` $\rightarrow$ `"mk"` $\rightarrow$ `true`, `"d" + "m"` $\rightarrow$ `"dm"` $\rightarrow$ `true`, and all math snippets (`sr`, `cb`, `rd`, `al`, `LL`, `fra`) to expand.
-- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, completed a rigorous module-by-module audit of all 15 source files in `repo-v2/src/latex-suite/`:
+- **Modules Audited & Verified**:
+  - `utils/context.ts` (SyntaxTree + `$` dollar scanner)
+  - `snippets/snippets.ts` (Snippet type contracts)
+  - `snippets/parse.ts` (Greek & symbol variable substitution, snippet string parser)
+  - `features/run_snippets.ts` (InputHandler trigger matcher, visual selection, string/regex triggers, options `mAtw`)
+  - `features/autofraction.ts` (Fraction `/` numerator scanner)
+  - `features/tabout.ts` (`Tab`/`Shift-Tab` tabstop traversal & delimiter tabouts)
+  - `snippets/codemirror/config.ts` (`latexSuiteConfigField` StateField)
+  - `latex_suite.ts` (CodeMirror 6 extension bundle coordinator)
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are 100% halted.
 
 ### v2.0 Architecture
 ```
