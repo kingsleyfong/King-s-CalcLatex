@@ -1,5 +1,19 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 33) — Direct Answer: Why the Cloned Codebase Faced `ViewPlugin.extension` Resolution Error
+
+### Status: 🟢 Direct Answer Delivered | Local Dev Active
+
+### What Was Done
+
+1. **Direct Answer to User Query**:
+   - In `artisticat1/obsidian-latex-suite`'s source repo (`main.ts` and `extensions.ts`), `mathBoundsPlugin.extension`, `contextPlugin.extension`, and `snippetQueuePlugin.extension` were referenced in the extension array.
+   - In CodeMirror 6, `ViewPlugin` objects created with `ViewPlugin.fromClass()` do NOT have an `.extension` property (`plugin.extension` evaluates to `undefined`).
+   - Registering `undefined` caused CodeMirror 6 to ignore the plugins. When `queueSnippet` tried to access `view.plugin(snippetQueuePlugin)`, it returned `null` and threw `Error: SnippetQueue plugin not found`, silently failing every snippet replacement.
+   - Passing `ViewPlugin` instances directly fixes the registration, allowing `mk` and `dm` to expand.
+
+---
+
 ## Session: 2026-07-22 (Part 32) — Forensic Resolution: `ViewPlugin` Extension Registration (`provider.ts` & `extensions.ts`)
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | All Plugins Registered & Active
