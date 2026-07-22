@@ -1,5 +1,19 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 34) — Direct Architectural Explanation: `LaTeXSuitePlugin` Class Lifecycle
+
+### Status: 🟢 Plugin Modifications Halted | Direct Explanation Delivered
+
+### What Was Done
+
+1. **Direct Architectural Explanation**:
+   - Standalone `obsidian-latex-suite` is designed as a standalone Obsidian `Plugin` class (`LaTeXSuitePlugin`).
+   - Its `onload()` method performs settings loading, `processLatexSuiteSettings()`, default snippet variable resolution, file watching, and populating `this.editorExtensions`.
+   - Extracting sub-modules into a secondary provider (`provider.ts`) bypassed `LaTeXSuitePlugin`'s complete `onload()` initialization lifecycle.
+   - Code modifications remain 100% halted per user directive.
+
+---
+
 ## Session: 2026-07-22 (Part 33) — Direct Answer: Why the Cloned Codebase Faced `ViewPlugin.extension` Resolution Error
 
 ### Status: 🟢 Direct Answer Delivered | Local Dev Active

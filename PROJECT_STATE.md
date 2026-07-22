@@ -8,14 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Direct Explanation of ViewPlugin Property Access Discrepancy, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Architectural Diagnosis of Plugin Class Lifecycle vs Sub-Module Provider, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, provided direct explanation answering user query on why a cloned codebase encountered CodeMirror 6 plugin resolution failures:
-- **Direct Answer**: Standalone `obsidian-latex-suite` source referenced `mathBoundsPlugin.extension`, `contextPlugin.extension`, and `snippetQueuePlugin.extension`. In CodeMirror 6, `ViewPlugin` objects created via `ViewPlugin.fromClass()` do not have an `.extension` property (`plugin.extension` evaluates to `undefined`).
-- **Effect**: Passing `undefined` into `registerEditorExtension` prevented CodeMirror from instantiating `snippetQueuePlugin`. When typing `mk` or `dm`, `getSnippetQueue(view)` threw `"SnippetQueue plugin not found"`, silently aborting text replacement.
-- **Resolution**: Passing `ViewPlugin` instances directly allows CodeMirror 6 to instantiate all core plugins.
-- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
+On 2026-07-22, provided direct explanation answering user inquiry on out-of-the-box cloned repository execution:
+- **Architectural Analysis**: Standalone `obsidian-latex-suite` is structured as a full Obsidian `Plugin` class (`LaTeXSuitePlugin`). Its `onload()` lifecycle manages settings migration, snippet file watchers, `CMSettings` processing, command palette commands, and editor extension binding.
+- **Why Standalone Works Out-of-the-Box**: When `LaTeXSuitePlugin` runs as an entire plugin, its `onload()` method executes `processSettings()` and binds `this.editorExtensions` to Obsidian. Extracting sub-modules into a separate wrapper bypassed `LaTeXSuitePlugin`'s full lifecycle setup.
+- **Code Modifications**: Halted per user directive. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
