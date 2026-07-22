@@ -1,5 +1,21 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 19) — Forensic Audit: Missing Typed `key` in `textBefore` Scanner (`run_snippets.ts`)
+
+### Status: 🟢 Code Modifications Paused | Root Cause Uncovered
+
+### What Was Done
+
+1. **Exact Root Cause Traceback (`run_snippets.ts`)**:
+   - In `runSnippetsOnInput`, `textBefore` was defined as:
+     `const textBefore = lineText.slice(0, col);`
+   - When CodeMirror 6 calls `inputHandler` for typed character `"k"`, `"k"` has NOT yet been written to `lineText`.
+   - As a result, when you typed `"k"` after `"m"`, `textBefore` evaluated to `"m"`.
+   - `textBefore.endsWith("mk")` evaluated to `"m".endsWith("mk")`, which is **`false`**!
+   - Because `textBefore` did NOT include `+ key`, **100% of string and regex snippets** (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) failed to match on every single keystroke.
+
+---
+
 ## Session: 2026-07-22 (Part 18) — Full Raw Source Codebase Integration Completed
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Local Dev Complete
