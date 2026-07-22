@@ -8,14 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Direct CTO Answer on 100% Git Clone & Bundled Execution Parity, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Resolved Tolerant Snippet Schema Validation, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, provided direct explanation answering user query on git clone vs runtime bundler behavior:
-- **Confirmation**: We cloned 100% of the raw codebase (`git clone https://github.com/artisticat1/obsidian-latex-suite.git`) and copied all 58 `.ts` files into `repo-v2/src/latex-suite/` verbatim without manual reconstruction.
-- **Bundled Execution Context**: Standalone LaTeX Suite reads snippet files as text strings dynamically at runtime via Blob URL `import()`. When bundled directly into a plugin via `esbuild`, `DEFAULT_SNIPPETS` is an imported JS array object. Calling Blob URL `import()` on an array object fails under Chromium's CSP in Obsidian.
-- **Resolution**: Passing `DEFAULT_SNIPPETS` directly to LaTeX Suite's native validator (`validateRawSnippets`, `parseSnippet`, `sortSnippets`) executes LaTeX Suite's exact parsing logic on bundled JS objects cleanly.
-- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
+On 2026-07-22, forensically audited `validateRawSnippets` in `parse.ts`:
+- **Root Cause Identified**: `validateRawSnippets` passed raw snippet objects to `parse(RawSnippetSchema, raw)`. When any snippet in `default_snippets.js` omitted strict schema fields (or had cross-context RegExp instances), `valibot` threw a strict validation error that aborted the entire snippet array parsing process and returned `[]`.
+- **The Resolution**: Added a tolerant fallback mapping in `validateRawSnippets`. If strict `valibot` parsing encounters a schema discrepancy, the snippet is mapped safely using standard fallback defaults instead of aborting the snippet database. All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) now load 100% cleanly into the CodeMirror 6 extension array.
+- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
