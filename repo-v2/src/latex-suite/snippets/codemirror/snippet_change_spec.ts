@@ -1,35 +1,44 @@
-import { ChangeSet, ChangeSpec } from "@codemirror/state";
+import { ChangeSet, ChangeSpec } from "@codemirror/state"
 import { TabstopSpec } from "../tabstop";
 import { ResultInsert } from "../luasnip_api/node";
 
 export class SnippetChangeSpec {
-  constructor(
-    public from: number,
-    public to: number,
-    public insert: ResultInsert,
-    public keyPressed?: string,
-    public after?: number,
-  ) {}
 
-  getTabstops(): TabstopSpec[] {
-    return this.insert.tabstops.map((ts) => ({
-      ...ts,
-      from: ts.from + this.from,
-      to: ts.to + this.from,
-    }));
-  }
+	constructor(
+		public from: number,
+		public to: number,
+		public insert: ResultInsert,
+		public keyPressed?: string,
+		public after?: number,
+	) {}
 
-  toChangeSpec(): ChangeSpec {
-    return { from: this.from, to: this.to, insert: this.insert.insert };
-  }
+	getTabstops(): TabstopSpec[] {
+		return this.insert.tabstops.map((ts) => {
+			return {
+				index: ts.index,
+				from: this.from + ts.from,
+				to: this.from + ts.to,
+			};
+		});
+	}
 
-  applyChange(changes: ChangeSet): SnippetChangeSpec {
-    return new SnippetChangeSpec(
-      changes.mapPos(this.from, 1),
-      changes.mapPos(this.to, 1),
-      this.insert,
-      this.keyPressed,
-      this.after !== undefined ? changes.mapPos(this.after, 1) : undefined,
-    );
-  }
+	applyChange(change: ChangeSet): SnippetChangeSpec {
+		const newFrom = change.mapPos(this.from, 1);
+		const newTo = change.mapPos(this.to, -1);
+		return new SnippetChangeSpec(
+			newFrom,
+			newTo,
+			this.insert,
+			this.keyPressed,
+			this.after,
+		);
+	}
+
+	toChangeSpec(): ChangeSpec {
+		return {
+			from: this.from,
+			to: this.to,
+			insert: this.insert.insert,
+		};
+	}
 }

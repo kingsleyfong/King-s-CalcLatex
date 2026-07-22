@@ -1,5 +1,24 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 26) — 100% Raw Git Fork Integration of Standalone `obsidian-latex-suite`
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Verbatim Codebase Active
+
+### What Was Done
+
+1. **Direct Git Fork Execution (`artisticat1/obsidian-latex-suite`)**:
+   - Cloned `https://github.com/artisticat1/obsidian-latex-suite.git` and copied the exact `src/` directory verbatim into `repo-v2/src/latex-suite/`. Zero manual line edits or AI re-writing.
+   - Configured `aliasSrcPlugin` in `esbuild.config.mjs` to resolve `src/*` path aliases directly to `repo-v2/src/latex-suite/*`.
+
+2. **Verbatim Provider Assembly (`provider.ts` & `main.ts`)**:
+   - Assembled `getLaTeXSuiteEngineExtension(plugin)` in `provider.ts` to run LaTeX Suite's exact `setEditorExtensions()` array (`mathBoundsPlugin`, `contextPlugin`, `getLatexSuiteConfigExtension`, `keyboardEventPlugin`, `inputHandler.of(onInput)`, `updateListener.of(handleUpdate)`, `snippetExtensions`, `keymap.of(getKeymaps(CMSettings))`, `mkConcealPlugin`, `colorPairedBracketsPluginLowestPrec`, `highlightCursorBracketsPlugin`, `mathPreview`).
+
+3. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 25) — Direct Git Repository Fetch Alignment (`obsidian-latex-suite`)
 
 ### Status: 🟢 Aligned on Direct Git Fetch | Local Dev Active
