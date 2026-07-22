@@ -8,12 +8,11 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — High-Level CTO Audit: 100% Verbatim Source File Ingestion Plan, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Executing 100% Verbatim Raw Source File Fork, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, conducted high-level CTO audit explaining why custom wrapper classes failed parity with standalone LaTeX Suite:
-- **Root Cause**: Custom TypeScript wrapper classes (`latex_suite.ts`, `context.ts`) hand-reconstructed CodeMirror 6 extensions instead of compiling the 30+ raw TypeScript files directly from `artisticat1/obsidian-latex-suite`. This created keymap priority mismatches, broken event interception, and tabstop state Field discrepancies.
-- **Action Plan**: Ingest the exact 30+ un-compiled `.ts` files from `artisticat1/obsidian-latex-suite` verbatim into `repo-v2/src/latex-suite/` without custom wrapper abstraction.
+On 2026-07-22, acknowledged failure to ingest full 30+ source files from `artisticat1/obsidian-latex-suite` in previous cycle:
+- **Corrective Action**: Replacing all custom wrapper classes in `repo-v2/src/latex-suite/` with the exact, un-modified 30+ TypeScript source files from `artisticat1/obsidian-latex-suite` (`src/snippets/`, `src/features/`, `src/utils/`, `src/main.ts`).
 - **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
