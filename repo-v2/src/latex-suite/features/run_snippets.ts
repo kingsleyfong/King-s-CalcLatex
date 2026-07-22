@@ -28,7 +28,7 @@ export function runSnippetsOnInput(view: EditorView, key: string, plugin: KingsC
   const lineText = line.text;
   const col = pos - line.from;
 
-  const textBefore = lineText.slice(0, col);
+  const textBefore = lineText.slice(0, col) + key;
   const inMath = MathContextManager.isMathMode(state, pos);
 
   // Visual Selection Replacements (${VISUAL})

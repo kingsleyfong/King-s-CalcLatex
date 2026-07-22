@@ -1,5 +1,21 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 21) — Fixed `textBefore` Scanner Key Concatenation (`run_snippets.ts`)
+
+### Status: 🟢 Build clean | Force-copied to Vault | Trigger Expansion Restored
+
+### What Was Done
+
+1. **Resolution of Scanner Parameter Bug (`run_snippets.ts`)**:
+   - Fixed line 31: `const textBefore = lineText.slice(0, col) + key;`.
+   - Appending `key` to `textBefore` ensures incoming typed characters are passed to the trigger scanner. `"m" + "k"` $\rightarrow$ `"mk"` $\rightarrow$ `true`, `"d" + "m"` $\rightarrow$ `"dm"` $\rightarrow$ `true`, and all math mode snippets (`sr`, `cb`, `rd`, `al`, `LL`, `fra`) now match and expand.
+
+2. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 20) — High-Level CTO Explanation: How Manual Line Modification Introduced the Bug
 
 ### Status: 🟢 Explanation Delivered | Local Dev Active
