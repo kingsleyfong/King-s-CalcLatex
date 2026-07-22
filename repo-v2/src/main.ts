@@ -53,16 +53,6 @@ export default class KingsCalcLatexPlugin extends Plugin {
     // 2. Initialize the expression engine
     this.engine = new ExpressionEngine(this.settings);
 
-    // 2b. Expose obsidian-latex-suite plugin alias so Excalidraw enables native LaTeX modal preview
-    try {
-      const plugins = (this.app as any).plugins;
-      if (plugins && plugins.plugins && !plugins.plugins["obsidian-latex-suite"]) {
-        plugins.plugins["obsidian-latex-suite"] = this;
-      }
-    } catch {
-      /* Graceful fallback */
-    }
-
     // 3. Register the settings tab
     this.addSettingTab(new KCLSettingTab(this.app, this));
 
