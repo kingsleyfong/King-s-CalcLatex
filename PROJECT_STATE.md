@@ -8,13 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Keymap Priority set to Prec.highest for Tab, Shift-Tab, and Autofraction, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Forensic Audit: keydown vs inputHandler Document State Timing Mismatch, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, forensically audited keymap priority and settings state for LaTeX Suite extensions in `.md` notes:
-- **Keymap Priority Fix**: Wrapped `keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])` in `Prec.highest(...)`. Previously, `Prec.high` allowed Obsidian's default `Tab` indent keymap to intercept `Tab` before tabstops or tabout ran. Setting `Prec.highest` ensures `Tab`, `Shift-Tab`, and `/` autofraction execute before default Obsidian keybindings.
-- **Settings State Verified**: Confirmed `"enableLaTeXSuite": true` in `data.json`.
-- **Local Dev Only**: Built bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, conducted deep forensic audit explaining why custom `latexSuitePlugin` keydown handler fails trigger expansion:
+- **Root Cause Identified**: Custom wrapper ran snippet detection inside a DOM `keydown` listener (`ViewPlugin`). At the exact moment `keydown` fires for `"k"`, CodeMirror 6 has NOT yet inserted `"k"` into `view.state.doc`.
+- **Standalone Parity Mismatch**: Standalone `obsidian-latex-suite` does NOT run snippet expansion on DOM `keydown`. It runs inside `EditorView.inputHandler.of()`, which fires AFTER CodeMirror 6 updates `view.state.doc` with `"mk"`.
+- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```

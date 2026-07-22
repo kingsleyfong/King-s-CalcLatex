@@ -1,5 +1,18 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 11) — Forensic Audit: DOM `keydown` vs CodeMirror 6 `inputHandler` Timing Mismatch
+
+### Status: 🟢 Code Modifications Paused | Diagnostic Audit Complete
+
+### What Was Done
+
+1. **Forensic Root Cause Uncovered**:
+   - **The Timing Bug**: Custom `latexSuitePlugin` ran snippet detection inside a DOM `keydown` listener. At the moment `keydown` fires for `"k"`, CodeMirror 6 has NOT yet updated the document text `view.state.doc`.
+   - **Standalone LaTeX Suite Architecture**: Standalone `obsidian-latex-suite` does NOT evaluate snippets inside DOM `keydown`. It evaluates snippets inside `EditorView.inputHandler.of()`, which fires AFTER CodeMirror 6 updates the document state with `"mk"`.
+   - Running inside `keydown` caused `expandSnippets` to race against CodeMirror 6's native text insertion, leaving `"mk"` or `"dm"` in the document un-expanded.
+
+---
+
 ## Session: 2026-07-22 (Part 10) — `Prec.highest` Priority Keymap Fix for Tab, Shift-Tab & Autofraction
 
 ### Status: 🟢 Build clean | Force-copied to Vault | Keymaps Updated
