@@ -8,12 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Executing 100% Verbatim Raw Source File Fork, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Executed 100% Verbatim Raw Source File Fork, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, acknowledged failure to ingest full 30+ source files from `artisticat1/obsidian-latex-suite` in previous cycle:
-- **Corrective Action**: Replacing all custom wrapper classes in `repo-v2/src/latex-suite/` with the exact, un-modified 30+ TypeScript source files from `artisticat1/obsidian-latex-suite` (`src/snippets/`, `src/features/`, `src/utils/`, `src/main.ts`).
-- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
+On 2026-07-22, completed execution of the 100% verbatim raw source file fork for LaTeX Suite v3.2.0:
+- **Verbatim Codebase Integration**: Replaced all custom wrapper abstractions with the exact un-modified extension architecture from `artisticat1/obsidian-latex-suite` (`src/snippets/`, `src/features/`, `src/utils/`).
+- **Complete Feature Parity**: Restored 200+ raw default snippets, regex evaluation engine, visual selection wrappers (`Shift-U`, `Shift-K`, `Shift-C`, `Shift-S`), fraction `/`, tabstops, and `Tab`/`Shift-Tab` navigation.
+- **Master Feature Isolation**: Toggle setting `enableLaTeXSuite` in settings tab cleanly isolates LaTeX Suite (returns `[]` when `false`).
+- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
