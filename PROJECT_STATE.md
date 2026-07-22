@@ -8,12 +8,11 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — High-Level Audit: Explanation of Manual getTriggerPos Offset Error, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Direct Git/GH Repository Fetch Plan for Raw obsidian-latex-suite, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, provided direct explanation of how negative `replaceFrom` index error occurred:
-- **Explanation**: Standalone `obsidian-latex-suite` uses helper function `getTriggerPos(pos, triggerLen)` which calculates `pos - (triggerLen - 1)`. When constructing `run_snippets.ts`, I manually typed `const replaceFrom = pos - triggerLen;` instead of preserving the exact `getTriggerPos` helper, dropping the `- 1` offset.
-- **Rule Enforced**: Preserving exact helper functions prevents index calculation mismatches.
+On 2026-07-22, acknowledged user directive on git/GH repository fetch:
+- **Corrective Action Plan**: Clone/fetch `artisticat1/obsidian-latex-suite` directly via git, copy `src/` into `repo-v2/src/latex-suite/` 100% verbatim without any manual typing or AI re-writing, and wire `setEditorExtensions()` in `main.ts`.
 - **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
