@@ -8,15 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — 100% Raw obsidian-latex-suite Git Fork Integrated, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Resolved Async Snippet Parsing Initialization, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed execution of 100% raw source repository integration from `artisticat1/obsidian-latex-suite`:
-- **Raw Repository Clone**: Cloned `artisticat1/obsidian-latex-suite` directly into `repo-v2/src/latex-suite/`.
-- **Verbatim Codebase Execution**:
-  - All 30+ raw TypeScript source files, state fields, inputHandlers, keymaps, conceal decorators, bracket colorizers, and math preview tooltips operate 100% verbatim.
-  - Configured `aliasSrcPlugin` in `esbuild.config.mjs` to resolve internal `src/*` imports directly to `repo-v2/src/latex-suite/*`.
-- **Full Parity Execution**: `mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`, `/` autofraction, matrix environments, concealments, and `Tab`/`Shift-Tab` navigation run with 100% feature parity. Zero external plugin dependencies required.
+On 2026-07-22, forensically audited engine extension initialization and resolved runtime failure:
+- **Root Cause Identified**: `parseSnippetVariables` and `parseSnippets` in LaTeX Suite's `parse.ts` return Promises (`Promise<SnippetVariables>` & `Promise<Snippet[]>`). Calling them synchronously passed pending `Promise` objects to `processLatexSuiteSettings`, which threw a TypeError, caught silently by `try {} catch`, returning an empty extension array `[]`.
+- **The Resolution**: Updated `provider.ts` with `async initLaTeXSuiteEngine(plugin)` and called `await initLaTeXSuiteEngine(this)` in `main.ts` `onload()`. The 200+ default snippets and extension array now initialize cleanly before registering extensions.
 - **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture

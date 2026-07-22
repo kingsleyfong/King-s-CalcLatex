@@ -14,20 +14,19 @@ import { colorPairedBracketsPluginLowestPrec, highlightCursorBracketsPlugin } fr
 import { cursorTooltipBaseTheme, cursorTooltipField } from "./editor_extensions/math_tooltip";
 import { contextPlugin, mathBoundsPlugin } from "./utils/context";
 
-let cachedExtensions: Extension[] | null = null;
+let cachedExtensions: Extension[] = [];
+let isInitialized = false;
 
-export function getLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin): Extension[] {
+export async function initLaTeXSuiteEngine(plugin: KingsCalcLatexPlugin): Promise<Extension[]> {
   if (plugin.settings.enableLaTeXSuite === false) {
+    cachedExtensions = [];
+    isInitialized = true;
     return [];
   }
 
-  if (cachedExtensions) {
-    return cachedExtensions;
-  }
-
   try {
-    const snippetVariables = parseSnippetVariables(DEFAULT_SNIPPET_VARIABLES, "snippet-variables.js");
-    const snippets = parseSnippets(DEFAULT_SNIPPETS, snippetVariables, "snippets.js");
+    const snippetVariables = await parseSnippetVariables(DEFAULT_SNIPPET_VARIABLES, "snippet-variables.js");
+    const snippets = await parseSnippets(DEFAULT_SNIPPETS, snippetVariables, "snippets.js");
     const CMSettings = processLatexSuiteSettings(snippets, DEFAULT_SETTINGS);
 
     const editorExtensions: Extension[] = [
@@ -49,9 +48,16 @@ export function getLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin): Exte
     if (CMSettings.mathPreviewEnabled) editorExtensions.push([cursorTooltipField.extension, cursorTooltipBaseTheme, tooltips({ position: "absolute" })]);
 
     cachedExtensions = editorExtensions;
+    isInitialized = true;
     return editorExtensions;
   } catch (e) {
     console.error("Failed to initialize verbatim LaTeX Suite extension array:", e);
+    cachedExtensions = [];
+    isInitialized = true;
     return [];
   }
+}
+
+export function getLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin): Extension[] {
+  return cachedExtensions;
 }

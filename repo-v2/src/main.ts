@@ -17,7 +17,7 @@ import { GraphInspectorView, GRAPH_INSPECTOR_VIEW } from "./views/inspector";
 import { initGiac, isGiacReady, terminateGiac } from "./engine/giac";
 import { ExcalidrawCompanionManager } from "./excalidraw/companion-manager";
 
-import { getLaTeXSuiteEngineExtension } from "./latex-suite/provider";
+import { initLaTeXSuiteEngine, getLaTeXSuiteEngineExtension } from "./latex-suite/provider";
 
 export default class KingsCalcLatexPlugin extends Plugin {
   settings!: KCLSettings;
@@ -50,19 +50,22 @@ export default class KingsCalcLatexPlugin extends Plugin {
     // 1. Load persisted settings
     await this.loadSettings();
 
-    // 2. Initialize the expression engine
+    // 2. Initialize built-in LaTeX Suite engine
+    await initLaTeXSuiteEngine(this);
+
+    // 3. Initialize the expression engine
     this.engine = new ExpressionEngine(this.settings);
 
-    // 3. Register the settings tab
+    // 4. Register the settings tab
     this.addSettingTab(new KCLSettingTab(this.app, this));
 
-    // 4. Register the Graph Inspector sidebar view
+    // 5. Register the Graph Inspector sidebar view
     this.registerView(
       GRAPH_INSPECTOR_VIEW,
       (leaf: WorkspaceLeaf) => new GraphInspectorView(leaf, this),
     );
 
-    // 5. Register CM6 editor extensions
+    // 6. Register CM6 editor extensions
     this.registerEditorExtension([
       createDecorationPlugin(this),
       createTabKeymap(this),
