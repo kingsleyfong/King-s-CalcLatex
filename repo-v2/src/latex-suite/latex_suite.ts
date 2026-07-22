@@ -48,7 +48,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   // Official LaTeX Suite Input Handler Architecture
   const inputHandlerExtension = Prec.highest(
     EditorView.inputHandler.of((view: EditorView, from: number, to: number, text: string) => {
-      if (!plugin.settings.enableLaTeXSuite) return false;
+      if (plugin.settings.enableLaTeXSuite === false) return false;
       if (text.length !== 1) return false;
 
       const state = view.state;
@@ -103,13 +103,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
           const triggerLen = trigger.length;
           const replaceFrom = pos - (triggerLen - 1);
 
-          let replacementRaw = "";
-          if (s.data.replacement && (s.data.replacement as any).nodes) {
-            const nodes = (s.data.replacement as any).nodes;
-            replacementRaw = nodes.map((n: any) => (typeof n.insert === "string" ? n.insert : "")).join("");
-          }
-
-          const { text: replacementText, initialCursorOffset, tabstopGroups } = computeSnippetExpansion(replacementRaw);
+          const { text: replacementText, initialCursorOffset, tabstopGroups } = computeSnippetExpansion(s.rawReplacement);
           const targetCursorPos = replaceFrom + initialCursorOffset;
 
           const mappedTabstops = tabstopGroups.map((grp) => {
@@ -142,7 +136,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   const tabKeybinding: KeyBinding = {
     key: "Tab",
     run: (view: EditorView) => {
-      if (!plugin.settings.enableLaTeXSuite) return false;
+      if (plugin.settings.enableLaTeXSuite === false) return false;
       const state = view.state;
       const tsState = state.field(tabstopsStateField, false);
 
@@ -203,7 +197,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
   const shiftTabKeybinding: KeyBinding = {
     key: "Shift-Tab",
     run: (view: EditorView) => {
-      if (!plugin.settings.enableLaTeXSuite) return false;
+      if (plugin.settings.enableLaTeXSuite === false) return false;
       const state = view.state;
       const tsState = state.field(tabstopsStateField, false);
 
