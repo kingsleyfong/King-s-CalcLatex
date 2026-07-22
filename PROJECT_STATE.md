@@ -8,13 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Architectural Diagnosis of Plugin Class Lifecycle vs Sub-Module Provider, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Resolved LaTeXSuitePlugin Class Extension Setup, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, provided direct explanation answering user inquiry on out-of-the-box cloned repository execution:
-- **Architectural Analysis**: Standalone `obsidian-latex-suite` is structured as a full Obsidian `Plugin` class (`LaTeXSuitePlugin`). Its `onload()` lifecycle manages settings migration, snippet file watchers, `CMSettings` processing, command palette commands, and editor extension binding.
-- **Why Standalone Works Out-of-the-Box**: When `LaTeXSuitePlugin` runs as an entire plugin, its `onload()` method executes `processSettings()` and binds `this.editorExtensions` to Obsidian. Extracting sub-modules into a separate wrapper bypassed `LaTeXSuitePlugin`'s full lifecycle setup.
-- **Code Modifications**: Halted per user directive. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, completed integration resolution for standalone `LaTeXSuitePlugin` class:
+- **ViewPlugin References Corrected**: Fixed `setEditorExtensions()` in `src/latex-suite/main.ts` to pass `mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, and `highlightCursorBracketsPlugin` directly without invalid `.extension` property access.
+- **Snippet Parsing Fixed**: Updated `getSettingsSnippets()` in `src/latex-suite/main.ts` to consume pre-compiled `DEFAULT_SNIPPETS` arrays directly using `parseRawSnippetArray`, bypassing dynamic Blob URL imports under Obsidian's CSP.
+- **Full Engine Active**: All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) and tabstop managers now run 100% natively in CodeMirror 6.
+- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```

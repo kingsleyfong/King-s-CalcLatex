@@ -1,5 +1,22 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 35) — Standalone `LaTeXSuitePlugin` Class Setup Resolution (`main.ts`)
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Full Parity Active
+
+### What Was Done
+
+1. **Resolution of Standalone `LaTeXSuitePlugin` Class Execution**:
+   - Fixed `setEditorExtensions()` in `src/latex-suite/main.ts` to register `mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, and `highlightCursorBracketsPlugin` directly without invalid `.extension` property access.
+   - Updated `getSettingsSnippets()` in `src/latex-suite/main.ts` to parse pre-compiled `DEFAULT_SNIPPETS` array objects directly using `parseRawSnippetArray`.
+   - Bypassed Chromium's Blob URL CSP restriction while preserving 100% of LaTeX Suite's exact class settings and extension binding logic.
+
+2. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 34) — Direct Architectural Explanation: `LaTeXSuitePlugin` Class Lifecycle
 
 ### Status: 🟢 Plugin Modifications Halted | Direct Explanation Delivered
