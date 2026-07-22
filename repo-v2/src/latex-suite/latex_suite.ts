@@ -265,7 +265,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
     },
   };
 
-  // Tab & Shift-Tab Keybindings
+  // Tab & Shift-Tab Keybindings (highest priority to override default indent)
   const tabKeybinding: KeyBinding = {
     key: "Tab",
     run: (view: EditorView) => {
@@ -377,7 +377,7 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
     tabstopsStateField,
     Prec.highest(latexSuitePlugin.extension),
     Prec.highest(inputHandlerExtension),
-    Prec.high(keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])),
+    Prec.highest(keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])),
   ];
 }
 

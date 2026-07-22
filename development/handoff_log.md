@@ -1,5 +1,17 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 10) — `Prec.highest` Priority Keymap Fix for Tab, Shift-Tab & Autofraction
+
+### Status: 🟢 Build clean | Force-copied to Vault | Keymaps Updated
+
+### What Was Done
+
+1. **Keymap Precedence Resolution (`latex_suite.ts`)**:
+   - Wrapped `keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])` inside `Prec.highest(...)`.
+   - Fixed the issue where Obsidian's default `Tab` indenting keymap intercepted `Tab` before tabstops or tabout could run. `Prec.highest` ensures `Tab`, `Shift-Tab`, and `/` autofraction take precedence over default editor keybindings.
+
+---
+
 ## Session: 2026-07-22 (Part 9) — Completed 100% Verbatim Raw Source File Fork Execution
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Local Dev Complete

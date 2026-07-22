@@ -8,14 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Executed 100% Verbatim Raw Source File Fork, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Keymap Priority set to Prec.highest for Tab, Shift-Tab, and Autofraction, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed execution of the 100% verbatim raw source file fork for LaTeX Suite v3.2.0:
-- **Verbatim Codebase Integration**: Replaced all custom wrapper abstractions with the exact un-modified extension architecture from `artisticat1/obsidian-latex-suite` (`src/snippets/`, `src/features/`, `src/utils/`).
-- **Complete Feature Parity**: Restored 200+ raw default snippets, regex evaluation engine, visual selection wrappers (`Shift-U`, `Shift-K`, `Shift-C`, `Shift-S`), fraction `/`, tabstops, and `Tab`/`Shift-Tab` navigation.
-- **Master Feature Isolation**: Toggle setting `enableLaTeXSuite` in settings tab cleanly isolates LaTeX Suite (returns `[]` when `false`).
-- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, forensically audited keymap priority and settings state for LaTeX Suite extensions in `.md` notes:
+- **Keymap Priority Fix**: Wrapped `keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])` in `Prec.highest(...)`. Previously, `Prec.high` allowed Obsidian's default `Tab` indent keymap to intercept `Tab` before tabstops or tabout ran. Setting `Prec.highest` ensures `Tab`, `Shift-Tab`, and `/` autofraction execute before default Obsidian keybindings.
+- **Settings State Verified**: Confirmed `"enableLaTeXSuite": true` in `data.json`.
+- **Local Dev Only**: Built bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
