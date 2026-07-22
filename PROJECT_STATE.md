@@ -8,13 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Forensic Audit: keydown vs inputHandler Document State Timing Mismatch, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Zero Custom Wrappers: Direct Raw Codebase Ingestion Plan, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, conducted deep forensic audit explaining why custom `latexSuitePlugin` keydown handler fails trigger expansion:
-- **Root Cause Identified**: Custom wrapper ran snippet detection inside a DOM `keydown` listener (`ViewPlugin`). At the exact moment `keydown` fires for `"k"`, CodeMirror 6 has NOT yet inserted `"k"` into `view.state.doc`.
-- **Standalone Parity Mismatch**: Standalone `obsidian-latex-suite` does NOT run snippet expansion on DOM `keydown`. It runs inside `EditorView.inputHandler.of()`, which fires AFTER CodeMirror 6 updates `view.state.doc` with `"mk"`.
-- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, acknowledged user directive eliminating all custom wrapper references:
+- **Directive**: Zero custom wrappers or hand-written helper classes. Ingest the exact un-modified 30+ TypeScript source files from `artisticat1/obsidian-latex-suite` directly into `repo-v2/src/latex-suite/`.
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
 ```

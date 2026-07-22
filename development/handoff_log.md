@@ -1,5 +1,17 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 12) — Elimination of All Custom Wrapper References & Alignment on 100% Raw Fork
+
+### Status: 🟢 Aligned on 100% Raw Fork | Zero Custom Wrappers
+
+### What Was Done
+
+1. **Directive Alignment**:
+   - Eliminated all custom wrapper discussion/logic.
+   - Committed to pulling the exact 30+ un-modified TypeScript source files directly from `artisticat1/obsidian-latex-suite` into `repo-v2/src/latex-suite/` without custom wrapper abstractions.
+
+---
+
 ## Session: 2026-07-22 (Part 11) — Forensic Audit: DOM `keydown` vs CodeMirror 6 `inputHandler` Timing Mismatch
 
 ### Status: 🟢 Code Modifications Paused | Diagnostic Audit Complete
