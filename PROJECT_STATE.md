@@ -8,12 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Excalidraw OD Snippet Engine & SVG Blur Event Sync Fixed, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Display Math $$ Blur Trim & SVG Equation Conversion Fixed, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, diagnosed and resolved Excalidraw OD textarea snippet expansion and SVG equation rendering issues:
-- **Full 200+ Snippet Database in Excalidraw**: Populated Excalidraw's `SnippetEngine` with all 200+ raw default snippets from `DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING` (`sr`, `cb`, `rd`, `fra`, `LL`, `al`, `/`, regex subscripts, and visual selection wrappers).
-- **Blur Event & React State Synchronization**: Updated `setTextareaValue` and `updateTextarea` in `interceptor.ts` to dispatch both `input` and `change` events. This ensures Excalidraw's React state syncs the updated text before blur, allowing clicking off an Excalidraw textbox to render LaTeX text (`$ ... $`) into an SVG equation element.
+On 2026-07-22, resolved Excalidraw display math (`$$ ... $$`) blur conversion to SVG equation image elements:
+- **Capture-Phase Blur Whitespace Trimming**: Updated `handleAttach` in `interceptor.ts` to attach a capture-phase `blur` listener. When `dm` expands into `$$\n ... \n$$`, any trailing newlines or whitespace after closing `$$` are trimmed synchronously before Excalidraw processes the blur event.
+- **Direct `editingElement.text` Synchronization**: Updated `interceptor.ts` to synchronize `appState.editingElement.text = trimmed` directly via `excalidrawAPI`. Clicking off an Excalidraw textarea containing `$$ ... $$` now triggers Excalidraw's `tex2svg` equation renderer and converts the text into an SVG equation element.
 
 ### v2.0 Architecture
 ```
