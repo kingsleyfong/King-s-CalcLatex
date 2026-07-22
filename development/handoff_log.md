@@ -1,5 +1,26 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 27) — Forensic Fix: Async Snippet Parsing Initialization (`provider.ts` & `main.ts`)
+
+### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Snippet Engine Active
+
+### What Was Done
+
+1. **Forensic Diagnosis of Un-expanded Snippets**:
+   - In LaTeX Suite's `parse.ts`, `parseSnippetVariables` and `parseSnippets` use dynamic module imports (`Blob` URLs), returning `Promise<SnippetVariables>` and `Promise<Snippet[]>`.
+   - In `provider.ts`, calling `parseSnippetVariables` and `parseSnippets` without `await` passed pending `Promise` objects to `processLatexSuiteSettings`.
+   - `processLatexSuiteSettings` threw a `TypeError` trying to iterate non-array Promises, which was caught by `try {} catch`, causing `getLaTeXSuiteEngineExtension` to return an empty array `[]`.
+
+2. **The Resolution**:
+   - Created `async initLaTeXSuiteEngine(plugin)` in `provider.ts` that properly awaits `await parseSnippetVariables(...)` and `await parseSnippets(...)`.
+   - Called `await initLaTeXSuiteEngine(this)` inside `main.ts` `onload()` before registering CM6 editor extensions.
+
+3. **Vault Deployment**:
+   - Built production bundle (`npm run build`) and force-copied `main.js`, `styles.css`, and `manifest.json` directly into `C:\Users\Kingsley\Documents\Obsidian Vault\.obsidian\plugins\kings-calclatex\`.
+   - GitHub remote pushes remain **100% HALTED**.
+
+---
+
 ## Session: 2026-07-22 (Part 26) — 100% Raw Git Fork Integration of Standalone `obsidian-latex-suite`
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Verbatim Codebase Active
