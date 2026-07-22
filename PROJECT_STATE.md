@@ -8,12 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — High-Level Audit: Missing CMSettings StateField in CodeMirror 6 Extension Array, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Built-In Standalone LaTeX Suite Fork Execution Plan, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, completed high-level forensic audit of standalone `obsidian-latex-suite`'s `main.js`:
-- **Root Cause Discovered**: Standalone `obsidian-latex-suite` stores `CMSettings` (containing the 200+ default snippets) inside a CodeMirror 6 `StateField` (`By(CMSettings)`). When `inputHandler.of(Xv)` runs, it reads `view.state.field(By)`. Because `By(CMSettings)` was not included in our extension array, `view.state.field(By)` returned an empty snippet list `[]`, causing `mk`, `dm`, and all snippets to evaluate against 0 active triggers.
-- **Local Dev Only**: Code modifications paused as requested. Remote GitHub pushes remain 100% halted.
+On 2026-07-22, confirmed core architectural requirement:
+- **Zero External Plugin Dependency**: King's CalcLatex contains the forked LaTeX Suite engine 100% built-in. Standalone `obsidian-latex-suite` does NOT need to be installed in Obsidian.
+- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
 
 ### v2.0 Architecture
 ```
