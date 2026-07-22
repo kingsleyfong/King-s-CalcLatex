@@ -11,8 +11,13 @@ import { snippetQueuePlugin, queueSnippets } from "./snippets/codemirror/snippet
 import { SnippetChangeSpec } from "./snippets/codemirror/snippet_change_spec";
 import { expandSnippets } from "./snippets/snippet_management";
 
-// ── Official Standalone obsidian-latex-suite Architecture ──
+// ── LaTeX Suite Extension Bundle Coordinator ──
 export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
+  // If LaTeX Suite feature toggle is disabled, return empty array (100% disabled & isolated)
+  if (plugin.settings.enableLaTeXSuite === false) {
+    return [];
+  }
+
   const parsedDefaultSnippets = parseRawSnippetsFromStr(DEFAULT_LATEX_SUITE_SNIPPETS_RAW_STRING);
 
   const latexSuitePlugin = ViewPlugin.fromClass(
@@ -148,15 +153,6 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
       },
     },
   );
-
-  // Standalone Input Handler
-  const inputHandlerExtension = EditorView.inputHandler.of((view: EditorView, from: number, to: number, text: string) => {
-    if (plugin.settings.enableLaTeXSuite === false) return false;
-    const pluginInst = view.plugin(latexSuitePlugin);
-    if (!pluginInst) return false;
-    const dummyEvent = new KeyboardEvent("keydown", { key: text });
-    return pluginInst.handleKeydown(dummyEvent);
-  });
 
   // Auto-fraction keybinding for "/"
   const autofractionKeybinding: KeyBinding = {
@@ -365,7 +361,6 @@ export function createLaTeXSuiteEngineExtension(plugin: KingsCalcLatexPlugin) {
     snippetQueuePlugin,
     tabstopsStateField,
     Prec.highest(latexSuitePlugin.extension),
-    Prec.highest(inputHandlerExtension),
     Prec.high(keymap.of([autofractionKeybinding, tabKeybinding, shiftTabKeybinding])),
   ];
 }

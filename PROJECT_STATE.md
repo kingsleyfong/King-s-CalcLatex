@@ -8,14 +8,13 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v2.2.0 — Excalidraw OD Merged, Settings Restructure, Custom Modal Position, 2026-07-21)
+## Current Status: 🟢 WORKING (v3.2.0 — LaTeX Suite Isolated Feature Toggle, 100% Verbatim Engine, 2026-07-22)
 
 ### What Happened
-On 2026-07-21, merged the standalone `kings-excalidraw-math-companion` plugin directly into **King's CalcLatex** v2.2.0 to unify codebase logic and eliminate redundant plugins.
-- **Excalidraw OD Integration**: Integrated textarea snippet engine, live MathJax preview tooltip, ExcalidrawAutomate graph placement, color dot bar (`\color{red}`), and `\bbox` panel.
-- **UI/UX Settings Restructure**: Split settings into two clean sections: **Markdown Note Features (`.md`)** and **Excalidraw OD Features (Canvas & Math Companion)**.
-- **Excalidraw LaTeX Modal Position**: Added configurable modal window positioning setting (`latexModalPosition`) defaulting to **Near Bottom of Screen** (`bottom: 40px`).
-- **Archive `Kings CalcTex`**: Summarized obsolete v1 Python prototype (`development/archive_summary_kings_calctex.md`).
+On 2026-07-22, completed integration of LaTeX Suite into **King's CalcLatex** v3.2.0 with complete feature isolation and setting toggles:
+- **LaTeX Suite Feature Toggle (`enableLaTeXSuite`)**: Added master settings toggle in plugin Settings Tab. When set to `false`, `createLaTeXSuiteEngineExtension(this)` returns `[]` (empty extension array), completely disabling and isolating all LaTeX Suite snippet handlers and keybindings.
+- **100% Non-Conflicting Core Features**: Verified that King's CalcLatex's CAS solving, Giac WASM engine, 2D/3D graphing, and Excalidraw Companion operate 100% independently without conflict.
+- **Mandatory Per-Cycle Doc Hook**: Added automatic per-cycle doc update rule to `CLAUDE.md` and `SESSION_START.md` requiring project state, handoff logs, and antipatterns to be updated after every turn.
 
 ### v2.0 Architecture
 ```

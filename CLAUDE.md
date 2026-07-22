@@ -5,6 +5,19 @@
 
 ---
 
+## 🚨 MANDATORY PER-CYCLE DOCUMENTATION HOOK (EVERY TURN)
+
+> [!IMPORTANT]
+> **AUTOMATIC PER-CYCLE DOC UPDATE RULE**:
+> After **EVERY SINGLE** prompt & response/action cycle performed with the USER, the AI AGENT MUST automatically inspect and update:
+> 1. **`PROJECT_STATE.md`**: Update current feature state, completed items, active workstream, and immediate next steps.
+> 2. **`development/handoff_log.md`**: Prepend a detailed entry summarizing actions taken, architectural decisions, root cause tracebacks, mistakes identified, and technical learnings.
+> 3. **`repo-v2/CLAUDE.md`**: Add any newly discovered runtime bugs, CodeMirror 6 antipatterns, or architectural constraints to the antipatterns registry.
+> 
+> *DO NOT END A TURN WITHOUT UPDATING THESE DOCS.*
+
+---
+
 ## Directory Map
 
 ```
