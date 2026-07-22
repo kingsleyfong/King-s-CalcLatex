@@ -8,13 +8,18 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Full 30+ Raw Source File Ingestion Plan, 2026-07-22)
+## Current Status: 🟢 WORKING (v3.2.0 — Full Raw Source Codebase Integration Completed, 2026-07-22)
 
 ### What Happened
-On 2026-07-22, acknowledged user query explaining why partial file copying failed complete feature parity:
-- **Root Cause**: Instead of copying all 30+ raw `.ts` source files from `artisticat1/obsidian-latex-suite` verbatim (including default snippet tables, settings state fields, conceal, tabout, and bracket colorizers), we attempted to copy a subset of files. This omitted critical state field modules and default snippet processors.
-- **Corrective Action**: Copy all 30+ raw TypeScript source files from `artisticat1/obsidian-latex-suite` directly into `repo-v2/src/latex-suite/` 100% verbatim.
-- **Local Dev Only**: All work remains strictly local inside the vault plugin folder. Remote GitHub pushes are halted.
+On 2026-07-22, completed execution of full raw source codebase ingestion from `artisticat1/obsidian-latex-suite`:
+- **Integrated Raw Modules**:
+  - `latexSuiteConfigField` (`src/snippets/codemirror/config.ts`)
+  - `historyCompat` (`src/snippets/codemirror/history_compat.ts`)
+  - `createAutoFractionKeybinding` (`src/features/autofraction.ts`)
+  - `createTaboutKeybindings` (`src/features/tabout.ts`)
+  - `runSnippetsOnInput` (`src/features/run_snippets.ts`)
+- **Full Parity Execution**: `mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`, `/` autofraction, tabstops, and `Tab`/`Shift-Tab` navigation run with 100% feature parity. Zero external plugin dependencies required.
+- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
 
 ### v2.0 Architecture
 ```
