@@ -8,14 +8,18 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 WORKING (v3.2.0 — Resolved LaTeXSuitePlugin Class Extension Setup, 2026-07-22)
+## Current Status: 🟢 LaTeX Suite integration ACTUALLY FIXED (2026-07-22, Part 36) — needs in-Obsidian confirmation
 
-### What Happened
-On 2026-07-22, completed integration resolution for standalone `LaTeXSuitePlugin` class:
-- **ViewPlugin References Corrected**: Fixed `setEditorExtensions()` in `src/latex-suite/main.ts` to pass `mathBoundsPlugin`, `contextPlugin`, `keyboardEventPlugin`, and `highlightCursorBracketsPlugin` directly without invalid `.extension` property access.
-- **Snippet Parsing Fixed**: Updated `getSettingsSnippets()` in `src/latex-suite/main.ts` to consume pre-compiled `DEFAULT_SNIPPETS` arrays directly using `parseRawSnippetArray`, bypassing dynamic Blob URL imports under Obsidian's CSP.
-- **Full Engine Active**: All 200+ default snippets (`mk`, `dm`, `sr`, `cb`, `rd`, `al`, `LL`, `fra`) and tabstop managers now run 100% natively in CodeMirror 6.
-- **Local Dev Only**: Built production bundle locally and force-copied to vault plugin folder. Remote GitHub pushes remain 100% halted.
+> ⚠️ **Correction:** The previous "🟢 WORKING (v3.2.0)" claim was FALSE. The snippet engine was silently registering **zero** extensions (see below). Do not trust a green status without an end-to-end check.
+
+### What Happened (Part 36 — the real fix)
+The live path is `main.ts → latex-suite/provider.ts → latex_suite.ts → runSnippets`. **Parts 33–35 all edited the standalone `src/latex-suite/main.ts` class, which nothing live imports** — so the actual bug was never touched. That dead file has now been deleted.
+
+**Root cause:** ES2022 target ⇒ `useDefineForClassFields` ON, but the vendored code was written for upstream's ES6/`false` build. `StringSnippet` redeclared `data: SnippetData<"string">;`, which under define-semantics reset `this.data = undefined` after `super()` set it, so `this.data.triggerAfter = …` threw on the first snippet (`mk`). `parseRawSnippetArray` threw → `provider.ts`'s `try/catch` swallowed it → `initLaTeXSuiteEngine` returned `[]` → **engine did nothing, no error surfaced.**
+
+**Fixed:** `useDefineForClassFields:false` + removed the redeclaration (both fix it). Verified in isolation: all **200** snippets now parse, `snippetsEnabled:true`. Also restored the type checker (tsconfig `paths` ⇒ LaTeX Suite is 100% type-clean), deleted 16 dead vendored files, fixed a `mkConcealPlugin` arg bug, deduped `@codemirror/state`, and fixed the production build's broken vault-sync. Full detail in `development/handoff_log.md` (Part 36).
+
+**Still to confirm (needs Obsidian, not CLI):** reload the plugin and (1) type `mk`, `dm`, `//`, `sr` — they should expand; (2) regression-check that a 2D plot, 3D plot, and `=` evaluation still render (the `useDefineForClassFields:false` flip changes the compiled emit of all KCL classes, so verify existing features once). Remote GitHub pushes remain halted (local dev only).
 
 ### v2.0 Architecture
 ```

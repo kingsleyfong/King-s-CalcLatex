@@ -6,27 +6,25 @@ import path from "path";
 const prod = process.argv[2] === "production";
 const vaultPluginDir = "C:/Users/Kingsley/Documents/Obsidian Vault/.obsidian/plugins/kings-calclatex";
 
+function syncToVault() {
+  try {
+    for (const f of ["main.js", "styles.css", "manifest.json"]) {
+      if (fs.existsSync(f)) {
+        fs.copyFileSync(f, path.join(vaultPluginDir, f));
+      }
+    }
+    console.log("[esbuild] Synced build to Obsidian vault plugin directory.");
+  } catch (e) {
+    console.error("[esbuild] Failed to sync to vault plugin directory:", e);
+  }
+}
+
 const syncVaultPlugin = {
   name: "sync-vault-plugin",
   setup(build) {
-    build.onEnd(() => {
-      setTimeout(() => {
-        try {
-          if (fs.existsSync("main.js")) {
-            fs.copyFileSync("main.js", path.join(vaultPluginDir, "main.js"));
-          }
-          if (fs.existsSync("styles.css")) {
-            fs.copyFileSync("styles.css", path.join(vaultPluginDir, "styles.css"));
-          }
-          if (fs.existsSync("manifest.json")) {
-            fs.copyFileSync("manifest.json", path.join(vaultPluginDir, "manifest.json"));
-          }
-          console.log("[esbuild] Synced build to Obsidian vault plugin directory.");
-        } catch (e) {
-          console.error("[esbuild] Failed to sync to vault plugin directory:", e);
-        }
-      }, 50);
-    });
+    // Runs after every (re)build. In watch mode the output is already flushed
+    // by the time onEnd fires, so the copy is safe to do synchronously here.
+    build.onEnd(() => syncToVault());
   },
 };
 

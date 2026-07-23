@@ -48,7 +48,7 @@ const addCellMatrixShortcutCallback = (view: EditorView): boolean => {
 	return true;
 }
 
-const matrixShortcutsRunner = (shortcut: (view: EditorView, bounds?: Bounds) => boolean) => (view: EditorView): boolean => {
+const matrixShortcutsRunner = (shortcut: (view: EditorView, bounds: Bounds) => boolean) => (view: EditorView): boolean => {
 	const ctx = getContextPlugin(view);
 	if (!ctx.mode.strictlyInMath()) return false;
 	const settings = getLatexSuiteConfig(view);

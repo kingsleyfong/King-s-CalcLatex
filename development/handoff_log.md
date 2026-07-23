@@ -1,5 +1,38 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 36) — ROOT CAUSE FOUND: LaTeX Suite silently no-op'd; Parts 33–35 fixed dead code
+
+### Status: 🟢 LaTeX Suite integration ACTUALLY fixed | Type checker restored | Build+vault-sync fixed | Needs in-Obsidian confirmation of `mk` expansion
+
+### The real problem (and why the prior ~10 commits didn't fix it)
+The live integration path is `src/main.ts → latex-suite/provider.ts → latex_suite.ts → runSnippets`. **Parts 33, 34, and 35 all edited `src/latex-suite/main.ts` (a standalone `LaTeXSuitePlugin` class) — which nothing live imports.** Every "fix" (setEditorExtensions, getSettingsSnippets, `.extension` removal, ViewPlugin tweaks) landed on dead code, so the actual bug was never touched. Part 34 even concluded `provider.ts` "bypassed the lifecycle" — i.e. it treated the *correct* live path as the mistake.
+
+### Actual root cause
+`repo-v2/tsconfig.json` and `esbuild.config.mjs` both target ES2022, so TypeScript's `useDefineForClassFields` was ON. The vendored LaTeX Suite was authored for upstream's ES6 / `useDefineForClassFields:false` build. In `snippets/snippets.ts`, `StringSnippet` **redeclared** `data: SnippetData<"string">;` with no initializer. Under define-semantics that emits `this.data = undefined` *after* `super()` had set it → the next line `this.data.triggerAfter = …` threw `TypeError: Cannot set properties of undefined`. The very first default snippet (`mk` → `$$0$`) is a StringSnippet, so it crashed immediately. `parseRawSnippetArray` threw → `provider.ts`'s `try/catch` swallowed it and returned `[]` → **the entire snippet engine registered zero extensions and silently did nothing.** (The prior "tolerant fallback in validateRawSnippets" and "bypass Blob URL CSP" commits were symptoms of chasing this swallowed error.)
+
+Verified in isolation (bundle+run in Node): before fix → threw on `mk`; after fix → all **200** snippets parse, `snippetsEnabled: true`.
+
+### What was done
+1. **Fixed root cause two ways** (belt + suspenders): set `useDefineForClassFields: false` in tsconfig (matches upstream's build assumptions, preempts the whole class of field-clobber bugs), AND removed the redundant `data` redeclaration in `StringSnippet` (base class already declares it).
+2. **Restored the type checker** — added `baseUrl: "."` + `paths: { "src/*": ["src/latex-suite/*"] }` so `tsc` resolves the vendored `src/…` imports the same way the esbuild alias does. The prior agent had been flying blind (146 tsc errors, mostly module-not-found), which is *why* it thrashed. LaTeX Suite now typechecks **100% clean**.
+3. **Deleted 16 dead vendored files** (empirically via esbuild `--metafile`, not grep): the standalone `main.ts`, the upstream settings-UI cluster (`settings_tab.ts`, `file_watch.ts`, `settings/ui/**`), `features/editor_commands.ts`, the `history_compat.ts` shim, duplicate `utils/default_snippet*.ts`, and `api.d.ts`. Kept ambient type files (`types/global.ts`, `types/imports.ts`, `vim_types.d.ts`). All recoverable via git.
+4. **Fixed a real live bug in `provider.ts`**: `mkConcealPlugin(CMSettings)` → `mkConcealPlugin(CMSettings.concealRevealTimeout)` (it takes a number; masked only because conceal defaults off).
+5. **Deduped `@codemirror/state`** — `@codemirror/commands` had nested its own `6.7.1` copy, giving `tsc` two incompatible `Annotation` types. Forced single `6.5.0` via `overrides` + fresh lockfile.
+6. **Fixed the build pipeline** — production `npm run build` never synced to the vault: the copy ran in a `setTimeout(50)` inside `onEnd`, but `process.exit(0)` fired first. Made the sync synchronous. Vault copy now updates reliably (this is likely why prior "force-copied to vault" was a manual step).
+7. Added `@types/node`, `@codemirror/language`, `@codemirror/commands`, `@lezer/common` as devDeps (needed for a clean `tsc`; all `external` at build time).
+8. Minor vendored strict-mode fixes: definite-assignment `!` in `Context`, tuple annotation in `sort.ts`, explicit `SetBinaryOp` type in `prototype_utils.ts`, `keyof` cast in `tabout.ts`, matrix-runner param type.
+
+### State
+- `tsc`: LaTeX Suite = **0 errors**. 27 pre-existing errors remain in unrelated project code (`engine/`, `renderer3d`, `excalidraw/`, the old `src/snippets/` system) — untouched, out of scope, do not block the esbuild build.
+- Production build: exit 0, `main.js` (~1.97 MB) contains the engine (`strictlyInMath`, snippet trigger handler, sqrt snippets) and is synced to the vault.
+
+### ⚠️ Needs user confirmation (cannot be done from CLI)
+Reload the plugin in Obsidian (or restart it), then:
+- **LaTeX Suite (the fix):** type `mk` in a note → should expand to inline math `$ $`. Also `dm` (display math), `//` (auto-fraction), `sr` (superscript).
+- **Regression check (because `useDefineForClassFields` was flipped project-wide, which changes the compiled emit of ALL KCL classes, not just the vendored code):** confirm existing features still render — a 2D plot (`@plot2d y=\sin(x)`), a 3D plot (`@plot3d z=x^2+y^2`), and an inline evaluation (`2+2 =`). Regression risk is low (`false` is the safer, Obsidian-standard direction) but unverified from CLI, so eyeball these three once.
+
+---
+
 ## Session: 2026-07-22 (Part 35) — Standalone `LaTeXSuitePlugin` Class Setup Resolution (`main.ts`)
 
 ### Status: 🟢 Build clean | Force-copied to Vault (v3.2.0) | Full Parity Active
