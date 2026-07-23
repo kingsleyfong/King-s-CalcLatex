@@ -5,6 +5,20 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-07-23
+
+### Fixed
+- **The entire Excalidraw companion was silently non-functional**: `ExcalidrawCompanionManager.onload()` threw on its very first async call (calling `parseSnippets`/`parseSnippetVariables` — functions that `eval` a raw JS source string — with our pre-compiled snippet data instead, which throws `"Invalid format"`). This meant the snippet engine, blur interceptor, live preview tooltip, and LaTeX modal enhancer never initialized at all, for any Excalidraw canvas. Rewrote the snippet-loading path to work directly on the pre-compiled data. **Verified empirically**: 199/200 default snippets now convert correctly (excluding the intentionally-disabled `dm`), including `${GREEK}`/`${SYMBOL}` variable substitution and regex-snippet compilation.
+- Restored a blur-time text-sync fix in the Excalidraw textarea interceptor (trims trailing whitespace and syncs Excalidraw's internal text-element state before its own blur handler runs) that appears to have been lost in an earlier session.
+- Added continuous position re-application for the LaTeX modification modal — it was only positioned once, and Excalidraw's React-controlled modal likely resets its own inline position on every keystroke.
+- Hid Excalidraw's own "Install the 'Latex Suite' plugin..." suggestion banner in its native LaTeX modal, and added our own live MathJax preview there instead — without touching Excalidraw's plugin registry (an earlier, since-reverted attempt to spoof plugin detection there broke right-click edit, double-click edit, and the equation shortcut entirely).
+- Fixed 3 real type errors surfaced by creating a previously-missing `src/excalidraw/types.ts` (3 files imported types from a file that didn't exist, silently erased by the bundler since the imports were type-only): a default/named import mismatch and a `Result<T>` narrowing bug in the graph-injector, and an inconsistent event-handler field type in the snippet engine.
+
+### Note
+- The `onload()` crash fix is verified in isolation. The blur-sync and modal-repositioning fixes restore/add code paths that have been dormant this whole time (since nothing after the crash ever ran) — they need confirmation in Obsidian, not just a clean build.
+
+---
+
 ## [3.3.1] - 2026-07-23
 
 ### Fixed

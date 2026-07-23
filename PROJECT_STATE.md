@@ -8,7 +8,18 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 v3.3.1 — conceal/tabstop/bracket-highlight CSS restored, full upstream fidelity audit done (2026-07-23, Part 38) — needs in-Obsidian confirmation
+## Current Status: 🟢 v3.4.0 — Excalidraw companion's onload() crash fixed (was 100% dead), CSS/fidelity fixes from Part 38 (2026-07-23, Part 39) — needs in-Obsidian confirmation
+
+### What Happened (Part 39 — Excalidraw companion was completely dead)
+User reported text→SVG conversion broken, wrong modal position, and a stale "Install Latex Suite" warning. Root cause: **`ExcalidrawCompanionManager.onload()` threw on its first async call** (`companion-manager.ts` was calling `parseSnippetVariables`/`parseSnippets` — functions that expect a raw JS string to `eval`, but was passing our pre-compiled snippet array/object instead, which throws `"Invalid format"`). This meant the snippet engine, blur interceptor, preview tooltip, and modal enhancer **never initialized at all** — explaining all three symptoms as one root cause. **Verified empirically** in an isolated Node harness (same technique used to catch the Part 36 bug).
+
+**Fixed and confirmed working**: rewrote the snippet-loading path (`buildExcalidrawSnippets()`) to work directly on the pre-compiled data — verified 199/200 snippets convert correctly, including variable substitution and regex compilation.
+
+**Fixed but NOT independently verifiable (needs live Obsidian confirmation)**: restored a blur-time text-sync fix in `interceptor.ts` (trims trailing whitespace, syncs Excalidraw's `editingTextElement` before its own blur handler runs) and added continuous modal-repositioning in `latex-modal.ts` (mirrors the existing tooltip-repositioning pattern, since Excalidraw's React-controlled modal likely resets its own position on every keystroke). Both target code paths that have been dormant this whole time — they may already be sufficient once `onload()` runs, or may need further iteration. Also added our own live MathJax preview + hid Excalidraw's "Install Latex Suite" banner in the modal (purely additive, doesn't touch Excalidraw's plugin registry — user explicitly declined re-attempting the plugin-registry spoof that catastrophically broke context menu/shortcuts/blur-conversion in Parts 4→5).
+
+**Created the missing `src/excalidraw/types.ts`** (3 files imported `SnippetDef`/`MathMode` from a file that never existed — silently erased by esbuild since they were type-only imports, so nothing ever caught it) and fixed 3 real type errors it surfaced (`graph-injector.ts` default/named import mismatch + a `Result<T>` narrowing bug, `snippet-engine.ts`'s inconsistent event-handler field type). Full detail in `development/handoff_log.md` (Part 39).
+
+**Still to confirm (needs Obsidian, not CLI) — priority order**: (1) check console on load for any further errors now that dormant code is running for the first time, (2) `mk`/display-math → click away → SVG conversion, (3) right-click/double-click/`Ctrl+\` still open the modal correctly, (4) modal shows live preview with no warning banner and stays positioned correctly while typing.
 
 > ⚠️ **Correction:** The old "🟢 WORKING (v3.2.0)" claim was FALSE. The snippet engine was silently registering **zero** extensions until Part 36. Do not trust a green status without an end-to-end check.
 

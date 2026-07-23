@@ -8,8 +8,75 @@ import { SidebarStyleEnhancer } from "./sidebar-enhancer";
 import { GraphInjector } from "./graph-injector";
 import DEFAULT_SNIPPETS from "../latex-suite/default_snippets.js";
 import DEFAULT_SNIPPET_VARIABLES from "../latex-suite/default_snippet_variables.js";
-import { parseSnippets, parseSnippetVariables } from "../latex-suite/snippets/parse";
 import type { SnippetDef } from "./types";
+
+const VALID_REGEX_FLAGS = ["i", "m", "s", "u", "v"];
+
+function filterRegexFlags(flags: string): string {
+  return Array.from(new Set((flags || "").split(""))).filter((f) => VALID_REGEX_FLAGS.includes(f)).join("");
+}
+
+/**
+ * Converts King's CalcLatex's pre-compiled default snippet data into the shape
+ * the Excalidraw companion's own lightweight SnippetEngine expects.
+ *
+ * NOTE: this deliberately does NOT use latex-suite/snippets/parse.ts's
+ * parseSnippets()/parseSnippetVariables() -- those expect a raw JS *source string*
+ * to eval via a Blob URL import (upstream's original architecture, before this fork
+ * pre-compiled the snippet data to satisfy Obsidian's CSP). Calling them with our
+ * already-compiled array/object throws "Invalid format" immediately, which silently
+ * aborted the rest of ExcalidrawCompanionManager.onload() -- meaning the snippet
+ * engine, blur interceptor, preview tooltip, and modal enhancer never initialized
+ * at all. This function does the equivalent work directly on the pre-compiled data.
+ */
+function buildExcalidrawSnippets(): SnippetDef[] {
+  const variables = DEFAULT_SNIPPET_VARIABLES as Record<string, string>;
+  const substitute = (s: string): string => {
+    let result = s;
+    for (const [name, pattern] of Object.entries(variables)) {
+      result = result.replaceAll(name, pattern);
+    }
+    return result;
+  };
+
+  return (DEFAULT_SNIPPETS as any[])
+    .flat()
+    .filter((s) => {
+      const tr = typeof s.trigger === "string" ? s.trigger : "";
+      return tr !== "dm"; // Exclude dm snippet in Excalidraw textareas
+    })
+    .map((s) => {
+      const optsStr = s.options ? String(s.options) : "";
+      const rawRepl = typeof s.replacement === "string" ? substitute(s.replacement) : "";
+      const substitutedTrigger = typeof s.trigger === "string" ? substitute(s.trigger) : "";
+
+      let trigger: string | RegExp = substitutedTrigger;
+      if (optsStr.includes("r")) {
+        try {
+          trigger = new RegExp(`(?:${substitutedTrigger})$`, filterRegexFlags(String(s.flags || "")));
+        } catch {
+          /* Fall back to literal string match if the pattern fails to compile. */
+        }
+      }
+
+      return {
+        trigger,
+        replacement: rawRepl,
+        options: optsStr,
+        description: s.description || "",
+        priority: s.priority || 0,
+        flags: {
+          math: optsStr.includes("m"),
+          text: optsStr.includes("t"),
+          display: optsStr.includes("d"),
+          auto: optsStr.includes("A"),
+          regex: optsStr.includes("r"),
+          word: optsStr.includes("w"),
+          visual: rawRepl.includes("${VISUAL}"),
+        },
+      };
+    });
+}
 
 export class ExcalidrawCompanionManager {
   private interceptor: TextareaInterceptor | null = null;
@@ -29,37 +96,7 @@ export class ExcalidrawCompanionManager {
     if (!this.plugin.settings.enableExcalidrawOD) return;
 
     this.snippetEngine = new SnippetEngine();
-
-    // Populate Excalidraw SnippetEngine using forked latex-suite parser
-    const variables = await parseSnippetVariables(DEFAULT_SNIPPET_VARIABLES, "snippet-variables.js");
-    const parsedRaw = await parseSnippets(DEFAULT_SNIPPETS, variables, "snippets.js");
-
-    const convertedSnippets: SnippetDef[] = parsedRaw
-      .filter((s) => {
-        const tr = typeof s.trigger === "string" ? s.trigger : "";
-        return tr !== "dm"; // Exclude dm snippet in Excalidraw textareas
-      })
-      .map((s) => {
-        const optsStr = s.options ? String(s.options) : "";
-        const rawRepl = typeof s.replacement === "string" ? s.replacement : "";
-        return {
-          trigger: s.trigger as string | RegExp,
-          replacement: rawRepl,
-          options: optsStr,
-          description: s.description || "",
-          priority: s.priority || 0,
-          flags: {
-            math: optsStr.includes("m"),
-            text: optsStr.includes("t"),
-            display: optsStr.includes("d"),
-            auto: optsStr.includes("A"),
-            regex: optsStr.includes("r") || s.trigger instanceof RegExp,
-            word: optsStr.includes("w"),
-            visual: rawRepl.includes("${VISUAL}"),
-          },
-        };
-      });
-    this.snippetEngine.setSnippets(convertedSnippets);
+    this.snippetEngine.setSnippets(buildExcalidrawSnippets());
 
     this.tooltip = new PreviewTooltip(this.plugin.settings);
     this.modalEnhancer = new LaTexModalEnhancer(this.plugin.settings);

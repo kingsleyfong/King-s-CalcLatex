@@ -1,3 +1,4 @@
+import { renderMath, finishRenderMath } from "obsidian";
 import type { KCLSettings } from "../types";
 
 const COMMON_COLORS = [
@@ -253,10 +254,22 @@ export class LaTexModalEnhancer {
 
       this.applyModalPosition(modalEl);
 
+      // Excalidraw's modal is React-controlled and re-applies its own inline
+      // position style on re-render (e.g. every keystroke in the equation editor),
+      // silently undoing our one-time positioning above. Watch for that and
+      // re-apply -- applyModalPosition() is itself guarded to no-op when the
+      // target position hasn't changed, so this can't loop.
+      const actualModalEl = (modalEl.closest(".modal") || modalEl) as HTMLElement;
+      const modalPositionObserver = new MutationObserver(() => {
+        this.applyModalPosition(modalEl);
+      });
+      modalPositionObserver.observe(actualModalEl, { attributes: true, attributeFilter: ["style", "class"] });
+
       if (!editorView) return;
 
       const initialText = editorView.state.doc.toString();
 
+      this.injectLivePreview(modalEl, editorView);
       this.injectColorBar(modalEl, editorView);
       this.injectBoxPanel(modalEl, editorView);
       this.setupAutoSave(modalEl, initialText);
@@ -316,6 +329,7 @@ export class LaTexModalEnhancer {
         if (!document.contains(modalEl)) {
           tooltipObserver.disconnect();
           attrObservers.forEach((obs) => obs.disconnect());
+          modalPositionObserver.disconnect();
           removalObserver.disconnect();
         }
       });
@@ -339,43 +353,108 @@ export class LaTexModalEnhancer {
     const activeLeaf = app?.workspace?.activeLeaf;
     const leafEl = activeLeaf?.view?.contentEl as HTMLElement;
 
+    // Guard against the continuous repositioning MutationObserver in enhanceModal()
+    // looping forever: compare the ACTUAL live inline style values against the target
+    // before writing (matching positionTooltip()'s pattern above). Keying this off
+    // the leaf-rect-derived inputs instead (e.g. a cached signature of left/bottom)
+    // would be wrong: the rect can stay identical between calls while Excalidraw's own
+    // React re-render has *already* overwritten the inline style out from under us --
+    // that case must still re-apply, which a rect-only comparison would incorrectly skip.
+    const applyIfChanged = (props: Record<string, string>, write: () => void) => {
+      const alreadyApplied = Object.entries(props).every(
+        ([prop, value]) => actualModal.style.getPropertyValue(prop) === value,
+      );
+      if (alreadyApplied) return;
+      write();
+    };
+
     if (leafEl && (pos === "bottom" || pos === "cursor")) {
       const rect = leafEl.getBoundingClientRect();
-      const left = Math.round(rect.left + rect.width / 2);
-      const bottom = Math.round(window.innerHeight - rect.bottom + 40);
+      const left = `${Math.round(rect.left + rect.width / 2)}px`;
+      const bottom = `${Math.max(20, Math.round(window.innerHeight - rect.bottom + 40))}px`;
 
-      actualModal.style.setProperty("position", "fixed", "important");
-      actualModal.style.setProperty("bottom", `${Math.max(20, bottom)}px`, "important");
-      actualModal.style.setProperty("top", "auto", "important");
-      actualModal.style.setProperty("left", `${left}px`, "important");
-      actualModal.style.setProperty("transform", "translateX(-50%)", "important");
-      actualModal.style.setProperty("margin", "0", "important");
-      actualModal.style.setProperty("pointer-events", "auto", "important");
-      actualModal.style.setProperty("box-shadow", "0 8px 32px rgba(0, 0, 0, 0.4)", "important");
+      applyIfChanged({ bottom, left, top: "auto" }, () => {
+        actualModal.style.setProperty("position", "fixed", "important");
+        actualModal.style.setProperty("bottom", bottom, "important");
+        actualModal.style.setProperty("top", "auto", "important");
+        actualModal.style.setProperty("left", left, "important");
+        actualModal.style.setProperty("transform", "translateX(-50%)", "important");
+        actualModal.style.setProperty("margin", "0", "important");
+        actualModal.style.setProperty("pointer-events", "auto", "important");
+        actualModal.style.setProperty("box-shadow", "0 8px 32px rgba(0, 0, 0, 0.4)", "important");
+      });
       return;
     }
 
     if (pos === "top" && leafEl) {
       const rect = leafEl.getBoundingClientRect();
-      const left = Math.round(rect.left + rect.width / 2);
-      const top = Math.round(rect.top + 60);
+      const left = `${Math.round(rect.left + rect.width / 2)}px`;
+      const top = `${Math.round(rect.top + 60)}px`;
 
-      actualModal.style.setProperty("position", "fixed", "important");
-      actualModal.style.setProperty("top", `${top}px`, "important");
-      actualModal.style.setProperty("bottom", "auto", "important");
-      actualModal.style.setProperty("left", `${left}px`, "important");
-      actualModal.style.setProperty("transform", "translateX(-50%)", "important");
-      actualModal.style.setProperty("margin", "0", "important");
-      actualModal.style.setProperty("pointer-events", "auto", "important");
+      applyIfChanged({ top, left, bottom: "auto" }, () => {
+        actualModal.style.setProperty("position", "fixed", "important");
+        actualModal.style.setProperty("top", top, "important");
+        actualModal.style.setProperty("bottom", "auto", "important");
+        actualModal.style.setProperty("left", left, "important");
+        actualModal.style.setProperty("transform", "translateX(-50%)", "important");
+        actualModal.style.setProperty("margin", "0", "important");
+        actualModal.style.setProperty("pointer-events", "auto", "important");
+      });
       return;
     }
 
-    actualModal.style.setProperty("position", "fixed", "important");
-    actualModal.style.setProperty("top", "50%", "important");
-    actualModal.style.setProperty("left", "50%", "important");
-    actualModal.style.setProperty("transform", "translate(-50%, -50%)", "important");
-    actualModal.style.setProperty("margin", "0", "important");
-    actualModal.style.setProperty("pointer-events", "auto", "important");
+    applyIfChanged({ top: "50%", left: "50%" }, () => {
+      actualModal.style.setProperty("position", "fixed", "important");
+      actualModal.style.setProperty("top", "50%", "important");
+      actualModal.style.setProperty("left", "50%", "important");
+      actualModal.style.setProperty("transform", "translate(-50%, -50%)", "important");
+      actualModal.style.setProperty("margin", "0", "important");
+      actualModal.style.setProperty("pointer-events", "auto", "important");
+    });
+  }
+
+  private injectLivePreview(modalEl: HTMLElement, editorView: any): void {
+    if (modalEl.querySelector(".kcl-latex-live-preview")) return;
+
+    // Excalidraw only wires its own snippet/preview engine into this modal when it
+    // detects the separate community "Latex Suite" plugin (app.plugins.plugins["latex-suite"]).
+    // We deliberately don't spoof that plugin id -- an earlier attempt to do so broke
+    // Excalidraw's right-click "Edit LaTeX", double-click editing, and Ctrl+\ shortcut
+    // entirely, because Excalidraw calls methods on that plugin expecting the real
+    // plugin's API shape. Instead, we hide its "install Latex Suite" suggestion and
+    // provide equivalent live preview ourselves via Obsidian's own renderMath API.
+    const suggestion = modalEl.querySelector(".excalidraw-latex-suite-suggestion");
+    if (suggestion instanceof HTMLElement) {
+      suggestion.style.display = "none";
+    }
+
+    const cmEditor = modalEl.querySelector(".cm-editor");
+    if (!cmEditor?.parentElement) return;
+
+    const preview = document.createElement("div");
+    preview.className = "kcl-latex-live-preview";
+    cmEditor.parentElement.insertBefore(preview, cmEditor.nextSibling);
+
+    const update = () => {
+      const text = editorView.state.doc.toString().trim();
+      preview.innerHTML = "";
+      if (!text) return;
+      try {
+        const rendered = renderMath(text, true);
+        preview.appendChild(rendered);
+        void finishRenderMath();
+      } catch {
+        /* Invalid/incomplete LaTeX while typing -- leave preview blank rather than erroring. */
+      }
+    };
+
+    update();
+
+    const cmContent = modalEl.querySelector(".cm-content");
+    if (cmContent) {
+      cmContent.addEventListener("keyup", update);
+      cmContent.addEventListener("input", update);
+    }
   }
 
   private injectColorBar(modalEl: HTMLElement, editorView: any): void {
