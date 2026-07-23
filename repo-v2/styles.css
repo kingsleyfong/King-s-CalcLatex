@@ -658,6 +658,24 @@
   filter: invert(1) hue-rotate(180deg);
 }
 
+/* Live MathJax preview injected into Excalidraw's native LaTeX modal --
+   replaces the "Install Latex Suite" suggestion banner it shows otherwise. */
+.kcl-latex-live-preview {
+  margin: 14px 0 6px 0;
+  padding: 10px 14px;
+  min-height: 1.5em;
+  background: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-sizing: border-box;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.kcl-latex-live-preview:empty {
+  display: none;
+}
+
 /* Color Dots Selector Bar */
 .kcl-latex-color-bar {
   display: flex;

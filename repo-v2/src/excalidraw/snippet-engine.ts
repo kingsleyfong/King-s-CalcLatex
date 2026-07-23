@@ -35,7 +35,7 @@ export class SnippetEngine {
   } | null = null;
 
   private handleInput: ((e: Event) => void) | null = null;
-  private handleKeydown: ((e: KeyboardEvent) => void) | null = null;
+  private handleKeydown: ((e: Event) => void) | null = null;
   private isExpanding = false;
 
   private autofractionEnabled = true;
@@ -85,7 +85,7 @@ export class SnippetEngine {
     this.textarea = textarea;
 
     this.handleInput = (e: Event) => this.onInput(e as InputEvent);
-    this.handleKeydown = (e: KeyboardEvent) => this.onKeydown(e);
+    this.handleKeydown = (e: Event) => this.onKeydown(e as KeyboardEvent);
 
     textarea.addEventListener("input", this.handleInput, true);
     textarea.addEventListener("keydown", this.handleKeydown, true);

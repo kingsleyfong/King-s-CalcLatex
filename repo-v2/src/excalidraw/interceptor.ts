@@ -5,6 +5,7 @@ import { WorkspaceLeaf } from "obsidian";
  */
 export class TextareaInterceptor {
   private focusInListeners = new Map<WorkspaceLeaf, (e: FocusEvent) => void>();
+  private blurSyncListeners = new Map<WorkspaceLeaf, (e: FocusEvent) => void>();
   private activeTextarea: HTMLTextAreaElement | null = null;
 
   constructor(
@@ -35,6 +36,21 @@ export class TextareaInterceptor {
     container.addEventListener("focusin", handleFocusIn, true);
     this.focusInListeners.set(leaf, handleFocusIn);
 
+    // `blur` does not bubble, but it does have a capture phase. Registering here
+    // (an ancestor of the textarea) guarantees this fires *before* Excalidraw's own
+    // blur listener on the textarea itself, regardless of listener registration order --
+    // giving us a chance to normalize the text (trim trailing whitespace left behind by
+    // snippet expansion, e.g. after "dm" expands to "$$\n\t$0\n$$") before Excalidraw's
+    // native tex2svg equation conversion reads it on blur.
+    const handleBlurSync = (e: FocusEvent) => {
+      const target = e.target;
+      if (target instanceof HTMLTextAreaElement && target === this.activeTextarea) {
+        this.syncEditingElementText(target, view);
+      }
+    };
+    container.addEventListener("blur", handleBlurSync, true);
+    this.blurSyncListeners.set(leaf, handleBlurSync);
+
     const activeEl = document.activeElement;
     if (activeEl instanceof HTMLTextAreaElement && container.contains(activeEl)) {
       if (
@@ -48,14 +64,19 @@ export class TextareaInterceptor {
   }
 
   unwatchLeaf(leaf: WorkspaceLeaf): void {
+    const view = leaf.view as any;
+    const container = this.getExcalidrawContainer(view);
+
     const handleFocusIn = this.focusInListeners.get(leaf);
     if (handleFocusIn) {
-      const view = leaf.view as any;
-      const container = this.getExcalidrawContainer(view);
-      if (container) {
-        container.removeEventListener("focusin", handleFocusIn, true);
-      }
+      if (container) container.removeEventListener("focusin", handleFocusIn, true);
       this.focusInListeners.delete(leaf);
+    }
+
+    const handleBlurSync = this.blurSyncListeners.get(leaf);
+    if (handleBlurSync) {
+      if (container) container.removeEventListener("blur", handleBlurSync, true);
+      this.blurSyncListeners.delete(leaf);
     }
   }
 
@@ -68,9 +89,55 @@ export class TextareaInterceptor {
       }
     }
     this.focusInListeners.clear();
+
+    for (const [leaf, handleBlurSync] of this.blurSyncListeners) {
+      const view = leaf.view as any;
+      const container = this.getExcalidrawContainer(view);
+      if (container) {
+        container.removeEventListener("blur", handleBlurSync, true);
+      }
+    }
+    this.blurSyncListeners.clear();
+
     if (this.activeTextarea) {
       this.handleDetach();
     }
+  }
+
+  /**
+   * Normalizes the currently-edited Excalidraw text element's text just before
+   * Excalidraw's own blur handler runs, so its native math-to-SVG conversion sees
+   * a cleanly-terminated equation (e.g. no trailing newline/whitespace after a
+   * closing "$$" left behind by snippet expansion).
+   */
+  private syncEditingElementText(textarea: HTMLTextAreaElement, view: any): void {
+    const value = textarea.value;
+    const trimmed = value.trim();
+    if (trimmed === value) return;
+
+    try {
+      const api = this.getExcalidrawAPI(view);
+      const el = api?.getAppState?.()?.editingTextElement;
+      if (!el) return;
+
+      el.text = trimmed;
+      el.originalText = trimmed;
+      el.rawText = trimmed;
+    } catch {
+      /* Best-effort sync -- if Excalidraw's internal shape changed, don't throw during blur. */
+    }
+  }
+
+  private getExcalidrawAPI(view: any): any {
+    try {
+      if (view.excalidrawAPI) return view.excalidrawAPI;
+      if (view.ea?.getExcalidrawAPI) return view.ea.getExcalidrawAPI();
+      const ea = (window as any).ExcalidrawAutomate;
+      if (ea?.getExcalidrawAPI) return ea.getExcalidrawAPI();
+    } catch {
+      /* Graceful fallback */
+    }
+    return null;
   }
 
   private getExcalidrawContainer(view: any): HTMLElement | null {

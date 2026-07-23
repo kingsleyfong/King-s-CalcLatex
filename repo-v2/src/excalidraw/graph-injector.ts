@@ -1,5 +1,5 @@
 import type { TriggerMatch, KCLSettings } from "../types";
-import type ExpressionEngine from "../engine";
+import type { ExpressionEngine } from "../engine";
 
 export class GraphInjector {
   constructor(
@@ -15,8 +15,12 @@ export class GraphInjector {
   ): Promise<boolean> {
     const mode = trigger.mode.includes(":") ? trigger.mode.split(":")[0] : trigger.mode;
     const specResult = this.engine.preparePlot(trigger.latex, mode);
-    if (!specResult.ok || !specResult.value) {
+    if (!specResult.ok) {
       console.warn("[KCL Excalidraw] Plot prep failed:", specResult.error);
+      return false;
+    }
+    if (!specResult.value) {
+      console.warn("[KCL Excalidraw] Plot prep failed: no plot spec returned for:", trigger.latex);
       return false;
     }
 
