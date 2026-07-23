@@ -455,6 +455,18 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Enable Regex Snippets")
+      .setDesc("Allow snippets that trigger on a regular expression match, not just a literal string (disabling drops regex-flagged snippets from the built-in set).")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableRegexSnippets)
+          .onChange(async (value) => {
+            this.plugin.settings.enableRegexSnippets = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
       .setName("Custom Snippet Definitions")
       .setDesc("Define custom JSON snippet definitions to override or add to default snippets. Format: [{\"trigger\":\"foo\",\"replacement\":\"bar\",\"options\":\"mA\"}]")
       .addTextArea((text) =>
@@ -463,6 +475,358 @@ export class KCLSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.customSnippetsText || "")
           .onChange(async (value) => {
             this.plugin.settings.customSnippetsText = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Auto-fraction ──
+    const lsAutofractionHeader = containerEl.createEl("h4", { text: "Auto-Fraction" });
+    lsAutofractionHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+
+    new Setting(containerEl)
+      .setName("Auto-Fraction Macro")
+      .setDesc("LaTeX macro inserted by auto-fraction (e.g. \\frac or \\dfrac).")
+      .addText((text) =>
+        text
+          .setPlaceholder("\\frac")
+          .setValue(this.plugin.settings.autofractionMacro || "\\frac")
+          .onChange(async (value) => {
+            const tr = value.trim();
+            if (tr) {
+              this.plugin.settings.autofractionMacro = tr;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Fraction Breaking Characters")
+      .setDesc("Characters that stop auto-fraction from consuming further into the numerator.")
+      .addText((text) =>
+        text
+          .setPlaceholder("+-=\\t")
+          .setValue(this.plugin.settings.autofractionBreakingChars || "")
+          .onChange(async (value) => {
+            this.plugin.settings.autofractionBreakingChars = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Fraction Excluded Environments")
+      .setDesc('Environments/macros excluded from auto-fraction, as a raw JSON array of [start, end] pairs.')
+      .addTextArea((text) =>
+        text
+          .setPlaceholder('[\n\t["^{", "}"],\n\t["\\\\pu{", "}"]\n]')
+          .setValue(this.plugin.settings.autofractionExcludedEnvs || "")
+          .onChange(async (value) => {
+            this.plugin.settings.autofractionExcludedEnvs = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Concealment & Highlighting ──
+    const lsConcealHeader = containerEl.createEl("h4", { text: "Concealment & Highlighting" });
+    lsConcealHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+
+    new Setting(containerEl)
+      .setName("Conceal LaTeX Commands")
+      .setDesc("Grey out / conceal LaTeX commands into symbols outside the active math block.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.concealEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.concealEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Conceal Reveal Timeout (ms)")
+      .setDesc("Milliseconds to keep concealed LaTeX revealed after the cursor leaves it.")
+      .addText((text) =>
+        text
+          .setPlaceholder("0")
+          .setValue(String(this.plugin.settings.concealRevealTimeout))
+          .onChange(async (value) => {
+            const n = Number(value);
+            if (Number.isFinite(n) && n >= 0) {
+              this.plugin.settings.concealRevealTimeout = n;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Color Paired Brackets")
+      .setDesc("Color matching bracket pairs by nesting depth.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.colorPairedBracketsEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.colorPairedBracketsEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Highlight Cursor Brackets")
+      .setDesc("Highlight the bracket pair surrounding the cursor.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.highlightCursorBracketsEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.highlightCursorBracketsEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Math Preview ──
+    const lsMathPreviewHeader = containerEl.createEl("h4", { text: "Math Preview" });
+    lsMathPreviewHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+
+    new Setting(containerEl)
+      .setName("Enable Math Preview Tooltip")
+      .setDesc("Floating live-preview tooltip that renders the current math block.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.mathPreviewEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.mathPreviewEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Math Preview Position Above Cursor")
+      .setDesc("Position the math preview tooltip above the cursor (vs. below).")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.mathPreviewPositionIsAbove)
+          .onChange(async (value) => {
+            this.plugin.settings.mathPreviewPositionIsAbove = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Math Preview Cursor Glyph")
+      .setDesc("Cursor marker glyph shown inside the math preview tooltip.")
+      .addText((text) =>
+        text
+          .setPlaceholder("▶")
+          .setValue(this.plugin.settings.mathPreviewCursor || "▶")
+          .onChange(async (value) => {
+            if (value) {
+              this.plugin.settings.mathPreviewCursor = value;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Math Preview Bracket Highlighting")
+      .setDesc("Highlight matching brackets inside the math preview tooltip.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.mathPreviewBracketHighlighting)
+          .onChange(async (value) => {
+            this.plugin.settings.mathPreviewBracketHighlighting = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Matrix Shortcuts ──
+    const lsMatrixHeader = containerEl.createEl("h4", { text: "Matrix Shortcuts" });
+    lsMatrixHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+
+    new Setting(containerEl)
+      .setName("Matrix Shortcut Environment Names")
+      .setDesc("Comma-separated environment names that trigger matrix shortcuts.")
+      .addText((text) =>
+        text
+          .setPlaceholder("pmatrix, cases, align, gather, bmatrix, Bmatrix, vmatrix, Vmatrix, array, matrix")
+          .setValue(this.plugin.settings.matrixShortcutsEnvNames || "")
+          .onChange(async (value) => {
+            this.plugin.settings.matrixShortcutsEnvNames = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Matrix Shortcut Macro Names")
+      .setDesc("Comma-separated macro names that trigger matrix shortcuts.")
+      .addText((text) =>
+        text
+          .setPlaceholder("eqalign")
+          .setValue(this.plugin.settings.matrixShortcutsMacroNames || "")
+          .onChange(async (value) => {
+            this.plugin.settings.matrixShortcutsMacroNames = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Tabout ──
+    const lsTaboutHeader = containerEl.createEl("h4", { text: "Tabout" });
+    lsTaboutHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+
+    new Setting(containerEl)
+      .setName("Tabout Only At End of Line")
+      .setDesc("Only allow tabout at the end of a line inside the matched equation.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.taboutExitEquationOnlyOnEOL)
+          .onChange(async (value) => {
+            this.plugin.settings.taboutExitEquationOnlyOnEOL = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Tabout Closing Symbols")
+      .setDesc("Comma-separated closing delimiters tabout will jump past.")
+      .addText((text) =>
+        text
+          .setPlaceholder("), ], \\rbrack, \\}, \\rbrace, \\rangle, \\rvert, \\rVert, \\rfloor, \\rceil, \\urcorner, }")
+          .setValue(this.plugin.settings.taboutClosingSymbols || "")
+          .onChange(async (value) => {
+            this.plugin.settings.taboutClosingSymbols = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Auto-Enlarge Brackets ──
+    const lsEnlargeHeader = containerEl.createEl("h4", { text: "Auto-Enlarge Brackets" });
+    lsEnlargeHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+
+    new Setting(containerEl)
+      .setName("Auto-Enlarge Brackets")
+      .setDesc("Auto-enlarge brackets around sum/int/frac/etc.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoEnlargeBrackets)
+          .onChange(async (value) => {
+            this.plugin.settings.autoEnlargeBrackets = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Enlarge Brackets Space")
+      .setDesc("Insert a thin space before auto-enlarged brackets.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoEnlargeBracketsSpace)
+          .onChange(async (value) => {
+            this.plugin.settings.autoEnlargeBracketsSpace = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Enlarge Brackets Triggers")
+      .setDesc("Comma-separated macros that trigger bracket auto-enlarging.")
+      .addText((text) =>
+        text
+          .setPlaceholder("sum, int, frac, prod, bigcup, bigcap")
+          .setValue(this.plugin.settings.autoEnlargeBracketsTriggers || "")
+          .onChange(async (value) => {
+            this.plugin.settings.autoEnlargeBracketsTriggers = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // ── Advanced ──
+    const lsAdvancedHeader = containerEl.createEl("h4", { text: "Advanced" });
+    lsAdvancedHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+
+    new Setting(containerEl)
+      .setName("Suppress Snippet Trigger on IME")
+      .setDesc("Suppress snippet triggering while an IME composition is active.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.suppressSnippetTriggerOnIME)
+          .onChange(async (value) => {
+            this.plugin.settings.suppressSnippetTriggerOnIME = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Remove Snippet Whitespace")
+      .setDesc("Remove excess whitespace left behind after a snippet expands.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.removeSnippetWhitespace)
+          .onChange(async (value) => {
+            this.plugin.settings.removeSnippetWhitespace = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-Delete Empty Math Delimiters")
+      .setDesc("Backspace inside empty $ $ deletes both dollar signs at once.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings["autoDelete$"])
+          .onChange(async (value) => {
+            this.plugin.settings["autoDelete$"] = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Enable Snippet Recursion")
+      .setDesc("Recursively re-run snippet matching after an expansion.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableSnippetRecursion)
+          .onChange(async (value) => {
+            this.plugin.settings.enableSnippetRecursion = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Word Delimiters")
+      .setDesc("Characters treated as word boundaries for word-based snippet matching.")
+      .addText((text) =>
+        text
+          .setPlaceholder("., +-\\n\\t:;!?\\/{}[]()=~$'\"|`<>*^%#@&")
+          .setValue(this.plugin.settings.wordDelimiters || "")
+          .onChange(async (value) => {
+            this.plugin.settings.wordDelimiters = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Force Math Languages")
+      .setDesc("Comma-separated codeblock languages treated as math regions.")
+      .addText((text) =>
+        text
+          .setPlaceholder("math")
+          .setValue(this.plugin.settings.forceMathLanguages || "")
+          .onChange(async (value) => {
+            this.plugin.settings.forceMathLanguages = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Snippet Debug Logging")
+      .setDesc("Verbosity of snippet-engine debug logging to the console.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            off: "Off",
+            info: "Info",
+            verbose: "Verbose",
+          })
+          .setValue(this.plugin.settings.snippetDebug || "off")
+          .onChange(async (value) => {
+            this.plugin.settings.snippetDebug = value as "off" | "info" | "verbose";
             await this.plugin.saveSettings();
           }),
       );
