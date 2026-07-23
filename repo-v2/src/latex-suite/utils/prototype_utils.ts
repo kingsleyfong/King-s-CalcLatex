@@ -38,5 +38,6 @@ if (Set.prototype.intersection) {
 	intersection_proto = <T>(a: Set<T>, b: Set<T>) => intersection.call(a, b) satisfies Set<T> as Set<T>;
 }
 
-export const difference = difference_proto || difference_impl;
-export const intersection = intersection_proto || intersection_impl;
+type SetBinaryOp = <T>(a: Set<T>, b: Set<T>) => Set<T>;
+export const difference: SetBinaryOp = difference_proto || difference_impl;
+export const intersection: SetBinaryOp = intersection_proto || intersection_impl;

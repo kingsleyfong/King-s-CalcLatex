@@ -42,7 +42,7 @@ export function initLaTeXSuiteEngine(plugin: KingsCalcLatexPlugin): Extension[] 
     const keymaps = getKeymaps(CMSettings);
     editorExtensions.push(keymap.of(keymaps));
 
-    if (CMSettings.concealEnabled) editorExtensions.push(mkConcealPlugin(CMSettings));
+    if (CMSettings.concealEnabled) editorExtensions.push(mkConcealPlugin(CMSettings.concealRevealTimeout));
     if (CMSettings.colorPairedBracketsEnabled) editorExtensions.push(colorPairedBracketsPluginLowestPrec);
     if (CMSettings.highlightCursorBracketsEnabled) editorExtensions.push(highlightCursorBracketsPlugin.extension);
     if (CMSettings.mathPreviewEnabled) editorExtensions.push([cursorTooltipField.extension, cursorTooltipBaseTheme, tooltips({ position: "absolute" })]);

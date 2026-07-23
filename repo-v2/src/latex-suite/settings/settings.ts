@@ -75,7 +75,11 @@ interface LatexSuiteParsedSettings {
 	forceMathLanguages: string[];
 }
 
-export type LatexSuitePluginSettings = {snippets: string, snippetVariables: string} & LatexSuiteBasicSettings & LatexSuiteRawSettings & LatexSuiteCMKeymapSettings;
+// NOTE (King's CalcLatex fork): upstream stores `snippets`/`snippetVariables` as raw
+// JS-source strings and compiles them lazily. This fork ships the snippets pre-compiled
+// (default_snippets.js is an array, default_snippet_variables.js a record) and feeds them
+// straight to parseRawSnippetArray in provider.ts, so the stored types differ from upstream.
+export type LatexSuitePluginSettings = {snippets: unknown[], snippetVariables: Record<string, string>} & LatexSuiteBasicSettings & LatexSuiteRawSettings & LatexSuiteCMKeymapSettings;
 export type LatexSuiteCMSettings = {snippets: Snippet[]} & LatexSuiteBasicSettings & LatexSuiteParsedSettings & LatexSuiteCMKeymapSettings;
 
 export const DEFAULT_SETTINGS: LatexSuitePluginSettings = {

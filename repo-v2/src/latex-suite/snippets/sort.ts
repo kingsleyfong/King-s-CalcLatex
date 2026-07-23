@@ -15,7 +15,7 @@ export function sortSnippets(snippets: Snippet[]): Snippet[] {
 	// and retrieving back the original elements.
 	return snippets
 		// first precompute trigger lengths for each snippet while keeping a reference to the original snippet (via index in `snippets`),
-		.map((snippet, i) => [getPriority(snippet), getTriggerLength(snippet), i])
+		.map((snippet, i): SchwartzianIntermediateValue => [getPriority(snippet), getTriggerLength(snippet), i])
 		// sort resultant tuples representing the snippets
 		.sort(schwartzianSnippetCompare)
 		// and get back the snippets

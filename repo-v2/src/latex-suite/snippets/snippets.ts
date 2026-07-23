@@ -201,8 +201,6 @@ export class RegexSnippet extends Snippet<"regex"> {
 }
 
 export class StringSnippet extends Snippet<"string"> {
-	data: SnippetData<"string">;
-
 	constructor({ trigger, replacement, options, priority, description, excludedEnvironments: excludeIn, triggerKey, triggerAfter }: CreateSnippet<"string">) {
 		super("string", trigger, replacement, options, priority, description, excludeIn, triggerKey);
 		this.data.triggerAfter = triggerAfter;

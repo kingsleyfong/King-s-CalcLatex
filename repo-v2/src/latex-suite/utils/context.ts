@@ -33,14 +33,14 @@ type MathBounds = Bounds & {mode: MathMode};
 
 export const contextPlugin = ViewPlugin.fromClass(
 	class Context implements PluginValue {
-	view: EditorView;
-	state: EditorState;
-	mode: Mode;
-	pos: number;
-	ranges: SelectionRange[];
+	view!: EditorView;
+	state!: EditorState;
+	mode!: Mode;
+	pos!: number;
+	ranges!: SelectionRange[];
 	codeblockLanguage: string | null = null;
-	boundsCache: Map<number, Bounds | null>;
-	innerBoundsCache: Map<number, Bounds | null>;
+	boundsCache!: Map<number, Bounds | null>;
+	innerBoundsCache!: Map<number, Bounds | null>;
 	shouldUpdate: boolean = false;
 	
 	constructor(view: EditorView) {

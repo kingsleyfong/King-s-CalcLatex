@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: repo-v2/package-lock.json
+
+      - name: Install dependencies
+        working-directory: repo-v2
+        run: npm ci
+
+      # NOTE: 27 pre-existing type errors remain outside latex-suite/ (engine/, renderer/,
+      # excalidraw/, the legacy src/snippets/ system) — non-blocking until those are cleared,
+      # so a broken build always fails CI even though the full repo isn't type-clean yet.
+      # LaTeX Suite itself (src/latex-suite/**) is 100% type-clean as of v3.2.1; watch this
+      # step's output for new latex-suite/ errors even though the job won't go red for them yet.
+      - name: Type check (report-only until legacy errors are cleared)
+        working-directory: repo-v2
+        run: npx tsc --noEmit -p tsconfig.json
+        continue-on-error: true
+
+      - name: Build plugin
+        working-directory: repo-v2
+        run: npm run build

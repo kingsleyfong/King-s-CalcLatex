@@ -51,6 +51,16 @@ King's CalcLatex v2 is a **100% browser-native** Obsidian plugin for inline math
 
 ## CRITICAL: CM6 Antipatterns (v1 Failures + Runtime Bugs — DO NOT REPEAT)
 
+### 0. Vendored LaTeX Suite: `useDefineForClassFields` MUST stay `false`; debug the LIVE path, not `latex-suite/main.ts`
+
+Two lessons from the integration that cost ~3 sessions:
+
+**(a) The live path is `src/main.ts → latex-suite/provider.ts → latex_suite.ts → runSnippets`.** There is NO standalone `latex-suite/main.ts` plugin class anymore (deleted — it was dead code that nothing imported). If snippets misbehave, instrument `provider.ts` / `parseRawSnippetArray`, not a re-vendored plugin class. **`provider.ts` builds its entire extension array inside a `try/catch` that returns `[]` on any throw** — a single error there makes the whole engine silently no-op with nothing in the console. When debugging "snippets don't fire," first confirm `initLaTeXSuiteEngine` returns a *populated* array (log `cachedExtensions.length`).
+
+**(b) `tsconfig.json` sets `useDefineForClassFields: false` on purpose — do not remove it.** The vendored code was authored for upstream's ES6/`false` build. With define-semantics ON, a subclass field *declaration* (even just `data: SnippetData<"string">;`) compiles to `this.data = undefined` that runs *after* `super()`, silently wiping base-class state set in the parent constructor. This is exactly what broke `StringSnippet` (crash on the first snippet `mk`). If you re-vendor files from upstream, keep this flag off and avoid redeclaring already-inherited fields in subclasses.
+
+**(c) Keep `tsconfig` `paths: { "src/*": ["src/latex-suite/*"] }`** so `tsc` resolves the vendored `src/…` imports the same way the esbuild `aliasSrcPlugin` does. Without it, `tsc` reports ~140 phantom module-not-found errors and becomes useless — run `npx tsc --noEmit` and expect LaTeX Suite to be error-free.
+
 ### 1. DO NOT rebuild DecorationSet on every transaction
 
 v1 rebuilt all decorations on every click/keystroke, destroying all widgets (including iframe graphs). This caused:
