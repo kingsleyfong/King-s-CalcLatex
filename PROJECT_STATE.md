@@ -8,7 +8,7 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 v3.2.1 — LaTeX Suite fixed, settings fully wired, pushed to GitHub (2026-07-22, Part 37) — needs in-Obsidian confirmation
+## Current Status: 🟢 v3.3.1 — conceal/tabstop/bracket-highlight CSS restored, full upstream fidelity audit done (2026-07-23, Part 38) — needs in-Obsidian confirmation
 
 > ⚠️ **Correction:** The old "🟢 WORKING (v3.2.0)" claim was FALSE. The snippet engine was silently registering **zero** extensions until Part 36. Do not trust a green status without an end-to-end check.
 
@@ -26,7 +26,16 @@ Separately: most of the LaTeX Suite settings toggles already in the UI (`enableA
 
 **Known limitation (not a regression, pre-existed for `enableLaTeXSuite`):** changing a LaTeX Suite setting requires reloading Obsidian to take effect — no live hot-reload yet (would need a CodeMirror `Compartment`, deferred as future work).
 
-**Still to confirm (needs Obsidian, not CLI):** reload the plugin and (1) type `mk`, `dm`, `//`, `sr` — they should expand; (2) regression-check that a 2D plot, 3D plot, and `=` evaluation still render; (3) change a LaTeX Suite setting (e.g. auto-fraction macro), reload Obsidian, confirm it took effect. **Also:** add & verify `kingsleyfong@gmail.com` under GitHub → Settings → Emails — commits are authored with that address but your account's verified email is `ktcfong@uwaterloo.ca`, so GitHub currently can't attribute any commit to you (only the required Claude co-author trailer shows).
+### What Happened (Part 38 — conceal's missing CSS + full upstream fidelity audit)
+User reported conceal specifically broken. Root cause: **`src/latex-suite/**`'s JS was cloned from upstream, but its `styles.css` never was.** Every class the live decoration code produces (`cm-concealed-bold/underline/mathrm`, `latex-suite-snippet-placeholder-0/1/2`, `cm-snippetFieldPosition`, `latex-suite-highlighted-bracket`, `latex-suite-color-bracket-*`, `latex-suite-mismatched-bracket`, `latex-suite-math-preview-highlight`, `cm-tooltip-cursor`) had zero supporting CSS — conceal, tabstop-placeholder colors, bracket highlighting/coloring, and the math-preview tooltip were all computing correct decorations that looked identical to plain unstyled text. Fetched upstream's real `styles.css` and ported the relevant sections in.
+
+Also did a **full file-by-file diff of all 30 live vendored files** against a fresh clone of `artisticat1/obsidian-latex-suite` (not a spot-check) — found and fixed 2 real bugs: (1) `latex_suite.ts`'s `onInput` had lost its `&& lastKeyboardEvent` guard in an earlier session, causing every keystroke to double-run snippet-matching instead of only the IME-composition fallback case; (2) `snippets/parse.ts` had a "tolerant fallback" that silently coerced invalid snippets instead of throwing (a leftover patch from the Part 36 root-cause chase, now a liability for the new custom-snippets feature). Both reverted to upstream's exact behavior. Confirmed the 200-snippet data file and all `DEFAULT_SETTINGS` values are byte-identical/field-identical to upstream — the "settings don't match" perception was entirely the missing CSS, not wrong data. Full detail in `development/handoff_log.md` (Part 38).
+
+**⚠️ Read before assuming this is done:**
+1. **Conceal defaults OFF** (matches upstream) — enable it in Settings → LaTeX Suite Features → Concealment & Highlighting, **reload Obsidian**, then check a math block with `\alpha` or `\mathbf{x}` outside the cursor.
+2. **The `onInput` revert is the one change this session NOT covered by any automated check** — it's an interactive input-timing path. Re-test `mk`/`dm`/`//`/`sr` snippet expansion after reloading. If snippet expansion regresses, this revert (`latex_suite.ts`) is the first suspect — the pre-revert state is what the user most recently confirmed as working, so treat this as a fidelity fix that needs re-validation, not a risk-free one.
+
+**Still to confirm (needs Obsidian, not CLI):** everything above, plus from Part 37: (1) `mk`/`dm`/`//`/`sr` expansion, (2) 2D/3D plot + `=` eval regression check, (3) a LaTeX Suite setting change taking effect after reload. **Also:** add & verify `kingsleyfong@gmail.com` under GitHub → Settings → Emails — commits are authored with that address but your account's verified email is `ktcfong@uwaterloo.ca`, so GitHub currently can't attribute any commit to you (only the required Claude co-author trailer shows).
 
 ### v2.0 Architecture
 ```

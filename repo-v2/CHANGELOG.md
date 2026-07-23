@@ -5,6 +5,23 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1] - 2026-07-23
+
+### Fixed
+- **Conceal, tabstop-placeholder colors, bracket highlighting/coloring, and the math-preview tooltip had zero supporting CSS** — the vendored LaTeX Suite JS was cloned from upstream, but its `styles.css` never was. The decoration logic was computing correct DOM classes the entire time; without CSS they rendered as plain unstyled text, indistinguishable from not working at all. Ported the relevant sections of upstream's real stylesheet in.
+- **`onInput` was double-processing every keystroke**: an earlier session removed a guard (`&& lastKeyboardEvent`) meant to restrict a code path to an IME-composition fallback case only; every ordinary keystroke was being reprocessed through it in addition to the normal `keydown` handler. Reverted to upstream's exact logic.
+- **Custom/invalid snippets were silently coerced instead of rejected**: `validateRawSnippets` had a "tolerant fallback" that turned a schema-validation failure into a defaulted, type-unsafe object rather than throwing. Reverted to upstream's strict behavior, which is now handled correctly by the two-layer fallback added in 3.3.0's custom-snippets feature.
+
+### Verified
+- Full file-by-file diff of all 30 live vendored LaTeX Suite source files against a fresh clone of `artisticat1/obsidian-latex-suite`: confirmed byte-identical except the two bugs above (now fixed) and 6 files with TypeScript-strict-mode-only annotations (no behavioral difference, left as-is).
+- The 200-entry default snippet data and every `DEFAULT_SETTINGS` value already matched upstream exactly — the "settings don't match" perception was entirely caused by the missing CSS, not incorrect data or defaults.
+- Re-ran the isolated snippet-parsing harness after removing the tolerant-fallback hack: all 200 default snippets still parse successfully under strict validation.
+
+### Note
+- Conceal defaults to **off**, matching upstream — enable it under Settings → LaTeX Suite Features → Concealment & Highlighting and reload Obsidian to see this fix take effect.
+
+---
+
 ## [3.3.0] - 2026-07-22
 
 ### Added
