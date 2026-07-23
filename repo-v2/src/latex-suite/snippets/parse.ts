@@ -176,19 +176,8 @@ function validateRawSnippets(snippets: unknown): RawSnippet[] {
 	return snippets.flat().map((raw) => {
 		try {
 			return parse(RawSnippetSchema, raw);
-		} catch (e) {
-			return {
-				trigger: raw.trigger,
-				triggerAfter: raw.triggerAfter,
-				replacement: typeof raw.replacement === "string" ? new ArrayNode([new SnippetTabstopOnlyNode(raw.replacement)]) : raw.replacement,
-				options: raw.options || "",
-				flags: raw.flags || "",
-				priority: raw.priority || 0,
-				description: raw.description || "no description provided",
-				triggerKey: raw.triggerKey || "",
-				excludedMacros: [],
-				excludedEnvironments: [],
-			} as any;
+		} catch {
+			throw new Error(`Value does not resemble snippet.\nErroring snippet:\n${serializeSnippetLike(raw)}`);
 		}
 	})
 }
