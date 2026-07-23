@@ -262,6 +262,62 @@ export interface KCLSettings {
   enableRegexSnippets: boolean;
   /** Custom snippet definitions string (JSON or YAML format) */
   customSnippetsText: string;
+
+  // ── LaTeX Suite: additional upstream settings (v3.2.1+) ──
+  // NOTE: `autofractionSymbol` above is NOT upstream's field of the same name (upstream uses
+  // it as the LaTeX macro to insert, e.g. "\frac"). This KCL field currently drives nothing at
+  // runtime and its description is misleading; left untouched to avoid scope creep. Use
+  // `autofractionMacro` below for the real upstream-equivalent setting.
+  /** LaTeX macro inserted by auto-fraction, e.g. "\frac" or "\dfrac" (upstream: autofractionSymbol) */
+  autofractionMacro: string;
+  /** Chars that trigger autofraction to stop consuming the numerator (upstream: autofractionBreakingChars) */
+  autofractionBreakingChars: string;
+  /** Environments/macros excluded from autofraction, raw JSON array-of-pairs string (upstream: autofractionExcludedEnvs) */
+  autofractionExcludedEnvs: string;
+  /** Suppress snippet triggering while an IME composition is active */
+  suppressSnippetTriggerOnIME: boolean;
+  /** Remove excess whitespace left behind after a snippet expands */
+  removeSnippetWhitespace: boolean;
+  /** Backspace inside an empty "$ $" deletes both dollar signs at once */
+  "autoDelete$": boolean;
+  /** Recursively re-run snippet matching after an expansion (0 = disabled, upstream: snippetRecursion, stored as boolean here for simplicity) */
+  enableSnippetRecursion: boolean;
+  /** Grey out / conceal LaTeX commands into their symbols outside the active math block */
+  concealEnabled: boolean;
+  /** Ms to keep concealed LaTeX revealed after the cursor leaves it */
+  concealRevealTimeout: number;
+  /** Color matching bracket pairs by nesting depth */
+  colorPairedBracketsEnabled: boolean;
+  /** Highlight the bracket pair surrounding the cursor */
+  highlightCursorBracketsEnabled: boolean;
+  /** Floating live-preview tooltip that renders the current math block */
+  mathPreviewEnabled: boolean;
+  /** Position the math preview tooltip above the cursor (vs. below) */
+  mathPreviewPositionIsAbove: boolean;
+  /** Cursor marker glyph shown inside the math preview tooltip */
+  mathPreviewCursor: string;
+  /** Highlight matching brackets inside the math preview tooltip */
+  mathPreviewBracketHighlighting: boolean;
+  /** Comma-separated environment names that trigger matrix shortcuts (upstream: matrixShortcutsEnvNames) */
+  matrixShortcutsEnvNames: string;
+  /** Comma-separated macro names that trigger matrix shortcuts (upstream: matrixShortcutsMacroNames) */
+  matrixShortcutsMacroNames: string;
+  /** Only allow tabout at the end of a line inside the matched equation */
+  taboutExitEquationOnlyOnEOL: boolean;
+  /** Comma-separated closing delimiters tabout will jump past (upstream: taboutClosingSymbols) */
+  taboutClosingSymbols: string;
+  /** Auto-enlarge brackets around sum/int/frac/etc. */
+  autoEnlargeBrackets: boolean;
+  /** Insert a thin space before auto-enlarged brackets */
+  autoEnlargeBracketsSpace: boolean;
+  /** Comma-separated macros that trigger bracket auto-enlarging (upstream: autoEnlargeBracketsTriggers) */
+  autoEnlargeBracketsTriggers: string;
+  /** Characters treated as word boundaries for word-based snippet matching */
+  wordDelimiters: string;
+  /** Comma-separated codeblock languages treated as math regions (upstream: forceMathLanguages) */
+  forceMathLanguages: string;
+  /** Verbosity of snippet-engine debug logging to the console */
+  snippetDebug: "off" | "info" | "verbose";
 }
 
 export const DEFAULT_SETTINGS: KCLSettings = {
@@ -301,4 +357,31 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   enableAutoSubscript: true,
   enableRegexSnippets: true,
   customSnippetsText: "",
+
+  // LaTeX Suite: additional upstream settings (v3.2.1+)
+  autofractionMacro: "\\frac",
+  autofractionBreakingChars: "+-=\t",
+  autofractionExcludedEnvs: `[\n\t["^{", "}"],\n\t["\\\\pu{", "}"]\n]`,
+  suppressSnippetTriggerOnIME: true,
+  removeSnippetWhitespace: true,
+  "autoDelete$": true,
+  enableSnippetRecursion: false,
+  concealEnabled: false,
+  concealRevealTimeout: 0,
+  colorPairedBracketsEnabled: true,
+  highlightCursorBracketsEnabled: true,
+  mathPreviewEnabled: true,
+  mathPreviewPositionIsAbove: true,
+  mathPreviewCursor: "▶",
+  mathPreviewBracketHighlighting: false,
+  matrixShortcutsEnvNames: "pmatrix, cases, align, gather, bmatrix, Bmatrix, vmatrix, Vmatrix, array, matrix",
+  matrixShortcutsMacroNames: "eqalign",
+  taboutExitEquationOnlyOnEOL: true,
+  taboutClosingSymbols: "), ], \\rbrack, \\}, \\rbrace, \\rangle, \\rvert, \\rVert, \\rfloor, \\rceil, \\urcorner, }",
+  autoEnlargeBrackets: true,
+  autoEnlargeBracketsSpace: true,
+  autoEnlargeBracketsTriggers: "sum, int, frac, prod, bigcup, bigcap",
+  wordDelimiters: "., +-\\n\t:;!?\\/{}[]()=~$'\"|`<>*^%#@&",
+  forceMathLanguages: "math",
+  snippetDebug: "off",
 };

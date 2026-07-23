@@ -1,5 +1,33 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-22 (Part 37) — Full LaTeX Suite settings parity; GH push, CI/CD, release automation
+
+### Status: 🟢 v3.2.1 pushed & released | CI added | Settings UI ↔ engine now fully wired
+
+### What was done
+Following Part 36's fix (engine was silently no-op'ing), this session closed out the remaining asks:
+
+1. **Pushed to GitHub properly**: committed the Part 36 fix as `7e2776a`, tagged `v3.2.1`, pushed `main` + tag to `kingsleyfong/King-s-CalcLatex`. Existing `.github/workflows/release.yml` auto-fired on the tag and published the GitHub Release with build artifacts.
+2. **Added `.github/workflows/ci.yml`**: typecheck + build on every push/PR to `main` (previously *nothing* validated commits between tagged releases — exactly how the Part 36 bug shipped unnoticed for ~10 commits). The typecheck step is `continue-on-error: true` for now — there are 27 pre-existing type errors outside `latex-suite/` (in `engine/`, `renderer/`, `excalidraw/`, the legacy `src/snippets/` system) that would otherwise make CI permanently red. `latex-suite/**` itself is 100% type-clean; watch the CI log for *new* errors there even though the job won't fail on them yet until the legacy debt is cleared.
+3. **Contributor-attribution mystery solved (not fully fixable by me)**: your GitHub account's verified email is `ktcfong@uwaterloo.ca`; every commit (and the mandatory `Co-Authored-By: Claude … <noreply@anthropic.com>` trailer) uses `kingsleyfong@gmail.com`, which GitHub can't attribute to your account — hence only "Claude" shows up anywhere. **You need to add & verify `kingsleyfong@gmail.com` under GitHub → Settings → Emails** — the moment it's verified, all existing commits retroactively attribute to you. No history rewrite was done (unnecessary and risky since nothing needed force-pushing).
+4. **LaTeX Suite settings parity** (the "next step" ask) — done via 2 parallel background agents, after I designed the shared contract myself first (extended `KCLSettings`/`DEFAULT_SETTINGS` in `types.ts` with ~28 fields) so the agents could work on fully disjoint files with zero merge risk:
+   - **Agent A** (`src/settings.ts`): added UI controls for all new fields, grouped under 7 sub-headings (Auto-Fraction, Concealment & Highlighting, Math Preview, Matrix Shortcuts, Tabout, Auto-Enlarge Brackets, Advanced).
+   - **Agent B** (`src/latex-suite/provider.ts`): previously `initLaTeXSuiteEngine` built its config from a **hardcoded static import**, ignoring `plugin.settings` almost entirely (only the master `enableLaTeXSuite` switch was live — every other existing toggle in the settings UI, like `enableAutoFraction` or `enableMatrixShortcuts`, was decorative and did nothing). Added `buildLatexSuiteSettings()` (full field mapping, see `provider.ts` inline docs) and `buildRawSnippets()` (custom-snippet JSON merging with a **two-layer fallback** — JSON-shape errors caught locally, structural-parse errors caught via a retry-without-custom-snippets path, so a bad custom snippet can never again silently zero the whole engine the way Part 36's bug did). Also resolved the two non-trivial cases: `inlineMathTrigger`/`displayMathTrigger` aren't real upstream settings — they're the literal `trigger` field on the `mk`/`dm` entries in `default_snippets.js`, patched via a non-mutating clone only when changed from default; `enableAutoSubscript`/`enableRegexSnippets` are implemented as pre-parse filters (regex flag = `"r"` in a snippet's `options` string; subscript entries = the 6 snippets whose trigger contains a literal `\d`). **Known caveat, documented inline, not silently glossed over**: a couple of snippets (`beg`/`int`) use a literal `RegExp` trigger instead of the `"r"` option flag and aren't caught by the `enableRegexSnippets` toggle.
+   - **My own follow-up fix**: Agent A's summary flagged that `enableRegexSnippets` had a default value in `types.ts` but no UI control — added the missing toggle in `settings.ts` since Agent B's wiring now actually reads and acts on it.
+5. Verified independently after both agents (not just trusting their self-reports): `tsc --noEmit` still exactly 27 pre-existing errors (none new, none in the touched files), production build exit 0, vault-synced.
+
+### Field-mapping reference (KCL setting → upstream LatexSuitePluginSettings field)
+See `buildLatexSuiteSettings()` and `buildRawSnippets()` in `src/latex-suite/provider.ts` — the mapping and every caveat is documented inline there; treat that file as the source of truth over this log entry if they ever disagree.
+
+### Still open / explicitly deferred (not done this session)
+- **Live settings hot-reload**: changing a LaTeX Suite setting still requires reloading Obsidian (disable+re-enable plugin, or restart) to take effect — `cachedExtensions` in `provider.ts` is a module-level singleton set once at `onload()`. This matches how `enableLaTeXSuite` already behaved before this session, so nothing regressed, but it'd be a nice follow-up (would need a CodeMirror `Compartment` wired through `main.ts`'s `registerEditorExtension` call, reconfigured from `settings.ts`'s `onChange` handlers).
+- **Vim support and file-based snippet loading**: both existed in the dead files removed in Part 36 (`features/editor_commands.ts`, `settings/file_watch.ts`). Neither was reintroduced — re-adding either is a real feature (vault file-watching, or Obsidian's vim-mode integration), not just a settings toggle. Flagging so nobody assumes they're silently working.
+
+### ⚠️ Needs user confirmation (cannot be done from CLI)
+Same as Part 36, plus: try changing an actual LaTeX Suite setting (e.g. auto-fraction macro, tabout closing symbols) and confirm it takes effect **after restarting Obsidian / reloading the plugin** (see "live hot-reload" caveat above — it won't apply instantly).
+
+---
+
 ## Session: 2026-07-22 (Part 36) — ROOT CAUSE FOUND: LaTeX Suite silently no-op'd; Parts 33–35 fixed dead code
 
 ### Status: 🟢 LaTeX Suite integration ACTUALLY fixed | Type checker restored | Build+vault-sync fixed | Needs in-Obsidian confirmation of `mk` expansion

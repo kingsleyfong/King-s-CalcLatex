@@ -8,18 +8,25 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 LaTeX Suite integration ACTUALLY FIXED (2026-07-22, Part 36) — needs in-Obsidian confirmation
+## Current Status: 🟢 v3.2.1 — LaTeX Suite fixed, settings fully wired, pushed to GitHub (2026-07-22, Part 37) — needs in-Obsidian confirmation
 
-> ⚠️ **Correction:** The previous "🟢 WORKING (v3.2.0)" claim was FALSE. The snippet engine was silently registering **zero** extensions (see below). Do not trust a green status without an end-to-end check.
+> ⚠️ **Correction:** The old "🟢 WORKING (v3.2.0)" claim was FALSE. The snippet engine was silently registering **zero** extensions until Part 36. Do not trust a green status without an end-to-end check.
 
 ### What Happened (Part 36 — the real fix)
 The live path is `main.ts → latex-suite/provider.ts → latex_suite.ts → runSnippets`. **Parts 33–35 all edited the standalone `src/latex-suite/main.ts` class, which nothing live imports** — so the actual bug was never touched. That dead file has now been deleted.
 
 **Root cause:** ES2022 target ⇒ `useDefineForClassFields` ON, but the vendored code was written for upstream's ES6/`false` build. `StringSnippet` redeclared `data: SnippetData<"string">;`, which under define-semantics reset `this.data = undefined` after `super()` set it, so `this.data.triggerAfter = …` threw on the first snippet (`mk`). `parseRawSnippetArray` threw → `provider.ts`'s `try/catch` swallowed it → `initLaTeXSuiteEngine` returned `[]` → **engine did nothing, no error surfaced.**
 
-**Fixed:** `useDefineForClassFields:false` + removed the redeclaration (both fix it). Verified in isolation: all **200** snippets now parse, `snippetsEnabled:true`. Also restored the type checker (tsconfig `paths` ⇒ LaTeX Suite is 100% type-clean), deleted 16 dead vendored files, fixed a `mkConcealPlugin` arg bug, deduped `@codemirror/state`, and fixed the production build's broken vault-sync. Full detail in `development/handoff_log.md` (Part 36).
+**Fixed:** `useDefineForClassFields:false` + removed the redeclaration (both fix it). Verified in isolation: all **200** snippets now parse, `snippetsEnabled:true`. Also restored the type checker, deleted 16 dead vendored files, fixed a `mkConcealPlugin` arg bug, deduped `@codemirror/state`, and fixed the production build's broken vault-sync.
 
-**Still to confirm (needs Obsidian, not CLI):** reload the plugin and (1) type `mk`, `dm`, `//`, `sr` — they should expand; (2) regression-check that a 2D plot, 3D plot, and `=` evaluation still render (the `useDefineForClassFields:false` flip changes the compiled emit of all KCL classes, so verify existing features once). Remote GitHub pushes remain halted (local dev only).
+### What Happened (Part 37 — pushed live + settings parity)
+Committed & tagged `v3.2.1`, pushed to `github.com/kingsleyfong/King-s-CalcLatex` (`main` + tag) — Release workflow auto-published it. Added a `ci.yml` workflow so every push/PR now gets typechecked+built (previously only tagged releases were validated at all, which is how the Part 36 bug shipped invisibly for ~10 commits).
+
+Separately: most of the LaTeX Suite settings toggles already in the UI (`enableAutoFraction`, `enableMatrixShortcuts`, etc.) turned out to be **decorative — `provider.ts` ignored `plugin.settings` almost entirely** and built its config from a hardcoded default. Fixed via two parallel agents on disjoint files (UI in `settings.ts`, engine wiring in `provider.ts`) against a contract I wrote first in `types.ts`. All ~29 upstream settings are now both exposed in the UI and actually control the engine — full mapping documented inline in `provider.ts`. Full detail in `development/handoff_log.md` (Part 37).
+
+**Known limitation (not a regression, pre-existed for `enableLaTeXSuite`):** changing a LaTeX Suite setting requires reloading Obsidian to take effect — no live hot-reload yet (would need a CodeMirror `Compartment`, deferred as future work).
+
+**Still to confirm (needs Obsidian, not CLI):** reload the plugin and (1) type `mk`, `dm`, `//`, `sr` — they should expand; (2) regression-check that a 2D plot, 3D plot, and `=` evaluation still render; (3) change a LaTeX Suite setting (e.g. auto-fraction macro), reload Obsidian, confirm it took effect. **Also:** add & verify `kingsleyfong@gmail.com` under GitHub → Settings → Emails — commits are authored with that address but your account's verified email is `ktcfong@uwaterloo.ca`, so GitHub currently can't attribute any commit to you (only the required Claude co-author trailer shows).
 
 ### v2.0 Architecture
 ```
