@@ -224,6 +224,8 @@ export interface KCLSettings {
   enableExcalidrawOD: boolean;
   /** Position of the Excalidraw LaTeX prompt modification modal */
   latexModalPosition: "bottom" | "center" | "top" | "cursor";
+  /** Where the cursor starts when the "Edit LaTeX" modal opens on an existing equation */
+  latexModalCursorPosition: "end" | "start";
   /** Enable auto-expanding LaTeX snippets in Excalidraw textareas */
   excalidrawSnippetsEnabled: boolean;
   /** Enable live preview tooltip above Excalidraw textareas */
@@ -337,6 +339,7 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   // Excalidraw OD Defaults
   enableExcalidrawOD: true,
   latexModalPosition: "bottom",
+  latexModalCursorPosition: "end",
   excalidrawSnippetsEnabled: true,
   excalidrawPreviewTooltipEnabled: true,
   excalidrawPreviewPosition: "below",

@@ -8,7 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 v3.6.1 — user confirmed Part 42's real-engine modal pivot works well live; canvas tabstop-staleness bug (deferred in Part 42) now fixed
+## Current Status: 🟢 v3.7.0 — added a setting for modal cursor position (defaults to end-of-equation instead of Excalidraw's default start-of-equation)
+
+### What Happened (Part 44 — new setting: modal cursor position)
+User asked for the "Edit LaTeX" modal to default the cursor to the END of an existing equation (Excalidraw always starts it at the beginning, forcing a manual click to continue typing) — as a real setting, not a silent behavior change. Added `latexModalCursorPosition: "end" | "start"` to `KCLSettings` (default `"end"`), a matching dropdown in Settings → Excalidraw OD, and `applyModalCursorPosition()` in `latex-modal.ts` which dispatches a pure CM6 selection change once per modal-open. Shipped as v3.7.0.
+
+**Needs live confirmation**: re-open an existing equation's "Edit LaTeX" modal — cursor should land at the end by default; toggle the setting to confirm "Start of Equation" still works too.
+
+### What Happened (Part 43 — canvas Tab navigation fixed; Part 42 pivot confirmed working)
 
 ### What Happened (Part 43 — canvas Tab navigation fixed; Part 42 pivot confirmed working)
 User tested v3.6.0 live and confirmed the modal works well ("everything works well ... mod. modal popup functions well") — the real-engine injection pivot from Part 42 holds. Then asked to fix canvas Tab navigation specifically ("tab does move around in the equation but not proper cursor location") — exactly the `TabstopManager.adjustForEdit()` dead-code bug identified but deferred at the end of Part 42 (canvas-only; the modal's real engine never had this bug). Fixed by diffing the buffer against a tracked `lastKnownText` on every keystroke and feeding the edit delta into the pre-existing `adjustForEdit`. Hand-traced against the exact previously-broken scenario from the user's own earlier log — tabstop positions now correctly track live edits instead of going stale. Shipped as v3.6.1, per the user's explicit ask to always ship a working checkpoint via CI/CD before taking on further requests, so there's a clean revert point.

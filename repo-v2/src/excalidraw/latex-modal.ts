@@ -280,6 +280,7 @@ export class LaTexModalEnhancer {
 
       const initialText = editorView.state.doc.toString();
 
+      this.applyModalCursorPosition(cmContent as HTMLElement, editorView);
       this.injectRealOrFallbackSnippetEngine(modalEl, editorView, cmContent as HTMLElement);
       this.injectLivePreview(modalEl, editorView);
       this.injectColorBar(modalEl, editorView);
@@ -478,6 +479,31 @@ export class LaTexModalEnhancer {
       }
     });
     removalObserver.observe(container, { childList: true });
+  }
+
+  /**
+   * Excalidraw defaults the cursor to the START of the equation when re-opening this
+   * modal on an existing element, which makes continuing/appending to an equation
+   * (the more common edit) require manually moving the cursor every single time.
+   * Controlled by `latexModalCursorPosition` (Settings -> Excalidraw OD -> "LaTeX Prompt
+   * Modal Cursor Position"), default "end". Guarded with `_kclCursorPositioned` on
+   * cmContent so this only runs once per modal open -- enhanceModal's MutationObserver
+   * can fire more than once while the same modal is still mounting, and re-applying this
+   * after the user has already started typing/moved the cursor themselves would yank it
+   * back unexpectedly.
+   */
+  private applyModalCursorPosition(cmContent: HTMLElement, editorView: any): void {
+    if ((cmContent as any)._kclCursorPositioned) return;
+    (cmContent as any)._kclCursorPositioned = true;
+
+    const wantStart = this.settings.latexModalCursorPosition === "start";
+    const pos = wantStart ? 0 : editorView.state.doc.length;
+
+    try {
+      editorView.dispatch({ selection: { anchor: pos, head: pos } });
+    } catch (e) {
+      console.error("[KCL-DEBUG] Modal: failed to apply cursor position", e);
+    }
   }
 
   /**

@@ -5,6 +5,13 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-07-26
+
+### Added
+- **New setting: LaTeX Prompt Modal Cursor Position** (Settings → Excalidraw OD). Excalidraw previously always placed the cursor at the *start* of an equation when re-opening the "Edit LaTeX" modal on an existing element, requiring a manual click to continue/append to it — now defaults to the *end* instead (the more common edit), with "Start of Equation" available as an option if you prefer the old behavior.
+
+---
+
 ## [3.6.1] - 2026-07-26
 
 ### Fixed

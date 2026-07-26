@@ -1,5 +1,20 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-26 (Part 44) — New setting: modal cursor position defaults to end-of-equation instead of start
+
+### Status: 🟢 Small, self-contained UI/UX addition. Typechecks and builds clean; not yet live-confirmed.
+
+User confirmed no complaints on canvas so far, then asked for one UI/UX improvement: Excalidraw's "Edit LaTeX" modal always places the cursor at the *start* of an existing equation on re-open, forcing a manual click every time to continue/append to it (the far more common edit than prepending). Asked for this to become a real setting rather than a silent behavior change, in the "Excalidraw OD" settings section.
+
+**Added**: `latexModalCursorPosition: "end" | "start"` to `KCLSettings` (`types.ts`), defaulting to `"end"`. New dropdown in `settings.ts` right after the existing "LaTeX Prompt Modal Window Position" setting, following its exact pattern. `latex-modal.ts` gained `applyModalCursorPosition(cmContent, editorView)`, called once per modal-open (right before `injectRealOrFallbackSnippetEngine`, so it runs regardless of which snippet-engine path ends up active) -- dispatches a pure CM6 selection change (`editorView.dispatch({ selection: { anchor: pos, head: pos } })`, no document edit) to `0` or `doc.length` depending on the setting. Guarded with a `_kclCursorPositioned` flag on `cmContent` so it only fires once per modal session -- `enhanceModal`'s MutationObserver can fire more than once while the same modal is still mounting, and re-applying this after the user has already started typing or moved the cursor themselves would yank it back unexpectedly.
+
+Build clean. Shipped as **v3.7.0** (minor -- new setting/capability) via the established CI/CD pipeline.
+
+### Needs live confirmation
+Right-click / double-click an existing Excalidraw LaTeX equation to re-open "Edit LaTeX" -- cursor should now land at the end of the equation by default. Toggle the new setting to "Start of Equation" and re-test to confirm the option itself works, not just the new default.
+
+---
+
 ## Session: 2026-07-26 (Part 43) — v3.6.0's real-engine modal pivot confirmed working live by the user; canvas tabstop staleness (deferred in Part 42) fixed and shipped as v3.6.1
 
 ### Status: 🟢 User confirmed the Part 42 pivot works well in live testing ("everything works well ... mod. modal popup functions well"). Fixed the canvas-specific tabstop-staleness bug that was explicitly deferred at the end of Part 42.

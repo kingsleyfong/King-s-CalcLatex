@@ -245,6 +245,22 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("LaTeX Prompt Modal Cursor Position")
+      .setDesc("Where the cursor starts when opening the \"Edit LaTeX\" modal on an existing equation. Default: End of Equation (append).")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            end: "End of Equation (Recommended)",
+            start: "Start of Equation",
+          })
+          .setValue(this.plugin.settings.latexModalCursorPosition || "end")
+          .onChange(async (value) => {
+            this.plugin.settings.latexModalCursorPosition = value as "end" | "start";
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
       .setName("Auto-Expanding Snippets in Textareas")
       .setDesc("Enable LaTeX Suite snippet auto-expansion inside Excalidraw text editing overlays.")
       .addToggle((toggle) =>
