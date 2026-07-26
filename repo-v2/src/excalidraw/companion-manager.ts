@@ -16,6 +16,34 @@ function filterRegexFlags(flags: string): string {
   return Array.from(new Set((flags || "").split(""))).filter((f) => VALID_REGEX_FLAGS.includes(f)).join("");
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Returns the inner LaTeX if `text` (trimmed) is ENTIRELY a single $...$ or $$...$$
+ * block with non-empty content, otherwise null. Deliberately whole-string only --
+ * this drives auto-conversion of a just-finished text element to an equation image,
+ * so partial/mixed text ("see $x=1$ above") must NOT match.
+ */
+function extractFullMathBlock(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 4) {
+    const inner = trimmed.slice(2, -2).trim();
+    return inner.length > 0 ? inner : null;
+  }
+  if (
+    trimmed.startsWith("$") &&
+    trimmed.endsWith("$") &&
+    trimmed.length > 2 &&
+    !trimmed.slice(1, -1).includes("$")
+  ) {
+    const inner = trimmed.slice(1, -1).trim();
+    return inner.length > 0 ? inner : null;
+  }
+  return null;
+}
+
 /**
  * Converts King's CalcLatex's pre-compiled default snippet data into the shape
  * the Excalidraw companion's own lightweight SnippetEngine expects.
@@ -42,22 +70,56 @@ function buildExcalidrawSnippets(): SnippetDef[] {
   return (DEFAULT_SNIPPETS as any[])
     .flat()
     .filter((s) => {
-      const tr = typeof s.trigger === "string" ? s.trigger : "";
-      return tr !== "dm"; // Exclude dm snippet in Excalidraw textareas
+      // Only the literal 2-char "dm" string trigger is excluded in Excalidraw
+      // textareas -- regex triggers that merely *contain* "dm" (e.g. the
+      // "display math in a list" snippet) must NOT be caught by this, so this
+      // must check the raw trigger's type/value directly rather than coercing
+      // non-string triggers to "" first (that coercion previously let a
+      // RegExp trigger silently sneak past this filter AND get mangled below).
+      return !(typeof s.trigger === "string" && s.trigger === "dm");
     })
     .map((s) => {
       const optsStr = s.options ? String(s.options) : "";
-      const rawRepl = typeof s.replacement === "string" ? substitute(s.replacement) : "";
-      const substitutedTrigger = typeof s.trigger === "string" ? substitute(s.trigger) : "";
+      const isRegexTrigger = s.trigger instanceof RegExp;
+
+      // Non-string triggers are always RegExp in this dataset. Extract the
+      // actual pattern source instead of discarding it to "" -- discarding it
+      // previously produced `new RegExp("(?:)$")`, which matches the empty
+      // string at the end of ANY text, i.e. fires on every keystroke.
+      const rawTriggerSource = isRegexTrigger
+        ? (s.trigger as RegExp).source
+        : typeof s.trigger === "string"
+          ? s.trigger
+          : "";
+      const substitutedTrigger = substitute(rawTriggerSource);
+
+      // Function replacements (used by regex snippets with capture-group
+      // logic) must be preserved, not discarded to "" -- matchRegexSnippet
+      // already knows how to call a function replacement.
+      const rawRepl: string | ((match: RegExpExecArray) => string) =
+        typeof s.replacement === "string"
+          ? substitute(s.replacement)
+          : typeof s.replacement === "function"
+            ? s.replacement
+            : "";
 
       let trigger: string | RegExp = substitutedTrigger;
-      if (optsStr.includes("r")) {
+      if (optsStr.includes("r") || isRegexTrigger) {
         try {
-          trigger = new RegExp(`(?:${substitutedTrigger})$`, filterRegexFlags(String(s.flags || "")));
+          // Reuse the original RegExp's own flags when we have them; the raw
+          // snippet objects never carry a separate `.flags` string field, so
+          // falling back to `s.flags` here (as before) only ever fed
+          // `String(undefined)` into the flag filter -- coincidentally
+          // leaking stray "u"/"i" flags onto every regex-string trigger.
+          const flagSource = isRegexTrigger ? (s.trigger as RegExp).flags : "";
+          trigger = new RegExp(`(?:${substitutedTrigger})$`, filterRegexFlags(flagSource));
         } catch {
           /* Fall back to literal string match if the pattern fails to compile. */
+          trigger = substitutedTrigger;
         }
       }
+
+      const replacementForVisualCheck = typeof rawRepl === "string" ? rawRepl : "";
 
       return {
         trigger,
@@ -70,9 +132,9 @@ function buildExcalidrawSnippets(): SnippetDef[] {
           text: optsStr.includes("t"),
           display: optsStr.includes("d"),
           auto: optsStr.includes("A"),
-          regex: optsStr.includes("r"),
+          regex: optsStr.includes("r") || isRegexTrigger,
           word: optsStr.includes("w"),
-          visual: rawRepl.includes("${VISUAL}"),
+          visual: replacementForVisualCheck.includes("${VISUAL}"),
         },
       };
     });
@@ -93,13 +155,16 @@ export class ExcalidrawCompanionManager {
   ) {}
 
   async onload(): Promise<void> {
+    console.log("[KCL-DEBUG] companion onload() starting, enableExcalidrawOD:", this.plugin.settings.enableExcalidrawOD);
     if (!this.plugin.settings.enableExcalidrawOD) return;
 
     this.snippetEngine = new SnippetEngine();
-    this.snippetEngine.setSnippets(buildExcalidrawSnippets());
+    const built = buildExcalidrawSnippets();
+    console.log("[KCL-DEBUG] buildExcalidrawSnippets produced", built.length, "snippets");
+    this.snippetEngine.setSnippets(built);
 
     this.tooltip = new PreviewTooltip(this.plugin.settings);
-    this.modalEnhancer = new LaTexModalEnhancer(this.plugin.settings);
+    this.modalEnhancer = new LaTexModalEnhancer(this.plugin.settings, built);
     this.sidebarEnhancer = new SidebarStyleEnhancer(this.plugin);
     this.graphInjector = new GraphInjector(
       this.plugin.engine,
@@ -113,6 +178,7 @@ export class ExcalidrawCompanionManager {
     this.interceptor = new TextareaInterceptor(
       (textarea, view) => this.onTextareaAttach(textarea, view),
       () => this.onTextareaDetach(),
+      (text, view) => this.onTextareaBlurCommit(text, view),
     );
 
     // Register global keydown listener for Ctrl+\ / Ctrl+Click LaTeX prompt shortcut
@@ -147,13 +213,16 @@ export class ExcalidrawCompanionManager {
 
   private watchLeafIfExcalidraw(leaf: WorkspaceLeaf): void {
     const viewType = leaf.view?.getViewType?.();
-    if (viewType === "excalidraw" || (leaf.view as any)?.excalidrawWrapperRef) {
+    const isExcalidraw = viewType === "excalidraw" || !!(leaf.view as any)?.excalidrawWrapperRef;
+    if (isExcalidraw) {
+      console.log("[KCL-DEBUG] watchLeafIfExcalidraw: detected excalidraw leaf, viewType:", viewType);
       if (this.interceptor) this.interceptor.watchLeaf(leaf);
       if (this.sidebarEnhancer) this.sidebarEnhancer.watchLeaf(leaf);
     }
   }
 
   private onTextareaAttach(textarea: HTMLTextAreaElement, view: any): void {
+    console.log("[KCL-DEBUG] onTextareaAttach, excalidrawSnippetsEnabled:", this.plugin.settings.excalidrawSnippetsEnabled, "engine exists:", !!this.snippetEngine);
     if (this.plugin.settings.excalidrawSnippetsEnabled && this.snippetEngine) {
       this.snippetEngine.attach(textarea);
     }
@@ -170,6 +239,71 @@ export class ExcalidrawCompanionManager {
   private onTextareaDetach(): void {
     if (this.tooltip) {
       this.tooltip.hide();
+    }
+  }
+
+  /**
+   * If the just-finished text element's ENTIRE content is a single $...$ or $$...$$
+   * block (e.g. typed via the "mk" snippet), auto-convert it to a rendered equation
+   * image using the same ExcalidrawAutomate pipeline the "Edit LaTeX" modal uses --
+   * there is no such conversion built into Excalidraw itself for plain text editing.
+   */
+  private async onTextareaBlurCommit(text: string, view: any): Promise<void> {
+    const latex = extractFullMathBlock(text);
+    if (!latex) return;
+
+    const trimmedOriginal = text.trim();
+    console.log("[KCL-DEBUG] onTextareaBlurCommit: detected full math block, latex=", latex);
+
+    try {
+      // Excalidraw commits the plain text element to the scene asynchronously right
+      // after blur; give it a moment before we look for it and replace it.
+      await delay(80);
+
+      const win = window as any;
+      if (typeof win.ExcalidrawAutomate?.getAPI !== "function") {
+        console.warn("[KCL Excalidraw] ExcalidrawAutomate.getAPI not available -- cannot auto-render equation");
+        return;
+      }
+      // Must be called as a method (not destructured) -- getAPI reads `this` internally.
+      const ea = win.ExcalidrawAutomate.getAPI(view);
+      if (!ea) return;
+
+      const api = ea.getExcalidrawAPI?.() ?? view.excalidrawAPI;
+      if (!api) return;
+
+      const elements = api.getSceneElements();
+      const candidates = elements.filter(
+        (e: any) => e.type === "text" && !e.isDeleted && e.text === trimmedOriginal,
+      );
+      if (candidates.length === 0) {
+        console.warn("[KCL Excalidraw] Could not find the committed text element to convert to an equation");
+        return;
+      }
+      const textEl = candidates.reduce((best: any, cur: any) =>
+        !best || (cur.updated ?? 0) > (best.updated ?? 0) ? cur : best,
+      );
+
+      // Delete the plain text element BEFORE adding the equation image, not after:
+      // addElementsToView's "save" commits scene state asynchronously through
+      // Excalidraw's own React update cycle, so reading getSceneElements() again
+      // immediately afterward can race that commit and silently drop this deletion
+      // (the equation appears, but the leftover raw-text element never gets removed).
+      // Deleting first has no such race -- it's a single independent mutation that
+      // addElementsToView's later read/merge will simply build on top of.
+      const elementsWithTextDeleted = api.getSceneElements().map((e: any) =>
+        e.id === textEl.id ? { ...e, isDeleted: true } : e,
+      );
+      api.updateScene({ elements: elementsWithTextDeleted });
+
+      const elementId = await ea.addLaTex(textEl.x, textEl.y, latex, 1, 1);
+      if (!elementId) {
+        console.warn("[KCL Excalidraw] tex2dataURL failed -- MathJax (excalidraw-extras) may not be activated");
+        return;
+      }
+      await ea.addElementsToView(false, true, false, false);
+    } catch (e) {
+      console.error("[KCL Excalidraw] Failed to auto-convert text to equation:", e);
     }
   }
 

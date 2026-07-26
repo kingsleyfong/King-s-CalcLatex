@@ -460,6 +460,172 @@ toDOM(): HTMLElement {
 }
 ```
 
+### 17. DO NOT read a CodeMirror 6 `EditorView`'s state synchronously inside a native `input` event handler on `.cm-content` (RUNTIME BUG 2026-07-25)
+
+CM6 reconciles native contenteditable DOM mutations (what the browser actually typed) back into
+its own `EditorState` via an internal `MutationObserver`, which runs as a **microtask** —
+*after* the native, synchronous `input` DOM event has already fired and any listener on it has
+already returned. A listener on `.cm-content` (or an ancestor) that reads `editorView.state`
+synchronously during that `input` event therefore always sees the *previous* keystroke's state,
+one keystroke stale. This is invisible for a plain `<textarea>`/`<input>` (`.value` is always
+synchronously current) — it only bites code written against a shared abstraction that's meant
+to also drive a real CM6 `EditorView` (see `excalidraw/text-surface.ts`'s `CM6Surface`).
+
+Confirmed live via `[KCL-DEBUG]` logs in the "Edit LaTeX" modal's snippet engine: typing `M`
+logged `text=""`; typing `_` next logged `text="M"`. The stale read fed bracket-pair snippet
+matching (`_` → `_{$0}$1`) a cursor position next to a `{` the engine had never actually seen
+inserted, cascading into a runaway `}}}}}...` loop on every subsequent keystroke.
+
+```ts
+// ❌ WRONG — reads editorView.state synchronously during the native "input" event;
+// CM6's own MutationObserver microtask hasn't run yet, state is one keystroke behind
+private onInput(_e: InputEvent): void {
+  const text = this.surface.getValue(); // stale for a CM6Surface
+  // ... match & expand against stale text ...
+}
+
+// ✅ CORRECT — defer the read to a microtask, scheduled AFTER CM6's own
+// MutationObserver microtask (which was queued first, during the input event)
+private onInput(_e: InputEvent): void {
+  if (this.isExpanding) return; // see antipattern 18 — this check must stay synchronous
+  queueMicrotask(() => this.processInput()); // now editorView.state is current
+}
+```
+
+If a future CM6 build's reconciliation turns out to flush via `requestAnimationFrame`
+instead of a microtask, one `queueMicrotask` hop won't be enough and the same stale-read
+symptom will reappear — don't guess at more defer timings in that case. Switch to CM6's
+native `EditorView.updateListener.of(...)` extension instead, which fires with guaranteed-
+fresh `update.state`. Note it forbids calling `view.dispatch()` synchronously from inside
+itself, so a write-back (e.g. auto-expansion) triggered from inside an `updateListener`
+needs its own defer/queue.
+
+### 18. DO NOT move a re-entrancy guard (`isExpanding`-style) inside a deferred/microtask callback (RUNTIME BUG 2026-07-25)
+
+Directly caused by the fix for antipattern 17 above. `updateTextarea()`'s (`excalidraw/interceptor.ts`)
+mechanism for bypassing React's controlled-`<textarea>` value reversion works by calling the
+native property setter directly, then **synchronously dispatching its own `input` event** —
+which re-enters the same `input` listener that triggered the expansion in the first place,
+*while the expansion is still in progress*. The only thing that stops this re-entrant call from
+re-matching (and re-expanding) whatever was just inserted is a synchronous `if (isExpanding) return;`
+guard checked at the very top of the handler, before any deferred work is scheduled.
+
+When antipattern 17's fix moved the actual read into a `queueMicrotask`-deferred function, it's
+tempting to move the whole handler body — including the `isExpanding` check — into that same
+deferred function for symmetry. Don't: the *outer* (non-re-entrant) call's microtask and the
+*inner* (re-entrant) call's microtask both get queued before either one runs, and the outer
+call resets `isExpanding = false` synchronously right after its `setValue`/dispatch returns —
+before the inner call's deferred check ever executes. The guard becomes a no-op, and the same
+runaway bracket-pair-snippet cascade (`_` → `_{` → re-matched `{` → `}` → re-matched → ...)
+that antipattern 17 was fixing reappears — on the canvas `<textarea>` path this time, since
+that's the only path where `setValue` synchronously re-dispatches a native event (`CM6Surface.setValue`
+uses `editorView.dispatch`, which never emits one, so CM6 can't hit this specific race).
+
+This was caught in advisor review before shipping, precisely because `mk` — the snippet used
+to confirm every prior fix in this file — doesn't exercise it (its cursor lands between `$$`,
+not adjacent to a bracket). **Any fix in this snippet engine needs `_`/`(`/`[`/`{` tested on
+the canvas specifically, not just `mk`, before it's considered verified.**
+
+```ts
+// ❌ WRONG — isExpanding check deferred along with everything else; the re-entrant
+// dispatchEvent("input") call's own deferred check runs AFTER the outer call has
+// already reset isExpanding to false, so it doesn't actually guard anything
+private onInput(_e: InputEvent): void {
+  queueMicrotask(() => {
+    if (this.isExpanding) return; // too late -- outer call already cleared this
+    this.processInput();
+  });
+}
+
+// ✅ CORRECT — guard checked synchronously, before scheduling the deferred read
+private onInput(_e: InputEvent): void {
+  if (this.isExpanding) return; // catches the re-entrant dispatch synchronously
+  queueMicrotask(() => this.processInput());
+}
+```
+
+### 19. DO NOT attach `input` and `keydown` listeners to the same element/phase when driving a real CM6 `EditorView` (RUNTIME BUG 2026-07-25)
+
+For a plain `<textarea>` there's no competing internal editor, so it doesn't matter where you
+listen. For a real CM6 `EditorView` (e.g. Excalidraw's "Edit LaTeX" modal), `keydown` and `input`
+need opposite listener placement, because they're racing different things:
+
+- **`keydown`** (used to intercept Tab/Backspace/auto-fraction via `preventDefault()`) needs to
+  win the race against CM6's **own** keydown handling, which CM6 registers directly on
+  `.cm-content` at editor-construction time. Listeners on the *same* element fire in
+  registration order regardless of the capture flag — so a same-element listener registered
+  later (as ours always is, since CM6 constructs first) loses. The fix is a **capture-phase
+  listener on an ancestor** (`.cm-editor`, or the modal root as fallback): capture-phase
+  ancestor listeners fire before the event even reaches the target, guaranteed, regardless of
+  registration order.
+- **`input`** needs the opposite. The same capture-phase-ancestor trick would fire *during the
+  capture descent* — before the event has reached `.cm-content` at all, i.e. before CM6 has done
+  anything with the keystroke. Combined with antipattern 17, this is even worse than just being
+  early. `input` should stay a normal (bubble-phase or target-phase) listener directly on
+  `.cm-content`, so it fires after CM6's own same-element handling of that event has run.
+
+```ts
+// ❌ WRONG — both listeners on the same ancestor with capture=true: keydown correctly
+// wins the race against CM6's own handling, but input now reads state mid-capture-descent,
+// before CM6 has processed the keystroke at all -- compounds antipattern 17's staleness
+ancestor.addEventListener("input", handleInput, true);
+ancestor.addEventListener("keydown", handleKeydown, true);
+
+// ✅ CORRECT — independent targets: keydown needs the ancestor+capture race-win,
+// input needs to just sit on cmContent and fire in its natural order
+cmContent.addEventListener("input", handleInput, true);
+(modalEl.querySelector(".cm-editor") || modalEl).addEventListener("keydown", handleKeydown, true);
+```
+
+### 20. ALWAYS call an `ExcalidrawAutomate` method as `win.ExcalidrawAutomate.method(...)`, never destructured (RUNTIME BUG 2026-07-25)
+
+`const getAPI = win.ExcalidrawAutomate?.getAPI; getAPI(view)` throws
+`TypeError: Cannot read properties of undefined (reading 'plugin')`. Destructuring a method off
+an object strips its `this` binding; `ExcalidrawAutomate.getAPI` (and by extension the rest of
+its surface reached the same way) reads internal plugin state via `this` under the hood, so it
+crashes the instant it's called detached from its owning object. Always call these as a method
+expression, keeping `this` bound to `window.ExcalidrawAutomate`:
+
+```ts
+// ❌ THROWS — this-binding stripped by destructuring
+const getAPI = win.ExcalidrawAutomate?.getAPI;
+const ea = getAPI(view);
+
+// ✅ CORRECT — called as a method, this stays bound
+if (typeof win.ExcalidrawAutomate?.getAPI !== "function") return;
+const ea = win.ExcalidrawAutomate.getAPI(view);
+```
+
+### 21. When mutating an Excalidraw scene via `ExcalidrawAutomate`, delete stale elements BEFORE adding new ones, not after (RUNTIME BUG 2026-07-25)
+
+`ea.addElementsToView(...)` commits its scene changes asynchronously, through Excalidraw's own
+React update cycle. If you delete an element by reading `api.getSceneElements()` again *after*
+`await ea.addElementsToView(...)` has resolved, that read can race the still-in-flight React
+commit and silently miss applying the deletion — the new element (e.g. a rendered LaTeX SVG)
+appears correctly, but the element it was meant to replace (e.g. the original plain-text
+element) never gets removed; both end up visible simultaneously. Confirmed live: reordering to
+delete first eliminated the leftover element with no other change.
+
+```ts
+// ❌ RACY — deletion read happens after addElementsToView's async React commit,
+// which can still be in flight; the deletion can be silently dropped
+const elementId = await ea.addLaTex(x, y, latex, 1, 1);
+await ea.addElementsToView(false, true, false, false);
+const afterElements = api.getSceneElements().map((e) =>
+  e.id === textEl.id ? { ...e, isDeleted: true } : e,
+);
+api.updateScene({ elements: afterElements }); // may be racing addElementsToView's own commit
+
+// ✅ CORRECT — delete first via a synchronous, independent updateScene call;
+// addElementsToView's later read/merge simply builds on top of it
+const elementsWithTextDeleted = api.getSceneElements().map((e) =>
+  e.id === textEl.id ? { ...e, isDeleted: true } : e,
+);
+api.updateScene({ elements: elementsWithTextDeleted });
+const elementId = await ea.addLaTex(x, y, latex, 1, 1);
+await ea.addElementsToView(false, true, false, false);
+```
+
 ## Coding Standards
 
 ### Imports

@@ -11,6 +11,8 @@ export class TextareaInterceptor {
   constructor(
     private onAttach: (textarea: HTMLTextAreaElement, view: any) => void,
     private onDetach: () => void,
+    /** Fired synchronously at blur time, before the textarea is torn down, with its final committed text. */
+    private onBlurCommit?: (text: string, view: any) => void,
   ) {}
 
   watchLeaf(leaf: WorkspaceLeaf): void {
@@ -23,11 +25,12 @@ export class TextareaInterceptor {
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target;
       if (target instanceof HTMLTextAreaElement) {
-        if (
-          !target.closest(".modal-container") &&
-          !target.closest(".excalidraw-prompt") &&
-          !target.closest(".excalidraw-dialog")
-        ) {
+        const excluded =
+          target.closest(".modal-container") ||
+          target.closest(".excalidraw-prompt") ||
+          target.closest(".excalidraw-dialog");
+        console.log("[KCL-DEBUG] focusin on textarea, excluded:", !!excluded);
+        if (!excluded) {
           this.handleAttach(target, view);
         }
       }
@@ -162,12 +165,21 @@ export class TextareaInterceptor {
   }
 
   private handleAttach(textarea: HTMLTextAreaElement, view: any): void {
-    if (this.activeTextarea === textarea) return;
+    if (this.activeTextarea === textarea) {
+      console.log("[KCL-DEBUG] handleAttach: already active textarea, skipping");
+      return;
+    }
 
+    console.log("[KCL-DEBUG] handleAttach: attaching to new textarea");
     this.activeTextarea = textarea;
     this.onAttach(textarea, view);
 
     const handleBlur = () => {
+      // Capture the final text synchronously -- the textarea may be torn down
+      // by the time the setTimeout below runs.
+      const finalText = textarea.value;
+      this.onBlurCommit?.(finalText, view);
+
       setTimeout(() => {
         if (this.activeTextarea === textarea) {
           this.handleDetach();

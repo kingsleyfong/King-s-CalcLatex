@@ -1,5 +1,8 @@
 import { renderMath, finishRenderMath } from "obsidian";
 import type { KCLSettings } from "../types";
+import type { SnippetDef } from "./types";
+import { SnippetEngine } from "./snippet-engine";
+import { CM6Surface } from "./text-surface";
 
 const COMMON_COLORS = [
   { name: "red", hex: "#ff4d4d", latex: "red" },
@@ -171,7 +174,10 @@ export class LaTexModalEnhancer {
   private observer: MutationObserver | null = null;
   private modalObserver: MutationObserver | null = null;
 
-  constructor(private settings: KCLSettings) {}
+  constructor(
+    private settings: KCLSettings,
+    private snippets: SnippetDef[] = [],
+  ) {}
 
   start(): void {
     if (this.observer) return;
@@ -269,6 +275,7 @@ export class LaTexModalEnhancer {
 
       const initialText = editorView.state.doc.toString();
 
+      this.injectSnippetEngine(modalEl, editorView, cmContent as HTMLElement);
       this.injectLivePreview(modalEl, editorView);
       this.injectColorBar(modalEl, editorView);
       this.injectBoxPanel(modalEl, editorView);
@@ -413,6 +420,61 @@ export class LaTexModalEnhancer {
     });
   }
 
+  /**
+   * Wires the same SnippetEngine used on the Excalidraw canvas textarea into this
+   * modal's real CM6 EditorView (via CM6Surface), so "mk", "sr", Greek letters, etc.
+   * work here too -- see injectLivePreview() below for why we can't just spoof the
+   * community "Latex Suite" plugin id to get Excalidraw's own snippet engine instead.
+   * The whole buffer here is raw LaTeX with no $ delimiters, so mode is forced to
+   * "math" rather than scanned -- otherwise every math-mode-only snippet (the vast
+   * majority: "sr", "sq", Greek letters, trig functions, ...) would never match.
+   */
+  private injectSnippetEngine(modalEl: HTMLElement, editorView: any, cmContent: HTMLElement): void {
+    console.log("[KCL-DEBUG] Modal injectSnippetEngine: snippets available=", this.snippets.length, "already attached=", !!(cmContent as any)._kclSnippetEngine);
+    if ((cmContent as any)._kclSnippetEngine) return;
+
+    // CM6 registers its own keydown handling directly on .cm-content when the editor
+    // is constructed -- well before this runs (enhanceModal fires 60ms after mount).
+    // Listeners on the SAME element fire in registration order regardless of the
+    // capture flag, so attaching there would let CM6's own Tab/Backspace handling win
+    // the race against our preventDefault()-based interception. `input` stays on
+    // cm-content itself, "input"-only (no "keyup" fallback): confirmed by live testing
+    // that a second call per keystroke double-processes auto-expand -- for bracket-pair
+    // snippets (e.g. "_" -> "_{$0}$1") the cursor lands adjacent to the just-inserted "{",
+    // so the redundant second call re-matches the same trailing "{" and re-expands,
+    // cascading into a runaway loop of closing braces on every subsequent keystroke.
+    //
+    // keydown is attached to document.documentElement (the <html> element), not just an
+    // Excalidraw-local ancestor like .cm-editor: Obsidian's Modal base class and/or
+    // Excalidraw's own prompt likely implement their own Tab focus-trap/cycling directly
+    // on the modal container for accessibility, and a capture-phase listener on a
+    // container INSIDE that trap's own target can still lose the race (capture order runs
+    // outside-in by DOM position, not by which extension registered first -- an ancestor
+    // closer to the root always wins regardless of when its listener was attached).
+    // documentElement is about as close to the root as a capture listener can get without
+    // risking a conflict with a listener some other part of Obsidian may have put directly
+    // on `document`. `focusScope` (cmContent) gates this so it only ever processes
+    // keydowns that actually originated inside this modal's editor, not every keystroke
+    // typed anywhere else in Obsidian while this modal happens to still be mounted.
+    const keydownTarget = document.documentElement;
+
+    const engine = new SnippetEngine();
+    engine.setSnippets(this.snippets);
+    engine.setForcedMode("math");
+    engine.attachSurface(new CM6Surface(editorView), cmContent, keydownTarget, cmContent);
+    (cmContent as any)._kclSnippetEngine = engine;
+    console.log("[KCL-DEBUG] Modal SnippetEngine attached, keydownTarget=", keydownTarget);
+
+    const container = modalEl.parentElement || document.body;
+    const removalObserver = new MutationObserver(() => {
+      if (!document.contains(modalEl)) {
+        engine.detach();
+        removalObserver.disconnect();
+      }
+    });
+    removalObserver.observe(container, { childList: true });
+  }
+
   private injectLivePreview(modalEl: HTMLElement, editorView: any): void {
     if (modalEl.querySelector(".kcl-latex-live-preview")) return;
 
@@ -421,8 +483,9 @@ export class LaTexModalEnhancer {
     // We deliberately don't spoof that plugin id -- an earlier attempt to do so broke
     // Excalidraw's right-click "Edit LaTeX", double-click editing, and Ctrl+\ shortcut
     // entirely, because Excalidraw calls methods on that plugin expecting the real
-    // plugin's API shape. Instead, we hide its "install Latex Suite" suggestion and
-    // provide equivalent live preview ourselves via Obsidian's own renderMath API.
+    // plugin's API shape. Instead, we hide its "install Latex Suite" suggestion, provide
+    // our own snippet engine directly (injectSnippetEngine() above), and render the
+    // live preview ourselves via Obsidian's own renderMath API.
     const suggestion = modalEl.querySelector(".excalidraw-latex-suite-suggestion");
     if (suggestion instanceof HTMLElement) {
       suggestion.style.display = "none";

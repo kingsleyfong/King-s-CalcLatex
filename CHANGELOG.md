@@ -5,6 +5,24 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-07-25
+
+### Added
+- **Canvas text now auto-converts to a rendered LaTeX equation on blur.** Finishing a `$...$`/`$$...$$` block in an Excalidraw canvas text box and clicking away now replaces it with a real rendered SVG equation via Excalidraw's own `ExcalidrawAutomate` API — this did not exist as a feature anywhere in Excalidraw or this plugin before.
+- **The "Edit LaTeX" modal now has a real snippet engine.** `mk`, `sr`, Greek letters, auto-fraction, matrix `Tab`→`&`, and tabstop navigation now work inside the modal's editor, driven by the same engine as the canvas (previously the modal had no snippet expansion at all — only its own "Install Latex Suite" nag, which is now suppressed in favor of this).
+
+### Fixed
+- `ExcalidrawAutomate.getAPI` crashed (`TypeError: Cannot read properties of undefined`) when called after being destructured off its owning object, which strips its `this` binding. Always called as a bound method now.
+- The original plain-text canvas element could be left behind after a successful equation conversion (both visible at once) — the deletion mutation raced `addElementsToView`'s async scene commit and was sometimes silently dropped. Reordered to delete first, synchronously, before adding the equation.
+- The modal's snippet matching read CodeMirror 6 editor state one keystroke late (CM6 reconciles contenteditable edits via a microtask that runs after the native `input` event fires), cascading into a runaway closing-brace loop for bracket-pair snippets. Fixed by deferring the read to a microtask — while keeping the re-entrancy guard synchronous, since deferring *that* too silently broke the canvas path's own re-entrant-dispatch protection (caught in review before shipping).
+- The modal's `input` and `keydown` listeners need opposite event-phase placement to coexist with CM6's own internal handling — split into independent targets instead of both sharing one ancestor capture-phase listener.
+- Tab-based tabstop navigation inside the modal was very likely losing the race against a focus-trap Excalidraw/Obsidian's modal system implements for accessibility — moved the keydown interception to `document.documentElement` (scoped to only fire for keydowns originating inside the modal's own editor) so it can no longer be preempted regardless of which container implements the trap.
+
+### Note
+- The Tab-navigation fix addresses the most likely cause but has not yet been confirmed live in Obsidian.
+
+---
+
 ## [3.4.0] - 2026-07-23
 
 ### Fixed

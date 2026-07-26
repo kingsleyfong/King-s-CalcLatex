@@ -1,7 +1,7 @@
 import type { SnippetDef, MathMode } from "./types";
 import { detectMathMode, isWordDelimiter, resolveVisualPlaceholder } from "./snippet-parser";
 import { TabstopManager, parseTabstops } from "./tabstop-manager";
-import { updateTextarea } from "./interceptor";
+import { TextareaSurface, type TextSurface } from "./text-surface";
 
 const DEFAULT_WORD_DELIMITERS = "., +-\n\t:;!?\\/{}[]()=~$'\"|`<>*^%#@&";
 
@@ -23,8 +23,18 @@ export class SnippetEngine {
     },
   ];
   private tabstopMgr = new TabstopManager();
-  private textarea: HTMLTextAreaElement | HTMLInputElement | null = null;
+  private surface: TextSurface | null = null;
+  private inputTarget: HTMLElement | null = null;
+  private keydownTarget: HTMLElement | null = null;
+  /** When keydownTarget is a broad ancestor (e.g. document.documentElement, to outrace a
+   *  host app's own focus-trap), gate keydown processing to events whose target is actually
+   *  inside this element -- otherwise every keystroke anywhere in the app would be read as
+   *  if it happened in our surface. Unused (null) for the normal same-element/near-ancestor case. */
+  private focusScope: HTMLElement | null = null;
   private wordDelimiters = DEFAULT_WORD_DELIMITERS;
+  /** When set, bypasses $-delimiter scanning and treats the whole surface as this mode
+   *  (e.g. the "Edit LaTeX" modal's buffer is raw LaTeX with no delimiters to scan). */
+  private forcedMode: MathMode | null = null;
   private lastExpansion: {
     beforeText: string;
     beforeStart: number;
@@ -81,59 +91,134 @@ export class SnippetEngine {
   }
 
   attach(textarea: HTMLTextAreaElement | HTMLInputElement): void {
+    this.attachSurface(new TextareaSurface(textarea), textarea);
+  }
+
+  /**
+   * Same engine, driven by any TextSurface (e.g. a CM6Surface wrapping a real EditorView).
+   *
+   * `inputTarget` and `keydownTarget` are deliberately independent: `input` must be read
+   * AFTER the underlying editor (CM6) has finished applying the keystroke to its own state
+   * -- listening on an ancestor with capture=true would fire DURING the capture descent,
+   * before the event even reaches the real target, reading a stale buffer. `keydown`
+   * (Tab/Backspace/auto-fraction interception via preventDefault) needs the opposite: it
+   * must win the race against the editor's OWN keydown handling, which capture-on-an-
+   * ancestor guarantees regardless of listener registration order. For a plain textarea
+   * there's no competing internal editor, so both default to the same element.
+   *
+   * Only listen for "input", never add a "keyup" fallback: a second call per keystroke
+   * double-processes auto-expand, and for bracket-pair snippets (e.g. "_" -> "_{$0}$1")
+   * the cursor lands adjacent to the just-inserted "{", so the redundant call re-matches
+   * the same trailing "{" and re-expands -- confirmed live to cascade into a runaway
+   * loop of closing braces on every subsequent keystroke.
+   */
+  attachSurface(
+    surface: TextSurface,
+    inputTarget: HTMLElement,
+    keydownTarget: HTMLElement = inputTarget,
+    focusScope: HTMLElement | null = null,
+  ): void {
+    console.log("[KCL-DEBUG] SnippetEngine.attach, snippet count:", this.snippets.length);
     this.detach();
-    this.textarea = textarea;
+    this.surface = surface;
+    this.inputTarget = inputTarget;
+    this.keydownTarget = keydownTarget;
+    this.focusScope = focusScope;
 
     this.handleInput = (e: Event) => this.onInput(e as InputEvent);
     this.handleKeydown = (e: Event) => this.onKeydown(e as KeyboardEvent);
 
-    textarea.addEventListener("input", this.handleInput, true);
-    textarea.addEventListener("keydown", this.handleKeydown, true);
+    inputTarget.addEventListener("input", this.handleInput, true);
+    keydownTarget.addEventListener("keydown", this.handleKeydown, true);
+  }
+
+  /** Force mode detection to always report `mode` instead of scanning for $ delimiters. */
+  setForcedMode(mode: MathMode | null): void {
+    this.forcedMode = mode;
   }
 
   detach(): void {
-    if (this.textarea) {
-      if (this.handleInput) {
-        this.textarea.removeEventListener("input", this.handleInput, true);
-      }
-      if (this.handleKeydown) {
-        this.textarea.removeEventListener("keydown", this.handleKeydown, true);
-      }
+    if (this.inputTarget && this.handleInput) {
+      this.inputTarget.removeEventListener("input", this.handleInput, true);
     }
-    this.textarea = null;
+    if (this.keydownTarget && this.handleKeydown) {
+      this.keydownTarget.removeEventListener("keydown", this.handleKeydown, true);
+    }
+    this.surface = null;
+    this.inputTarget = null;
+    this.keydownTarget = null;
+    this.focusScope = null;
     this.handleInput = null;
     this.handleKeydown = null;
     this.tabstopMgr.clear();
   }
 
   private onInput(_e: InputEvent): void {
-    if (!this.textarea) return;
-    if (this.isExpanding) return;
+    // Must check isExpanding SYNCHRONOUSLY, before scheduling the microtask below.
+    // updateTextareaPrivate's textarea path (updateTextarea in interceptor.ts)
+    // synchronously re-dispatches a native "input" event as part of setValue, which
+    // re-enters this handler WHILE isExpanding is still true. If that check were
+    // deferred into processInput() along with everything else, the re-entrant call's
+    // deferred check would run after isExpanding has already been reset to false,
+    // so it would proceed instead of bailing out -- re-matching the just-inserted
+    // "{" of a bracket-pair snippet (e.g. "_" -> "_{$0}$1") and cascading into a
+    // runaway "}}}}" loop, identical in symptom to the modal bug below but on canvas.
+    // Confirmed by tracing updateTextarea's synchronous dispatchEvent call.
+    if (this.isExpanding) {
+      console.log("[KCL-DEBUG] onInput: skipped (sync), isExpanding=true");
+      return;
+    }
 
-    const text = this.textarea.value;
-    const cursor = this.textarea.selectionStart || 0;
-    const mode = detectMathMode(text, cursor);
+    // Defer the actual read to a microtask. For a CM6Surface, the underlying EditorView
+    // reconciles native contenteditable edits via a MutationObserver, which runs as a
+    // microtask AFTER the "input" event has already fired -- reading `surface.getValue()`
+    // synchronously here sees the PREVIOUS keystroke's state, one keystroke stale.
+    // Confirmed live: this silently corrupted every match in the "Edit LaTeX" modal
+    // and cascaded into a runaway loop for bracket-pair snippets (cursor lands next
+    // to a "{" the match never actually saw get typed past). A plain <textarea>'s
+    // `.value` is already synchronously current, so this defer is a no-op for it, and
+    // CM6Surface.setValue (editorView.dispatch) never emits a native "input" event, so
+    // isExpanding can't be wrongly true when the CM6 path's own deferred read runs.
+    queueMicrotask(() => this.processInput());
+  }
 
-    this.tryAutoExpand(text, cursor, mode);
+  private processInput(): void {
+    if (!this.surface) return;
+    if (this.isExpanding) {
+      console.log("[KCL-DEBUG] onInput: skipped, isExpanding=true");
+      return;
+    }
+
+    const text = this.surface.getValue();
+    const cursor = this.surface.getSelectionStart() || 0;
+    const mode = this.forcedMode ?? detectMathMode(text, cursor);
+    console.log("[KCL-DEBUG] onInput: text=", JSON.stringify(text), "cursor=", cursor, "mode=", mode);
+
+    const expanded = this.tryAutoExpand(text, cursor, mode);
+    console.log("[KCL-DEBUG] onInput: tryAutoExpand result=", expanded, "textarea.value now=", JSON.stringify(this.surface.getValue()));
   }
 
   private onKeydown(e: KeyboardEvent): void {
-    if (!this.textarea) return;
+    if (!this.surface) return;
+    if (this.focusScope && !this.focusScope.contains(e.target as Node)) return;
 
-    const text = this.textarea.value;
-    const cursor = this.textarea.selectionStart || 0;
-    const mode = detectMathMode(text, cursor);
+    const text = this.surface.getValue();
+    const cursor = this.surface.getSelectionStart() || 0;
+    const mode = this.forcedMode ?? detectMathMode(text, cursor);
+    console.log("[KCL-DEBUG] onKeydown: key=", e.key, "text=", JSON.stringify(text), "cursor=", cursor, "lastExpansion=", JSON.stringify(this.lastExpansion));
 
     if (e.key === "Backspace" && !e.ctrlKey && !e.altKey && !e.metaKey) {
       if (this.lastExpansion) {
-        const currentStart = this.textarea.selectionStart;
-        const currentEnd = this.textarea.selectionEnd;
+        const currentStart = this.surface.getSelectionStart();
+        const currentEnd = this.surface.getSelectionEnd();
+        console.log("[KCL-DEBUG] onKeydown Backspace: currentStart=", currentStart, "currentEnd=", currentEnd, "matches afterText=", this.surface.getValue() === this.lastExpansion.afterText, "matches afterStart=", currentStart === this.lastExpansion.afterStart, "matches afterEnd=", currentEnd === this.lastExpansion.afterEnd);
 
         if (
-          this.textarea.value === this.lastExpansion.afterText &&
+          this.surface.getValue() === this.lastExpansion.afterText &&
           currentStart === this.lastExpansion.afterStart &&
           currentEnd === this.lastExpansion.afterEnd
         ) {
+          console.log("[KCL-DEBUG] onKeydown Backspace: UNDO branch firing, reverting to beforeText=", JSON.stringify(this.lastExpansion.beforeText));
           e.preventDefault();
           e.stopPropagation();
 
@@ -154,13 +239,9 @@ export class SnippetEngine {
       this.lastExpansion = null;
     }
 
-    const selectionStart = this.textarea.selectionStart;
-    const selectionEnd = this.textarea.selectionEnd;
-    if (
-      selectionStart !== null &&
-      selectionEnd !== null &&
-      selectionStart !== selectionEnd
-    ) {
+    const selectionStart = this.surface.getSelectionStart();
+    const selectionEnd = this.surface.getSelectionEnd();
+    if (selectionStart !== selectionEnd) {
       if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         const char = e.key;
         const selectedText = text.slice(selectionStart, selectionEnd);
@@ -201,7 +282,7 @@ export class SnippetEngine {
         e.stopPropagation();
         const ts = isShift ? this.tabstopMgr.prev() : this.tabstopMgr.next();
         if (ts) {
-          this.updateTextareaPrivate(this.textarea.value, ts.from, ts.to);
+          this.updateTextareaPrivate(this.surface.getValue(), ts.from, ts.to);
         }
         return;
       }
@@ -359,11 +440,12 @@ export class SnippetEngine {
     fullText: string,
     selectedText: string = "",
   ): void {
-    if (!this.textarea) return;
+    if (!this.surface) return;
+    console.log("[KCL-DEBUG] applyExpansion called: triggerStart=", triggerStart, "triggerEnd=", triggerEnd, "replacement=", JSON.stringify(replacement), "fullText=", JSON.stringify(fullText));
 
     const beforeText = fullText;
-    const beforeStart = this.textarea.selectionStart || 0;
-    const beforeEnd = this.textarea.selectionEnd || 0;
+    const beforeStart = this.surface.getSelectionStart() || 0;
+    const beforeEnd = this.surface.getSelectionEnd() || 0;
 
     const resolvedReplacement = resolveVisualPlaceholder(replacement, selectedText);
     const { text: expandedText, tabstops } = parseTabstops(
@@ -372,6 +454,7 @@ export class SnippetEngine {
     );
     const newText =
       fullText.slice(0, triggerStart) + expandedText + fullText.slice(triggerEnd);
+    console.log("[KCL-DEBUG] applyExpansion: expandedText=", JSON.stringify(expandedText), "newText=", JSON.stringify(newText), "tabstops=", tabstops.length);
 
     let newCursorStart = triggerStart + expandedText.length;
     let newCursorEnd = newCursorStart;
@@ -390,6 +473,15 @@ export class SnippetEngine {
       this.updateTextareaPrivate(newText, newCursorStart, newCursorStart);
     }
 
+    console.log("[KCL-DEBUG] applyExpansion: after updateTextareaPrivate, textarea.value=", JSON.stringify(this.surface.getValue()));
+
+    // Check again on the next microtask/macrotask in case Excalidraw's own React
+    // re-render (triggered by the "input" event we just dispatched) overwrites our
+    // change asynchronously.
+    setTimeout(() => {
+      console.log("[KCL-DEBUG] applyExpansion: textarea.value 50ms later=", JSON.stringify(this.surface?.getValue()));
+    }, 50);
+
     this.lastExpansion = {
       beforeText,
       beforeStart,
@@ -401,7 +493,7 @@ export class SnippetEngine {
   }
 
   private tryAutoFraction(text: string, cursor: number): boolean {
-    if (!this.textarea) return false;
+    if (!this.surface) return false;
     const textBefore = text.slice(0, cursor);
 
     for (const [open, close] of this.autofractionExcludedEnvs) {
@@ -475,7 +567,7 @@ export class SnippetEngine {
   }
 
   private tryTabout(text: string, cursor: number): boolean {
-    if (!this.textarea) return false;
+    if (!this.surface) return false;
     if (cursor >= text.length) return false;
 
     const charAfter = text.slice(cursor);
@@ -537,19 +629,19 @@ export class SnippetEngine {
     selectionStart: number,
     selectionEnd: number,
   ): void {
-    if (!this.textarea) return;
+    if (!this.surface) return;
     try {
       this.isExpanding = true;
-      updateTextarea(this.textarea, value, selectionStart, selectionEnd);
+      this.surface.setValue(value, selectionStart, selectionEnd);
     } finally {
       this.isExpanding = false;
     }
   }
 
   private insertAtCursor(insert: string): void {
-    if (!this.textarea) return;
-    const text = this.textarea.value;
-    const cursor = this.textarea.selectionStart || 0;
+    if (!this.surface) return;
+    const text = this.surface.getValue();
+    const cursor = this.surface.getSelectionStart() || 0;
     const newText = text.slice(0, cursor) + insert + text.slice(cursor);
     const newCursor = cursor + insert.length;
     this.updateTextareaPrivate(newText, newCursor, newCursor);
