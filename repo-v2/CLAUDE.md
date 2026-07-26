@@ -626,6 +626,61 @@ const elementId = await ea.addLaTex(x, y, latex, 1, 1);
 await ea.addElementsToView(false, true, false, false);
 ```
 
+### 22. `src/latex-suite/utils/context.ts`'s `alwaysMathFacet` is a deliberate KCL fork addition -- do not "fix" it away in an upstream-fidelity diff (RUNTIME BUG 2026-07-26)
+
+Rule 0(e) above calls for diffing vendored `src/latex-suite/**` files against a fresh clone
+of `artisticat1/obsidian-latex-suite` before trusting a local patch as correct. `context.ts`
+will show a real, intentional diff: an exported `alwaysMathFacet` and two short-circuit
+checks inside `MathBoundsPlugin.inMathBound()`/`.getEquations()`. **This is not drift --
+do not revert it to match upstream.**
+
+Reason: the real, vendored LaTeX Suite CM6 extension array (`provider.ts`'s
+`initLaTeXSuiteEngine`) is injected directly into Excalidraw's "Edit LaTeX" modal (a
+foreign, plain CM6 `EditorView` with no markdown language loaded) via
+`StateEffect.appendConfig`, instead of running a parallel hand-rolled reimplementation
+there (see `excalidraw/latex-modal.ts`'s `injectRealOrFallbackSnippetEngine`). Upstream's
+math-bounds detection depends entirely on Obsidian's markdown syntax tree (specific node
+names), which doesn't exist in that foreign editor -- without this facet, the real engine
+would silently report "never in math" everywhere in that modal, which is the same silent-
+degradation failure shape several other bugs in this project have had. The facet defaults
+to unset/false everywhere else, so it has zero effect on the normal Obsidian-editor path.
+
+### 23. To reuse a REAL vendored CM6 extension array inside a foreign, host-app-owned `EditorView` you don't construct, use `StateEffect.appendConfig` -- but verify survivability live FIRST (RUNTIME BUG 2026-07-26)
+
+When a third-party plugin (Excalidraw) hands you an `EditorView` it built and owns the
+lifecycle of, you can still extend its live configuration without tearing it down:
+`editorView.dispatch({ effects: StateEffect.appendConfig.of([...extensions]) })` appends
+extensions to the CURRENT config in place -- this works for keymaps, `ViewPlugin`s (their
+`eventHandlers`, e.g. `keydown`, get picked up by CM6's own existing native listener, no
+manual `addEventListener`/capture-phase-race workaround needed), `StateField`s, and
+`Facet` values alike.
+
+**Before relying on this for anything real, confirm the foreign view isn't rebuilt out
+from under you.** A host app's own React re-renders can tear down and reconstruct its
+`EditorView` at any point outside your control; if that happens, anything you appended is
+silently discarded along with the old instance, and you won't get an error -- your feature
+just quietly stops working, indistinguishable from "never worked." Ship a throwaway,
+dependency-free probe first (e.g. `EditorView.updateListener.of(u => console.log(...))`
+via `appendConfig`) and confirm live that it keeps firing through a real usage session
+(not just once) before investing in the actual feature. Confirmed live for Excalidraw's
+"Edit LaTeX" modal specifically: its `EditorView` is stable across a full typing session.
+Do not assume this holds for other foreign editors without the same live check.
+
+```ts
+// ❌ WRONG -- reimplementing snippet/tabstop/conceal/bracket-matching logic by hand for
+// a foreign editor you can't add your normal extensions to, when you already HAVE a real,
+// working CM6 extension array for this exact job. Every bug this project fought in
+// Excalidraw's modal for weeks (CM6-microtask staleness, a reentrancy regression, a
+// "$"-swallowing bug, a dead tabstop-adjustForEdit call) was a bug IN the reimplementation
+// -- none of them exist in the real engine.
+
+// ✅ CORRECT -- inject the real thing
+const realExtensions = getLaTeXSuiteEngineExtension(plugin); // same one main editor uses
+foreignEditorView.dispatch({
+  effects: StateEffect.appendConfig.of([...realExtensions, alwaysMathFacet.of(true)]),
+});
+```
+
 ## Coding Standards
 
 ### Imports

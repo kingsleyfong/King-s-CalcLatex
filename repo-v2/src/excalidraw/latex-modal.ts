@@ -1,8 +1,12 @@
-import { renderMath, finishRenderMath } from "obsidian";
+import { renderMath, finishRenderMath, loadMathJax } from "obsidian";
+import { StateEffect } from "@codemirror/state";
 import type { KCLSettings } from "../types";
+import type KingsCalcLatexPlugin from "../main";
 import type { SnippetDef } from "./types";
 import { SnippetEngine } from "./snippet-engine";
 import { CM6Surface } from "./text-surface";
+import { getLaTeXSuiteEngineExtension } from "../latex-suite/provider";
+import { alwaysMathFacet } from "../latex-suite/utils/context";
 
 const COMMON_COLORS = [
   { name: "red", hex: "#ff4d4d", latex: "red" },
@@ -177,6 +181,7 @@ export class LaTexModalEnhancer {
   constructor(
     private settings: KCLSettings,
     private snippets: SnippetDef[] = [],
+    private plugin?: KingsCalcLatexPlugin,
   ) {}
 
   start(): void {
@@ -275,7 +280,7 @@ export class LaTexModalEnhancer {
 
       const initialText = editorView.state.doc.toString();
 
-      this.injectSnippetEngine(modalEl, editorView, cmContent as HTMLElement);
+      this.injectRealOrFallbackSnippetEngine(modalEl, editorView, cmContent as HTMLElement);
       this.injectLivePreview(modalEl, editorView);
       this.injectColorBar(modalEl, editorView);
       this.injectBoxPanel(modalEl, editorView);
@@ -429,8 +434,8 @@ export class LaTexModalEnhancer {
    * "math" rather than scanned -- otherwise every math-mode-only snippet (the vast
    * majority: "sr", "sq", Greek letters, trig functions, ...) would never match.
    */
-  private injectSnippetEngine(modalEl: HTMLElement, editorView: any, cmContent: HTMLElement): void {
-    console.log("[KCL-DEBUG] Modal injectSnippetEngine: snippets available=", this.snippets.length, "already attached=", !!(cmContent as any)._kclSnippetEngine);
+  private injectHandRolledSnippetEngineFallback(modalEl: HTMLElement, editorView: any, cmContent: HTMLElement): void {
+    console.log("[KCL-DEBUG] Modal injectSnippetEngine (fallback): snippets available=", this.snippets.length, "already attached=", !!(cmContent as any)._kclSnippetEngine);
     if ((cmContent as any)._kclSnippetEngine) return;
 
     // CM6 registers its own keydown handling directly on .cm-content when the editor
@@ -475,6 +480,63 @@ export class LaTexModalEnhancer {
     removalObserver.observe(container, { childList: true });
   }
 
+  /**
+   * Injects the REAL, vendored LaTeX Suite CM6 extension array (the exact same one
+   * `provider.ts` builds for the main note editor -- snippets, tabstops, auto-fraction,
+   * tabout, matrix shortcuts, conceal, bracket-color-matching, math-preview-tooltip, all
+   * of it) directly into this foreign, Excalidraw-owned EditorView via
+   * StateEffect.appendConfig, instead of the hand-rolled SnippetEngine/TextSurface
+   * reimplementation. That reimplementation was the actual source of every modal bug
+   * fought this week (CM6-microtask staleness, a reentrancy-guard regression, the
+   * "$"-swallowing auto-fraction bug, input/keydown listener-phase races, and a tabstop
+   * that goes stale because TabstopManager.adjustForEdit() is never called on input) --
+   * bugs that don't exist in the real engine because it's the same code already running
+   * correctly in the main note editor.
+   *
+   * This is NOT the "detect the community 'Latex Suite' plugin" mechanism the user asked
+   * about, and deliberately avoids it: Excalidraw's own plugin-detection path calls
+   * methods on `app.plugins.plugins["latex-suite"]` expecting that specific plugin's API
+   * shape, and spoofing that id previously broke Excalidraw's right-click "Edit LaTeX",
+   * double-click editing, and the Ctrl+\ shortcut entirely (Parts 4-5). This instead
+   * injects our own engine's CM6 extensions directly into our own already-working
+   * "Edit LaTeX" modal integration -- Excalidraw's plugin registry is never touched.
+   *
+   * Feasibility of appendConfig surviving on a foreign, React-managed EditorView was
+   * confirmed live before this was written (a throwaway updateListener probe kept firing
+   * through a full typing session, including across a Tab press -- see handoff_log.md
+   * Part 42). The one remaining dependency this needed was math-bounds detection, which
+   * upstream ties to Obsidian's markdown syntax tree (absent here) -- resolved via
+   * `alwaysMathFacet` in utils/context.ts (a marked KCL fork addition), which tells the
+   * real engine's mathBoundsPlugin to treat this buffer as always-and-entirely math,
+   * which is true by construction for this modal (no $ delimiters exist in its buffer).
+   *
+   * Falls back to the hand-rolled engine (still required for the plain-<textarea> canvas
+   * path, which has no CM6 to inject into) if this throws, so a real-engine regression
+   * degrades to the previously-working behavior rather than to nothing.
+   */
+  private injectRealOrFallbackSnippetEngine(modalEl: HTMLElement, editorView: any, cmContent: HTMLElement): void {
+    if ((cmContent as any)._kclRealEngineAttached || (cmContent as any)._kclSnippetEngine) return;
+
+    if (this.plugin) {
+      try {
+        const realExtensions = getLaTeXSuiteEngineExtension(this.plugin);
+        editorView.dispatch({
+          effects: StateEffect.appendConfig.of([...realExtensions, alwaysMathFacet.of(true)]),
+        });
+        (cmContent as any)._kclRealEngineAttached = true;
+        console.log(
+          "[KCL-DEBUG] Modal: real LaTeX Suite engine injected via appendConfig, extension count=",
+          realExtensions.length,
+        );
+        return;
+      } catch (e) {
+        console.error("[KCL-DEBUG] Modal: real LaTeX Suite engine injection failed, falling back to hand-rolled engine", e);
+      }
+    }
+
+    this.injectHandRolledSnippetEngineFallback(modalEl, editorView, cmContent);
+  }
+
   private injectLivePreview(modalEl: HTMLElement, editorView: any): void {
     if (modalEl.querySelector(".kcl-latex-live-preview")) return;
 
@@ -483,9 +545,9 @@ export class LaTexModalEnhancer {
     // We deliberately don't spoof that plugin id -- an earlier attempt to do so broke
     // Excalidraw's right-click "Edit LaTeX", double-click editing, and Ctrl+\ shortcut
     // entirely, because Excalidraw calls methods on that plugin expecting the real
-    // plugin's API shape. Instead, we hide its "install Latex Suite" suggestion, provide
-    // our own snippet engine directly (injectSnippetEngine() above), and render the
-    // live preview ourselves via Obsidian's own renderMath API.
+    // plugin's API shape. Instead, we hide its "install Latex Suite" suggestion, inject
+    // our own real engine's CM6 extensions directly (injectRealOrFallbackSnippetEngine()
+    // above), and render the live preview ourselves via Obsidian's own renderMath API.
     const suggestion = modalEl.querySelector(".excalidraw-latex-suite-suggestion");
     if (suggestion instanceof HTMLElement) {
       suggestion.style.display = "none";
@@ -498,7 +560,18 @@ export class LaTexModalEnhancer {
     preview.className = "kcl-latex-live-preview";
     cmEditor.parentElement.insertBefore(preview, cmEditor.nextSibling);
 
+    // Confirmed live (2026-07-26): every renderMath() call here threw
+    // "ReferenceError: MathJax is not defined". Obsidian only lazy-loads the global
+    // MathJax runtime the first time it's actually needed (normally triggered by
+    // rendering markdown math in a note) -- this modal is a floating overlay that never
+    // goes through normal markdown rendering, so MathJax was never loaded at all by the
+    // time this fires. loadMathJax() (Obsidian's own public loader) must be awaited
+    // before the first renderMath() call; it's safe to call repeatedly/resolves
+    // immediately once already loaded.
+    let mathJaxReady = false;
+
     const update = () => {
+      if (!mathJaxReady) return;
       const text = editorView.state.doc.toString().trim();
       preview.innerHTML = "";
       if (!text) return;
@@ -516,7 +589,14 @@ export class LaTexModalEnhancer {
       }
     };
 
-    update();
+    loadMathJax()
+      .then(() => {
+        mathJaxReady = true;
+        update();
+      })
+      .catch((err) => {
+        console.error("[KCL-DEBUG] Modal live preview: loadMathJax() failed", err);
+      });
 
     const cmContent = modalEl.querySelector(".cm-content");
     if (cmContent) {

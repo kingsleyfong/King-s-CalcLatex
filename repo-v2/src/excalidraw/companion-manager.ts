@@ -164,7 +164,7 @@ export class ExcalidrawCompanionManager {
     this.snippetEngine.setSnippets(built);
 
     this.tooltip = new PreviewTooltip(this.plugin.settings);
-    this.modalEnhancer = new LaTexModalEnhancer(this.plugin.settings, built);
+    this.modalEnhancer = new LaTexModalEnhancer(this.plugin.settings, built, this.plugin);
     this.sidebarEnhancer = new SidebarStyleEnhancer(this.plugin);
     this.graphInjector = new GraphInjector(
       this.plugin.engine,

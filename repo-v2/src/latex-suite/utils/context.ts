@@ -1,4 +1,4 @@
-import { EditorState, SelectionRange } from "@codemirror/state";
+import { EditorState, Facet, SelectionRange } from "@codemirror/state";
 import { EditorView, PluginValue, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { findMatchingBracket, getCloseBracket } from "src/utils/editor_utils";
 import { Mode } from "../snippets/options";
@@ -7,6 +7,23 @@ import { getLatexSuiteConfig } from "../snippets/codemirror/config";
 import { syntaxTree } from "@codemirror/language";
 import { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import { snippetLessArea, textAreaEnvs } from "./default_text_areas";
+
+/**
+ * KCL fork addition, NOT upstream (github.com/artisticat1/obsidian-latex-suite) --
+ * mark this clearly on any future upstream-fidelity diff/audit so it isn't reverted.
+ *
+ * Math-bounds detection below is fundamentally coupled to Obsidian's markdown syntax
+ * tree (specific node names like "formatting_formatting-math_..."), which only exists
+ * when this engine runs inside Obsidian's own markdown editor. This facet lets a host
+ * EditorView opt out of that entirely and declare its whole buffer as always-math --
+ * used to inject this real, vendored engine into Excalidraw's "Edit LaTeX" modal (a
+ * foreign, plain CM6 instance with no markdown language loaded, whose buffer is raw
+ * LaTeX with no $ delimiters at all by construction). Defaults to false/unset
+ * everywhere else, so this has zero effect on the normal Obsidian-editor path.
+ */
+export const alwaysMathFacet = Facet.define<boolean, boolean>({
+	combine: (values) => values.some(Boolean),
+});
 
 const OPEN_INLINE_MATH_NODE = "formatting_formatting-math_formatting-math-begin_keyword_math";
 const CLOSE_INLINE_MATH_NODE = "formatting_formatting-math_formatting-math-end_keyword_math_math-";
@@ -497,6 +514,26 @@ export const mathBoundsPlugin = ViewPlugin.fromClass(
 		}
 
 		inMathBound = (state: EditorState, pos: number): MathBounds | null => {
+			// KCL fork addition -- see alwaysMathFacet above. Short-circuits BEFORE touching
+			// this.mathBounds (which is always empty here -- updateMathBounds's syntaxTree
+			// scan finds nothing without a markdown language loaded) and unconditionally for
+			// every pos, including pos===0 and pos===doc.length: the normal binary-search
+			// path below treats being exactly AT bounds[0].outer_start/bounds[last].outer_end
+			// as "outside" (correct for a real $-delimited equation, where the boundary itself
+			// is ambiguous) -- but for "whole buffer is math", that edge case is the single
+			// most common cursor position while actively typing (cursor sits at doc.length
+			// after every appended keystroke), so it would silently make "always math" fail
+			// exactly when it matters most.
+			if (state.facet(alwaysMathFacet)) {
+				return {
+					inner_start: 0,
+					inner_end: state.doc.length,
+					outer_start: 0,
+					outer_end: state.doc.length,
+					mode: MathMode.BlockMath,
+				};
+			}
+
 			const bounds = this.mathBounds;
 			if (
 				pos <= bounds[0]?.outer_start ||
@@ -636,6 +673,14 @@ export const mathBoundsPlugin = ViewPlugin.fromClass(
 		
 		getEquations(state: EditorState) {
 			if (this.equations) return this.equations;
+			// KCL fork addition -- see alwaysMathFacet above. conceal_fns.ts and
+			// highlight_brackets.ts call this directly (not via inMathBound) to iterate every
+			// known equation region in the viewport; without this, it would always be an
+			// empty map here (this.mathBounds is never populated without a syntax tree).
+			if (state.facet(alwaysMathFacet)) {
+				this.equations = new Map([[0, state.sliceDoc(0, state.doc.length)]]);
+				return this.equations;
+			}
 			this.equations = new Map(
 				this.mathBounds.map((bound) => [
 					bound.inner_start,

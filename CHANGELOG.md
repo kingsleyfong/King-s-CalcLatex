@@ -5,6 +5,21 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-07-26
+
+### Changed
+- **The "Edit LaTeX" modal now injects the real, vendored LaTeX Suite CM6 engine directly, instead of running a parallel hand-rolled reimplementation.** The exact same extension array the main note editor uses (snippets, tabstops, auto-fraction, tabout, matrix shortcuts, conceal, bracket-color-matching, math-preview-tooltip) is appended into the modal's own CodeMirror instance via `StateEffect.appendConfig` — without touching Excalidraw's plugin registry or its own "detect the community Latex Suite plugin" mechanism, which is what broke right-click/double-click/`Ctrl+\` editing in a much earlier session. Falls back automatically to the previous hand-rolled engine if the real-engine injection fails for any reason. The canvas text-box path is unaffected (still the hand-rolled engine — there's no CM6 instance there to inject into).
+- Added `alwaysMathFacet` to the vendored LaTeX Suite's math-bounds detection (`utils/context.ts`) — a deliberate, clearly-marked fork addition, not upstream drift — so the real engine can be told "this entire buffer is math" for host editors (like this modal) that have no markdown syntax tree to detect math regions from.
+
+### Fixed
+- Modal live preview threw `ReferenceError: MathJax is not defined` on every render attempt — Obsidian only lazy-loads MathJax on first real use via normal markdown rendering, which this floating modal never goes through. Now awaits Obsidian's own `loadMathJax()` before the first render.
+
+### Note
+- **This is an architecture change, not a polish pass, and is UNVERIFIED live as of this release.** It was built after confirming (via a live throwaway probe) that Excalidraw's modal `EditorView` survives across a full typing session rather than being torn down and rebuilt by React — but whether the real engine's snippets, tabstops, conceal, bracket-coloring, and tooltip actually work correctly once injected has not yet been tested in Obsidian.
+- Also found, not yet fixed: canvas tabstop navigation can land at a stale position after typing inside an earlier tabstop (`TabstopManager.adjustForEdit()` is dead code, never called). Deferred — canvas conversion/snippets were confirmed working well otherwise, and this session's focus was the modal.
+
+---
+
 ## [3.5.1] - 2026-07-26
 
 ### Fixed
