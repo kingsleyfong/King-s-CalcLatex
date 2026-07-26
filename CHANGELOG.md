@@ -5,6 +5,13 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-07-26
+
+### Fixed
+- **Canvas Tab navigation between tabstops (e.g. after `mk`, or an exponent/fraction snippet) could land the cursor at the wrong position.** `TabstopManager.adjustForEdit()` existed but was never actually called anywhere in the input-handling flow, so a tabstop's stored position went stale the moment the user typed inside an *earlier* tabstop (e.g. typing "10" into `^{|}`'s empty braces shifts everything after it, but the next tabstop's recorded position never moved to match) — Tab would then jump to that stale, pre-edit position instead of the correct one. Fixed by diffing the buffer against its last-known state on every keystroke and feeding that edit delta into `adjustForEdit`, so stored tabstop positions now track live edits correctly. (The "Edit LaTeX" modal is unaffected — it already switched to the real vendored engine's own tabstop tracking in 3.6.0, which never had this bug.)
+
+---
+
 ## [3.6.0] - 2026-07-26
 
 ### Changed

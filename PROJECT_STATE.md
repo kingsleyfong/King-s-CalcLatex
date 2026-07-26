@@ -8,7 +8,14 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟡 v3.5.1 + unreleased Part 42 pivot — modal now injects the REAL vendored LaTeX Suite CM6 engine instead of a hand-rolled reimplementation; UNVERIFIED live, not yet shipped
+## Current Status: 🟢 v3.6.1 — user confirmed Part 42's real-engine modal pivot works well live; canvas tabstop-staleness bug (deferred in Part 42) now fixed
+
+### What Happened (Part 43 — canvas Tab navigation fixed; Part 42 pivot confirmed working)
+User tested v3.6.0 live and confirmed the modal works well ("everything works well ... mod. modal popup functions well") — the real-engine injection pivot from Part 42 holds. Then asked to fix canvas Tab navigation specifically ("tab does move around in the equation but not proper cursor location") — exactly the `TabstopManager.adjustForEdit()` dead-code bug identified but deferred at the end of Part 42 (canvas-only; the modal's real engine never had this bug). Fixed by diffing the buffer against a tracked `lastKnownText` on every keystroke and feeding the edit delta into the pre-existing `adjustForEdit`. Hand-traced against the exact previously-broken scenario from the user's own earlier log — tabstop positions now correctly track live edits instead of going stale. Shipped as v3.6.1, per the user's explicit ask to always ship a working checkpoint via CI/CD before taking on further requests, so there's a clean revert point.
+
+**Needs live confirmation**: type inside a multi-tabstop snippet (e.g. `10` + `rd` → `10^{}`) on canvas, then Tab — confirm correct cursor landing position.
+
+### What Happened (Part 42 pivot, confirmed working in Part 43)
 
 ### What Happened (Part 42 — modal now runs the real LaTeX Suite engine via CM6 appendConfig, not a reimplementation)
 User's latest log (testing v3.5.1) surfaced two more concrete bugs: (1) modal live preview threw `ReferenceError: MathJax is not defined` on every render attempt — Obsidian only lazy-loads the global MathJax runtime on first real use, and this floating modal never goes through normal markdown rendering, so it was never loaded; fixed by awaiting `loadMathJax()` (Obsidian's own public loader) before the first `renderMath()` call. (2) Tabstop navigation lands at the wrong position after typing inside an earlier tabstop — traced to `TabstopManager.adjustForEdit()` existing but never actually being called anywhere in the input-handling flow, so stored tabstop positions go stale the moment the user types. **This second bug is NOT fixed** (still affects the canvas path specifically, see below) — it became moot for the modal because of a bigger change described next.

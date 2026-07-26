@@ -47,6 +47,19 @@ export class SnippetEngine {
   private handleInput: ((e: Event) => void) | null = null;
   private handleKeydown: ((e: Event) => void) | null = null;
   private isExpanding = false;
+  /**
+   * Tracks the buffer as of the last time WE looked at or wrote it, so the next keystroke
+   * can be diffed against it to find exactly what the user typed (position, chars removed,
+   * chars inserted). Needed to keep TabstopManager's stored tabstop positions accurate as
+   * the user types INSIDE an earlier tabstop (e.g. typing "10" into "^{|}" after an
+   * exponent snippet expands) -- without this, a later tabstop's `from`/`to` stays at its
+   * pre-edit position, so Tab jumps to the wrong (stale) place. Kept in sync at every
+   * point WE write the buffer too (updateTextareaPrivate), so the diff always reflects
+   * only the user's own edits, never our own snippet-expansion rewrites (those already
+   * call tabstopMgr.setTabstops with correct fresh positions and must not ALSO be run
+   * through adjustForEdit on top of that).
+   */
+  private lastKnownText: string | null = null;
 
   private autofractionEnabled = true;
   private autofractionSymbol = "\\frac";
@@ -124,6 +137,7 @@ export class SnippetEngine {
     this.inputTarget = inputTarget;
     this.keydownTarget = keydownTarget;
     this.focusScope = focusScope;
+    this.lastKnownText = surface.getValue();
 
     this.handleInput = (e: Event) => this.onInput(e as InputEvent);
     this.handleKeydown = (e: Event) => this.onKeydown(e as KeyboardEvent);
@@ -148,6 +162,7 @@ export class SnippetEngine {
     this.inputTarget = null;
     this.keydownTarget = null;
     this.focusScope = null;
+    this.lastKnownText = null;
     this.handleInput = null;
     this.handleKeydown = null;
     this.tabstopMgr.clear();
@@ -191,11 +206,52 @@ export class SnippetEngine {
 
     const text = this.surface.getValue();
     const cursor = this.surface.getSelectionStart() || 0;
+
+    // Keep TabstopManager's stored positions accurate as the user types INSIDE an earlier
+    // tabstop (e.g. "10" typed into "^{|}" after an exponent snippet expands) -- see
+    // lastKnownText's field comment for why this must run BEFORE tryAutoExpand (which may
+    // call applyExpansion -> setTabstops, replacing the tabstop set outright; that fresh
+    // set must not then ALSO be shifted by this same edit's delta).
+    if (this.tabstopMgr.isActive() && this.lastKnownText !== null) {
+      const delta = this.computeEditDelta(this.lastKnownText, text);
+      if (delta) {
+        this.tabstopMgr.adjustForEdit(delta.from, delta.oldLen, delta.newLen);
+      }
+    }
+    this.lastKnownText = text;
+
     const mode = this.forcedMode ?? detectMathMode(text, cursor);
     console.log("[KCL-DEBUG] onInput: text=", JSON.stringify(text), "cursor=", cursor, "mode=", mode);
 
     const expanded = this.tryAutoExpand(text, cursor, mode);
     console.log("[KCL-DEBUG] onInput: tryAutoExpand result=", expanded, "textarea.value now=", JSON.stringify(this.surface.getValue()));
+  }
+
+  /**
+   * Finds the single contiguous edit between two buffer snapshots via common-prefix/
+   * common-suffix trimming -- accurate for the overwhelming majority of real keystrokes
+   * (a single character typed/deleted, or a small contiguous replacement), which is the
+   * only case this needs to handle: it runs once per "input" event, i.e. once per actual
+   * edit, not as a general-purpose multi-edit differ.
+   */
+  private computeEditDelta(
+    oldText: string,
+    newText: string,
+  ): { from: number; oldLen: number; newLen: number } | null {
+    if (oldText === newText) return null;
+
+    const maxPrefix = Math.min(oldText.length, newText.length);
+    let start = 0;
+    while (start < maxPrefix && oldText[start] === newText[start]) start++;
+
+    let oldEnd = oldText.length;
+    let newEnd = newText.length;
+    while (oldEnd > start && newEnd > start && oldText[oldEnd - 1] === newText[newEnd - 1]) {
+      oldEnd--;
+      newEnd--;
+    }
+
+    return { from: start, oldLen: oldEnd - start, newLen: newEnd - start };
   }
 
   private onKeydown(e: KeyboardEvent): void {
@@ -649,6 +705,11 @@ export class SnippetEngine {
     } finally {
       this.isExpanding = false;
     }
+    // Every write WE make funnels through here (expansion, tabstop jump, tabout, undo) --
+    // sync lastKnownText immediately so the next real keystroke's diff (processInput)
+    // reflects only the user's own edit, never gets confused by comparing against a
+    // pre-write snapshot.
+    this.lastKnownText = value;
   }
 
   private insertAtCursor(insert: string): void {

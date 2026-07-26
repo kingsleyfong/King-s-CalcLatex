@@ -1,5 +1,22 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-26 (Part 43) — v3.6.0's real-engine modal pivot confirmed working live by the user; canvas tabstop staleness (deferred in Part 42) fixed and shipped as v3.6.1
+
+### Status: 🟢 User confirmed the Part 42 pivot works well in live testing ("everything works well ... mod. modal popup functions well"). Fixed the canvas-specific tabstop-staleness bug that was explicitly deferred at the end of Part 42.
+
+User's exact ask: fix Tab navigation on the canvas ("within text boxes with mk expansion snippets") to match real LaTeX Suite -- "tab does move around in the equation but not proper cursor location". This is precisely the `TabstopManager.adjustForEdit()` dead-code bug identified (but deliberately deferred) in Part 42, since it only affects the canvas `<textarea>` path (the modal now uses the real engine's own correct tabstop tracking as of v3.6.0, unaffected).
+
+**Fix**: `snippet-engine.ts` gained a `lastKnownText` field tracking the buffer as of the last time the engine itself read or wrote it, plus a small common-prefix/common-suffix `computeEditDelta()` helper. `processInput()` (the deferred "input"-event handler) now diffs the current buffer against `lastKnownText` on every keystroke and, if `tabstopMgr.isActive()`, feeds that delta into the pre-existing (never-before-called) `tabstopMgr.adjustForEdit(from, oldLen, newLen)`. `updateTextareaPrivate()` -- the single choke point every one of the engine's OWN writes funnels through (expansion, tabstop-jump, tabout, backspace-undo) -- now syncs `lastKnownText` immediately after writing, so the next real keystroke's diff reflects only the user's own edit, never gets confused by comparing against a pre-write snapshot, and never double-adjusts a freshly-`setTabstops()`-populated set on top of itself.
+
+Hand-traced against the exact scenario from Part 41's log (`10` + `rd` -> `10^{}` with tabstop0 inside the braces at position 32, tabstop1 right after the closing `}` at position 33; typing `1` then `0` into the braces): each keystroke's diff correctly shifts tabstop1 from 33 -> 34 -> 35, so a subsequent Tab now lands at the actual end-of-braces position instead of the stale pre-edit one. Not yet confirmed live (no way to test an interactive Tab-navigation fix outside Obsidian), but the trace is exact against a real previously-broken case, not a guess.
+
+Build clean (`tsc --noEmit`, `npm run build`). Shipped as **v3.6.1** (patch) via the established CI/CD pipeline, per the user's explicit request to always ship a working checkpoint before taking on further improvement requests, so there's always a clean revert point.
+
+### ⚠️ Needs live confirmation
+Type an exponent/fraction/other multi-tabstop snippet on the canvas (e.g. `10` then `rd` for `10^{}`), type inside the first tabstop, then press Tab -- confirm the cursor lands at the correct position (immediately after whatever was typed), not a stale one.
+
+---
+
 ## Session: 2026-07-26 (Part 42) — Modal now injects the REAL LaTeX Suite CM6 engine instead of a hand-rolled reimplementation (architecture pivot, unshipped/unverified)
 
 ### Status: 🟡 Implemented, typechecks clean, builds clean -- but this is a genuine architecture change to a foreign host editor and has NOT been tested live yet. Do not report this as working until confirmed.
