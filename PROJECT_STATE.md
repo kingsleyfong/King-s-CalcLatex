@@ -8,12 +8,12 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 v3.7.0 — added a setting for modal cursor position (defaults to end-of-equation instead of Excalidraw's default start-of-equation)
+## Current Status: 🟢 v3.8.0 — added Excalidraw OD LHS element styling shortcuts, secondary number key interception, and visual HUD
+
+### What Happened (Part 45 — Excalidraw OD LHS element styling shortcuts & HUD)
+Implemented fluid, non-conflicting Left-Hand Side (LHS) keyboard shortcuts for styling canvas elements (`Shift + F` for Line Style, `Shift + D` for Stroke Thickness, `Shift + X` for Edge Roundness, `Shift + Q` for Sloppiness/Roughness). Built `ExcalidrawShortcutManager` in `src/excalidraw/shortcut-manager.ts`, added modal keydown interception for secondary number keys (`1`, `2`, `3`, `4`) with `stopPropagation()` to prevent tool switching, added a sleek floating HUD overlay (`.kcl-shortcut-hud`), and added full user configuration controls in Settings → Excalidraw OD Features. Tested and confirmed working live in Obsidian. Shipped as v3.8.0.
 
 ### What Happened (Part 44 — new setting: modal cursor position)
-User asked for the "Edit LaTeX" modal to default the cursor to the END of an existing equation (Excalidraw always starts it at the beginning, forcing a manual click to continue typing) — as a real setting, not a silent behavior change. Added `latexModalCursorPosition: "end" | "start"` to `KCLSettings` (default `"end"`), a matching dropdown in Settings → Excalidraw OD, and `applyModalCursorPosition()` in `latex-modal.ts` which dispatches a pure CM6 selection change once per modal-open. Shipped as v3.7.0.
-
-**Needs live confirmation**: re-open an existing equation's "Edit LaTeX" modal — cursor should land at the end by default; toggle the setting to confirm "Start of Equation" still works too.
 
 ### What Happened (Part 43 — canvas Tab navigation fixed; Part 42 pivot confirmed working)
 

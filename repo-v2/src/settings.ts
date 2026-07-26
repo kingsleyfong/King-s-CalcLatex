@@ -372,6 +372,111 @@ export class KCLSettingTab extends PluginSettingTab {
           }),
       );
 
+    new Setting(containerEl)
+      .setName("Enable Element Styling Shortcuts")
+      .setDesc("Enable LHS keyboard shortcuts to quickly style selected canvas elements (Line style, width, edges, sloppiness).")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.excalidrawElementShortcutsEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.excalidrawElementShortcutsEnabled = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Element Shortcut Primary Modifier")
+      .setDesc("Primary modifier key to trigger element styling actions (Shift is recommended for non-conflicting LHS access).")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            shift: "Shift",
+            alt: "Alt / Option",
+            ctrl: "Ctrl / Cmd",
+          })
+          .setValue(this.plugin.settings.excalidrawElementShortcutModifier || "shift")
+          .onChange(async (value) => {
+            this.plugin.settings.excalidrawElementShortcutModifier = value as "shift" | "alt" | "ctrl";
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Line Style Trigger Key")
+      .setDesc("Key to toggle/cycle Line Style (Solid → Dashed → Dotted). Secondary number keys [1, 2, 3] set variant.")
+      .addText((text) =>
+        text
+          .setPlaceholder("f")
+          .setValue(this.plugin.settings.excalidrawLineStyleKey || "f")
+          .onChange(async (value) => {
+            const key = value.trim().toLowerCase();
+            if (key) {
+              this.plugin.settings.excalidrawLineStyleKey = key;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Stroke Width Trigger Key")
+      .setDesc("Key to cycle Stroke Thickness (1px → 2px → 4px → 8px). Secondary number keys [1, 2, 3, 4] set variant.")
+      .addText((text) =>
+        text
+          .setPlaceholder("d")
+          .setValue(this.plugin.settings.excalidrawStrokeWidthKey || "d")
+          .onChange(async (value) => {
+            const key = value.trim().toLowerCase();
+            if (key) {
+              this.plugin.settings.excalidrawStrokeWidthKey = key;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Edge Roundness Trigger Key")
+      .setDesc("Key to toggle Edge Roundness (Sharp ↔ Curved). Secondary number keys [1, 2] set variant.")
+      .addText((text) =>
+        text
+          .setPlaceholder("x")
+          .setValue(this.plugin.settings.excalidrawEdgeRoundnessKey || "x")
+          .onChange(async (value) => {
+            const key = value.trim().toLowerCase();
+            if (key) {
+              this.plugin.settings.excalidrawEdgeRoundnessKey = key;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Sloppiness / Roughness Trigger Key")
+      .setDesc("Key to cycle Sloppiness (Architect → Artist → Cartoonist). Secondary number keys [1, 2, 3] set variant.")
+      .addText((text) =>
+        text
+          .setPlaceholder("q")
+          .setValue(this.plugin.settings.excalidrawSloppinessKey || "q")
+          .onChange(async (value) => {
+            const key = value.trim().toLowerCase();
+            if (key) {
+              this.plugin.settings.excalidrawSloppinessKey = key;
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Show Floating Shortcut HUD")
+      .setDesc("Display a subtle visual HUD popup on the canvas when an element shortcut is triggered.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.excalidrawShowShortcutHud)
+          .onChange(async (value) => {
+            this.plugin.settings.excalidrawShowShortcutHud = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
     // ══════════════════════════════════════════════════════════════
     //  SECTION 3: LATEX SUITE FEATURES (SNIPPETS & FAST MATH ENTRY)
     // ══════════════════════════════════════════════════════════════

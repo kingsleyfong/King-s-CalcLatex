@@ -5,6 +5,17 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-07-26
+
+### Added
+- **Excalidraw OD LHS Element Styling Shortcuts**:
+  - Implemented non-conflicting left-hand keyboard shortcuts for styling canvas elements (`Shift + F` for Line Style, `Shift + D` for Stroke Width, `Shift + X` for Edge Roundness, `Shift + Q` for Sloppiness/Roughness).
+  - Modal secondary key interception (`1`, `2`, `3`, `4`) with `stopPropagation()` so Excalidraw tool selection shortcuts are not triggered while styling elements.
+  - Sleek floating HUD toast (`.kcl-shortcut-hud`) with translucent blur displaying active options and number shortcuts.
+  - Full settings integration under **Section 2: Excalidraw OD Features (Canvas & Math Companion)** in settings page.
+
+---
+
 ## [3.4.0] - 2026-07-23
 
 ### Fixed

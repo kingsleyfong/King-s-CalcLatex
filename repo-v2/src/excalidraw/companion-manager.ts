@@ -6,6 +6,7 @@ import { PreviewTooltip } from "./preview-tooltip";
 import { LaTexModalEnhancer } from "./latex-modal";
 import { SidebarStyleEnhancer } from "./sidebar-enhancer";
 import { GraphInjector } from "./graph-injector";
+import { ExcalidrawShortcutManager } from "./shortcut-manager";
 import DEFAULT_SNIPPETS from "../latex-suite/default_snippets.js";
 import DEFAULT_SNIPPET_VARIABLES from "../latex-suite/default_snippet_variables.js";
 import type { SnippetDef } from "./types";
@@ -147,6 +148,7 @@ export class ExcalidrawCompanionManager {
   private modalEnhancer: LaTexModalEnhancer | null = null;
   private sidebarEnhancer: SidebarStyleEnhancer | null = null;
   private graphInjector: GraphInjector | null = null;
+  private shortcutManager: ExcalidrawShortcutManager | null = null;
   private handleKeydownBound: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(
@@ -171,6 +173,8 @@ export class ExcalidrawCompanionManager {
       this.plugin,
       this.plugin.settings,
     );
+    this.shortcutManager = new ExcalidrawShortcutManager(this.plugin, this.plugin.settings);
+    this.shortcutManager.start();
 
     this.tooltip.create();
     this.modalEnhancer.start();
@@ -204,6 +208,7 @@ export class ExcalidrawCompanionManager {
       window.removeEventListener("keydown", this.handleKeydownBound, true);
       this.handleKeydownBound = null;
     }
+    if (this.shortcutManager) this.shortcutManager.destroy();
     if (this.interceptor) this.interceptor.destroy();
     if (this.snippetEngine) this.snippetEngine.detach();
     if (this.tooltip) this.tooltip.destroy();

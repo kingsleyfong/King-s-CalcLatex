@@ -242,6 +242,20 @@ export interface KCLSettings {
   latexEditorShortcutModifier: "ctrl" | "alt" | "shift";
   /** Key for LaTeX editor shortcut */
   latexEditorShortcutKey: string;
+  /** Enable LHS keyboard shortcuts for element styling (line style, width, roundness, sloppiness) */
+  excalidrawElementShortcutsEnabled: boolean;
+  /** Primary modifier for element styling shortcuts */
+  excalidrawElementShortcutModifier: "shift" | "alt" | "ctrl";
+  /** Trigger key for line style (solid/dashed/dotted) */
+  excalidrawLineStyleKey: string;
+  /** Trigger key for stroke width (1px/2px/4px/8px) */
+  excalidrawStrokeWidthKey: string;
+  /** Trigger key for edge roundness (sharp/curved) */
+  excalidrawEdgeRoundnessKey: string;
+  /** Trigger key for sloppiness (architect/artist/cartoonist) */
+  excalidrawSloppinessKey: string;
+  /** Show visual floating HUD toast when shortcut triggers */
+  excalidrawShowShortcutHud: boolean;
 
   // ── LaTeX Suite Settings ──
   /** Enable LaTeX Suite snippet expansion across Markdown notes (.md) and Excalidraw overlays */
@@ -348,6 +362,13 @@ export const DEFAULT_SETTINGS: KCLSettings = {
   latexEditorShortcutEnabled: true,
   latexEditorShortcutModifier: "ctrl",
   latexEditorShortcutKey: "\\",
+  excalidrawElementShortcutsEnabled: true,
+  excalidrawElementShortcutModifier: "shift",
+  excalidrawLineStyleKey: "f",
+  excalidrawStrokeWidthKey: "d",
+  excalidrawEdgeRoundnessKey: "x",
+  excalidrawSloppinessKey: "q",
+  excalidrawShowShortcutHud: true,
 
   // LaTeX Suite Defaults
   enableLaTeXSuite: true,
