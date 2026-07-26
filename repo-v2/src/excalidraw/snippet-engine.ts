@@ -556,6 +556,19 @@ export class SnippetEngine {
       if (depth === 0 && /\s/.test(ch)) {
         break;
       }
+      // "$" is always a math-mode delimiter, never legitimate numerator content --
+      // unlike upstream LaTeX Suite (which only ever sees text already stripped of its
+      // surrounding $ by CM6 syntax-tree math bounds), this engine's canvas surface
+      // operates on the raw buffer with the delimiters still literally present. Without
+      // this, typing "/" right after "$1$" pulls the opening "$" into the numerator
+      // ("$1"), which then collides with parseTabstops' own "$<digit>" tabstop syntax
+      // when that numerator text is spliced into the \frac{...}{$0}$1 template -- the
+      // "$1" gets silently consumed as a fake tabstop instead of literal text, deleting
+      // both the "$" and the numerator digit. Confirmed live: "$1$" + "/" produced
+      // "\frac{}{}$" (numerator empty, leading "$" gone) instead of "\frac{1}{}$".
+      if (depth === 0 && ch === "$") {
+        break;
+      }
       i--;
     }
 

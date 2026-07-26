@@ -5,6 +5,14 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.1] - 2026-07-26
+
+### Fixed
+- **Auto-fraction on the canvas (`/`) could eat the opening `$` and drop the numerator entirely** — e.g. `$1$` + `/` produced `\frac{}{}$` instead of `$\frac{1}{}$`. Root cause: unlike upstream LaTeX Suite (which only ever sees text already stripped of its surrounding `$` by CM6's syntax tree), this engine's canvas surface operates on the raw buffer with the `$` delimiters still literally present, and the numerator-boundary scan didn't know to stop at one. The captured numerator (`"$1"`) then got spliced directly into the `\frac{...}{$0}$1` template string, where its own leading `"$1"` collided with the template's own `$`-prefixed tabstop syntax and was silently consumed as a fake tabstop instead of literal text. Fixed by treating `$` as an unconditional numerator boundary.
+- Modal live-preview render failures are no longer silently swallowed — logged via `console.warn` so a genuinely broken preview is now distinguishable from one that's just empty (CSS hides an empty preview div entirely, so a silent failure looked identical to the feature not existing).
+
+---
+
 ## [3.5.0] - 2026-07-25
 
 ### Added

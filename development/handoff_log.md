@@ -1,5 +1,30 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-26 (Part 41) — Auto-fraction "$"-swallowing bug fixed; modal live-preview failures now logged instead of silently swallowed; shipped as v3.5.1
+
+### Status: 🟢 Auto-fraction fix is root-caused and traced end-to-end against the user's own log (high confidence) | 🟡 Modal live-preview fix is diagnostic-only (added logging, did not blind-fix) — needs the resulting log to actually fix it | Tab-navigation confirmation from Part 40's fix still pending (user's log cut off exactly at the Tab keypress)
+
+User pasted a full console log from testing canvas auto-fraction and the modal after v3.5.0. Two concrete, traceable bugs found in it, plus one confirmation and one open question:
+
+1. **Canvas auto-fraction (`/`) was eating the leading `$` and losing the numerator** — reported by the user as "gets rid of the starting $". Traced exactly against the log: typing `$1$` then `/` produced `text= "\\frac{}{}$"` (numerator empty, only one `$` left) instead of the expected `$\frac{1}{}$`. Root cause: `findNumerator()` in `snippet-engine.ts` scans backward from the cursor for the start of the fraction's numerator, and had no stopping condition for `$`. Upstream LaTeX Suite never encounters this because its numerator scan only ever sees text already stripped of surrounding `$` (CM6 syntax-tree math bounds exclude the delimiters) — our canvas engine works on the raw buffer with `$` still literally present. So the scan pulled the opening `$` into the numerator (`"$1"`), and that string then got spliced directly into the `\frac{...}{$0}$1` template *before* `parseTabstops` ran on it — where the numerator's own leading `"$1"` was indistinguishable from the template's own `$`-prefixed tabstop syntax, and `parseTabstops` silently consumed it as a fake tabstop (dropping it from the output entirely) instead of treating it as literal text. **Fixed** by adding `$` as an unconditional numerator boundary in `findNumerator`. Re-traced the fix by hand against the same input: `$1$` + `/` → numerator correctly captured as `"1"`, final buffer `"$\frac{1}{}$"` with cursor in the denominator. Not yet re-confirmed live (no build-time way to verify a live-editing bug; the trace is exact, not a guess, but "exact trace" isn't "user confirmed it now works").
+
+2. **Modal live preview ("Edit LaTeX" popup) reportedly shows nothing at all**, while the canvas's own (Excalidraw-native, unrelated code path) preview-as-you-type works fine. Investigated `injectLivePreview()` in `latex-modal.ts`: found `.kcl-latex-live-preview` DOES have real CSS (background, padding, min-height — not a repeat of the Part 38 missing-CSS bug), but also has `:empty { display: none }`. `update()`'s `catch` block around `renderMath()`/`finishRenderMath()` was swallowing ANY render failure with zero logging — meaning a genuinely broken render is visually indistinguishable from the feature simply not existing (same failure *shape* as several bugs earlier this project, though not verified to be the same failure here). **Did not blind-fix this** — added `console.warn` logging to the catch block instead, since guessing at a fix without knowing why `renderMath` fails (if it's even the render call that's failing, rather than something upstream like `cmEditor.parentElement` being null) would just burn another round-trip on a wrong guess.
+
+3. **Confirmed from the same log: the Part 40 CM6-microtask-staleness fix is holding.** The modal's `onInput` reads are no longer one-keystroke-stale — sequential `text=`/`cursor=` values in the log are internally consistent through a long typing sequence (`"10^{}"` → `"10^{1}"` etc., correct at every step). This was the biggest open risk from last session and it appears resolved.
+
+4. **Still open: Tab-navigation confirmation.** The user's pasted log ends exactly at `onKeydown: key= Tab` inside the modal with no following `onInput`/`applyExpansion` line — i.e., the paste was simply cut off there, not evidence of failure or success either way. The `document.documentElement`-based keydown fix from Part 40 is confirmed to be wired correctly (the log shows `keydownTarget= <html>...` from `injectSnippetEngine`), but whether Tab actually now jumps tabstops in the modal is still unconfirmed.
+
+5. **Non-bug, for the record: `"rd"` is a real upstream trigger, not a corruption artifact.** The log showed typing `r` then `d` after `10` unexpectedly expanding to `10^{}`. Grepped `default_snippets.js`: `{trigger: "rd", replacement: "^{$0}$1", options: "mA"}` is a genuine upstream LaTeX Suite default snippet (shorthand for "raised to" / exponent), not a bug introduced by this fork's snippet-conversion path. Left as-is.
+
+Build clean (`tsc --noEmit`, `npm run build`). Shipped through the existing CI/CD pipeline as **v3.5.1** (patch — bug fixes only, no new features) following the same commit → CHANGELOG → `npm version patch` → push commit+tag flow established in Part 40.
+
+### ⚠️ Needs live confirmation next round
+1. Re-test canvas auto-fraction specifically with a `$`-delimited buffer (e.g. `$1$` then `/`, or `$$1$$` then `/`) — confirm the numerator and both `$`s now survive.
+2. Re-test the modal live preview and paste whatever appears in the console — either a rendered preview (bug fixed itself / was already fine and the report was stale) or a `[KCL-DEBUG] Modal live preview: renderMath failed for text=...` warning with the actual thrown error, which will point at the real fix.
+3. Explicitly test Tab inside the modal after an expansion with tabstops (e.g. type `sr`, then Tab) and confirm the log shows tabstop movement, not just the keypress being registered.
+
+---
+
 ## Session: 2026-07-25 (Part 40) — Built canvas blur-to-equation from scratch; wired a real snippet engine into the modal; caught a re-entrancy regression in review before it shipped
 
 ### Status: 🟡 Both features functionally built and typecheck/build-clean, but the two most recent fixes in this session are UNVERIFIED — need explicit user retest with console logs

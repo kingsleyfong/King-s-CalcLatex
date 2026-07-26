@@ -8,7 +8,22 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟡 v3.4.0 — Excalidraw companion mostly working; two fixes just applied (Part 40, 2026-07-25) are UNVERIFIED — awaiting user retest
+## Current Status: 🟡 v3.5.1 — canvas blur-to-equation + modal snippet engine live; auto-fraction "$"-swallowing bug fixed (Part 41, 2026-07-26); modal live-preview and Tab-nav still unconfirmed
+
+### What Happened (Part 41 — auto-fraction "$" bug fixed, modal preview failure now logged not swallowed)
+User's console log from testing v3.5.0 traced exactly to a real bug: canvas auto-fraction (`$1$` + `/`) produced `\frac{}{}$` instead of `$\frac{1}{}$` — `findNumerator()`'s backward scan didn't stop at `$`, so the numerator captured `"$1"` including the delimiter, which then collided with `parseTabstops`' own `$`-prefixed tabstop syntax when spliced into the `\frac{...}{$0}$1` template and got silently eaten. Fixed by adding `$` as an unconditional numerator boundary — hand-traced against the same input, now produces the correct `$\frac{1}{}$`.
+
+Also confirmed from the same log: **Part 40's CM6 microtask-staleness fix is holding** — modal `onInput` reads are no longer one-keystroke-stale through a long typing sequence. That was the biggest open risk from last session.
+
+**Modal live preview reportedly still doesn't show anything** — investigated but did not blind-fix; `.kcl-latex-live-preview` has real CSS (not a repeat of the old missing-stylesheet bug) but also `:empty { display: none }`, and the render call's `catch` block was silently swallowing failures with zero logging, making a broken preview indistinguishable from a nonexistent one. Added `console.warn` logging instead of guessing — next log will show the actual failure.
+
+**`"rd"` typed after `10` expanding to `10^{}` is not a bug** — confirmed via grep that `{trigger: "rd", replacement: "^{$0}$1"}` is a genuine upstream LaTeX Suite default snippet.
+
+Shipped as **v3.5.1** via the CI/CD pipeline (patch bump — bug fixes only).
+
+**Still needs live confirmation**: (1) auto-fraction with `$` delimiters now correct, (2) modal preview — paste whatever the console shows now, warning or rendered equation, (3) Tab-in-modal explicitly tested with an active tabstop (last session's log was cut off exactly at the Tab keypress, no confirmation either way).
+
+### What Happened (Part 40)
 
 ### What Happened (Part 40 — canvas blur-to-equation built as new feature + modal snippet engine wired, both mid-verification)
 User confirmed `mk`/`sr`/auto-fraction expansion now works on the canvas (Part 39's fix holds). Two things remained broken and were addressed this session:

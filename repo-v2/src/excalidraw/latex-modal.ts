@@ -506,8 +506,13 @@ export class LaTexModalEnhancer {
         const rendered = renderMath(text, true);
         preview.appendChild(rendered);
         void finishRenderMath();
-      } catch {
-        /* Invalid/incomplete LaTeX while typing -- leave preview blank rather than erroring. */
+      } catch (err) {
+        // Logged (not silently swallowed): a live-preview failure that's ALWAYS silent
+        // is indistinguishable from "this feature doesn't exist" -- and .kcl-latex-live-preview
+        // has `:empty { display: none }` in styles.css, so an empty preview div renders as
+        // if nothing was ever injected at all. If this fires on every keystroke rather than
+        // just on genuinely incomplete/invalid LaTeX mid-typing, that's the actual bug.
+        console.warn("[KCL-DEBUG] Modal live preview: renderMath failed for text=", JSON.stringify(text), err);
       }
     };
 
