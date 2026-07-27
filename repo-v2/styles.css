@@ -1006,6 +1006,15 @@
   padding-bottom: 80px !important;
 }
 
+/* Long, unwrapped LaTeX source should pan horizontally to keep the cursor in view
+   (like a single-line text field) rather than being clipped with no way to reach it --
+   this only has a fixed box to pan *within* once latex-modal.ts's applyModalPosition()
+   caps .modal's max-width to the Excalidraw pane; pinned explicitly here as insurance
+   rather than relying on CM6's default base-theme value continuing to hold. */
+.excalidraw-LatexPrompt .cm-editor .cm-scroller {
+  overflow-x: auto !important;
+}
+
 /* ══════════════════════════════════════════════════════════════
    LaTeX Suite Engine Styles
    Ported from upstream artisticat1/obsidian-latex-suite `styles.css`.

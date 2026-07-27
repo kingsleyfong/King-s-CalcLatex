@@ -8,6 +8,13 @@ import { CM6Surface } from "./text-surface";
 import { getLaTeXSuiteEngineExtension } from "../latex-suite/provider";
 import { alwaysMathFacet } from "../latex-suite/utils/context";
 
+// Breathing room (px) kept between the modal's capped width and the edges of the
+// Excalidraw pane it was opened from, so the modal never touches a split divider.
+const MODAL_PANE_MARGIN_PX = 40;
+// Floor so an extremely narrow split pane still renders a usable editor box instead
+// of squeezing down to something unreadable.
+const MODAL_MIN_WIDTH_PX = 360;
+
 const COMMON_COLORS = [
   { name: "red", hex: "#ff4d4d", latex: "red" },
   { name: "orange", hex: "#ff9f43", latex: "orange" },
@@ -365,6 +372,7 @@ export class LaTexModalEnhancer {
     const app = (window as any).app;
     const activeLeaf = app?.workspace?.activeLeaf;
     const leafEl = activeLeaf?.view?.contentEl as HTMLElement;
+    const rect = leafEl?.getBoundingClientRect();
 
     // Guard against the continuous repositioning MutationObserver in enhanceModal()
     // looping forever: compare the ACTUAL live inline style values against the target
@@ -381,8 +389,25 @@ export class LaTexModalEnhancer {
       write();
     };
 
-    if (leafEl && (pos === "bottom" || pos === "cursor")) {
-      const rect = leafEl.getBoundingClientRect();
+    // Cap the modal's width to the Excalidraw pane it was opened from, not the whole
+    // Obsidian window. Obsidian's Modal base class attaches at document.body with no
+    // notion of which split pane triggered it, so in a split-screen layout it would
+    // otherwise render centered on/wider than the whole app window -- and for a long,
+    // unwrapped equation, keep growing past the pane entirely since nothing gives the
+    // CM6 editor a hard width to stop at. This max-width is also the precondition for
+    // .cm-scroller's horizontal auto-scroll-to-cursor to have a fixed box to pan
+    // within (see the matching .cm-scroller overflow rule in styles.css) -- without a
+    // real cap here, "cursor moves off past the edge but the box just keeps growing"
+    // is indistinguishable from "the cursor stopped moving" to the user.
+    // Applied independent of `pos` (bottom/top/center/cursor all need this equally).
+    if (rect) {
+      const maxWidth = `${Math.max(MODAL_MIN_WIDTH_PX, Math.round(rect.width - MODAL_PANE_MARGIN_PX * 2))}px`;
+      applyIfChanged({ "max-width": maxWidth }, () => {
+        actualModal.style.setProperty("max-width", maxWidth, "important");
+      });
+    }
+
+    if (rect && (pos === "bottom" || pos === "cursor")) {
       const left = `${Math.round(rect.left + rect.width / 2)}px`;
       const bottom = `${Math.max(20, Math.round(window.innerHeight - rect.bottom + 40))}px`;
 
@@ -399,8 +424,7 @@ export class LaTexModalEnhancer {
       return;
     }
 
-    if (pos === "top" && leafEl) {
-      const rect = leafEl.getBoundingClientRect();
+    if (rect && pos === "top") {
       const left = `${Math.round(rect.left + rect.width / 2)}px`;
       const top = `${Math.round(rect.top + 60)}px`;
 

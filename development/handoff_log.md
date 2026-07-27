@@ -1,5 +1,22 @@
 # Handoff Log: King's CalcLatex Session Summary
 
+## Session: 2026-07-27 (Part 46) — Modal width capped to Excalidraw pane; long-equation cursor-follow panning
+
+### Status: 🟢 Small, self-contained CSS+JS fix. Typechecks and builds clean; not yet live-confirmed.
+
+User runs Excalidraw in split-screen and reported the "Edit LaTeX" modal isn't width-constrained to the pane, and that with a long equation the cursor "physically won't move" past a certain point on End/arrow-key navigation. Talked through it with the user before writing anything (explicit "don't make any code edits yet, let's discuss" + a later request for a UI/UX-only, non-technical explanation): read Excalidraw's own bundled `main.js`/`styles.css` to confirm the "Edit LaTeX" modal is a body-level Obsidian `Modal` (no pane awareness at all -- our own `kcl-modal-container-*` CSS only ever controlled vertical alignment, never width) and that `.excalidraw-LatexPrompt .cm-editor` has no explicit width cap, just `justify-content: center` with `.cm-scroller { width: 100% }`. Had the user do a live End-key test to disambiguate two hypotheses (pure clipping/no-scroll vs. our own capture-phase keydown listener from antipattern 19 swallowing Arrow/Home/End) -- confirmed it's the former: the cursor's document position moves fine, it's landing off-screen because nothing ever gave the editor a hard width to stop growing at, so `.cm-scroller`'s horizontal auto-scroll-to-cursor never had a fixed box to pan *within*.
+
+**Fix**: `applyModalPosition()` in `latex-modal.ts` now hoists a single `rect = leafEl?.getBoundingClientRect()` (previously computed redundantly per position branch) and, independent of which `latexModalPosition` setting is active, caps `actualModal`'s `max-width` to `rect.width - 2*MODAL_PANE_MARGIN_PX` (40px each side, floored at `MODAL_MIN_WIDTH_PX` = 360px), written via the same `applyIfChanged`-guarded `!important` pattern already used for position so it can't fight the repositioning `MutationObserver`. Added `.excalidraw-LatexPrompt .cm-editor .cm-scroller { overflow-x: auto !important }` in `styles.css` as explicit insurance rather than trusting CM6's base-theme default to keep holding.
+
+**Deliberately not done**: `EditorView.lineWrapping` -- user explicitly wants pan-to-follow (single-line text-field behavior), not the equation reflowing onto multiple lines. Also considered and rejected `overflow: hidden` on `.modal` to force clipping: `.modal` already carries an inline `transform` from `applyModalPosition()`'s own positioning, which makes it the containing block for `position: fixed` descendants (tooltips) -- `overflow: hidden` on that same transformed ancestor clips fixed-position children too, not just static ones, so it would have broken tooltip positioning for no benefit (the `max-width` cap alone already bounds children through normal block layout, since `.cm-scroller`'s `width: 100%` resolves against the now-capped container).
+
+Typecheck: clean for `latex-modal.ts`/`styles.css` (repo has pre-existing, unrelated errors in `engine/`, `renderer/`, `snippets/` -- not touched here). Build clean, synced to vault plugin directory.
+
+### Needs live confirmation
+Open a long equation's "Edit LaTeX" modal while Excalidraw is in a split pane: (1) modal should stay within the pane's width instead of centering on/exceeding the whole window, (2) pressing End or arrow-keying toward either end of a long equation should visibly pan the text horizontally to keep the cursor in view, not appear frozen. Also worth a quick check that short equations still render at their natural (non-full-width) size rather than always stretching to the new cap.
+
+---
+
 ## Session: 2026-07-26 (Part 44) — New setting: modal cursor position defaults to end-of-equation instead of start
 
 ### Status: 🟢 Small, self-contained UI/UX addition. Typechecks and builds clean; not yet live-confirmed.

@@ -5,6 +5,20 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-07-26
+
+### Added
+- **Excalidraw OD LHS Element Styling Shortcuts**: non-conflicting left-hand keyboard shortcuts for styling canvas elements (`Shift + F` for Line Style, `Shift + D` for Stroke Width, `Shift + X` for Edge Roundness, `Shift + Q` for Sloppiness/Roughness), secondary number-key selection (`1`-`4`) with `stopPropagation()` so Excalidraw's own tool-switching shortcuts don't fire, a floating HUD toast showing the active options, and full configuration in Settings → Excalidraw OD.
+
+---
+
+## [3.8.1] - 2026-07-27
+
+### Fixed
+- **"Edit LaTeX" modal could grow wider than the Excalidraw pane in split-screen, and long equations were unreachable at their far ends.** The modal is a body-level Obsidian `Modal` with no awareness of which split pane it was opened from, so it had no width limit and would keep growing to fit a long, unwrapped equation — the cursor was still moving correctly on Home/End/arrow keys, it was just landing in space rendered off-screen. `applyModalPosition()` now also caps the modal's `max-width` to the active Excalidraw pane's own width (minus 40px breathing room on each side, floored at 360px so a very narrow pane still stays usable), computed from the same `leafEl.getBoundingClientRect()` already used for vertical placement. With a real fixed width in place, `.cm-scroller`'s horizontal auto-scroll-to-cursor (pinned explicitly in `styles.css` as insurance) now has a box to pan within, so typing/navigating toward either end pans the visible window like a single-line text field instead of clipping.
+
+---
+
 ## [3.7.0] - 2026-07-26
 
 ### Added

@@ -5,6 +5,13 @@ All notable changes to **King's CalcLatex** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.1] - 2026-07-27
+
+### Fixed
+- **"Edit LaTeX" modal could grow wider than the Excalidraw pane in split-screen, and long equations were unreachable at their far ends.** The modal had no width limit tied to its pane, so it kept growing to fit a long, unwrapped equation -- the cursor was moving correctly on Home/End/arrow keys, it was just landing in space rendered off-screen. `applyModalPosition()` now caps the modal's `max-width` to the active Excalidraw pane's own width (40px margin each side, floored at 360px). With a real fixed width in place, `.cm-scroller`'s horizontal auto-scroll-to-cursor (pinned explicitly in `styles.css` as insurance) now has a box to pan within.
+
+---
+
 ## [3.8.0] - 2026-07-26
 
 ### Added
