@@ -716,6 +716,44 @@ version=$(node -p "require('./repo-v2/manifest.json').version")
 gh release create "$version" ...
 ```
 
+## Design Principles
+
+Standing rules for future dev, not tied to one specific bug fix -- read before designing
+any new Excalidraw-canvas-facing feature.
+
+### 1. Every visual element King's CalcLaTeX places on an Excalidraw canvas MUST have a clickable/selectable hitbox that matches its actual visual footprint -- verify this, never assume it (2026-07-27)
+
+**The problem this guards against**: `ea.addLaTex()` (Excalidraw's own ExcalidrawAutomate API,
+used by the auto-convert-on-blur path in `companion-manager.ts`) sizes the inserted image
+element from whatever its own MathJax-to-SVG pipeline reports back as the equation's
+dimensions. That size is font-metric-derived (ascent/descent/viewBox math) and is NOT
+reliably tight against the actual rendered ink for every equation shape -- a tall fraction,
+a lone variable, and a wide matrix don't get consistently-proportioned boxes. The result:
+some equations end up with a hit-target far smaller than what's visually painted, and
+which equations are affected is inconsistent, because the cause is upstream sizing math we
+don't control, not one fixable numeric bug.
+
+**The rule**: when inserting ANY equation/graph/rendered content onto the canvas, the
+clickable area a user can drag/select from must cover what they visually see, consistently,
+regardless of content shape. Do not trust a third-party API's (Excalidraw's, or any future
+one) self-reported size as automatically correct for this purpose -- it was designed for
+that API's own use case (typically just "big enough to display it"), not for guaranteeing
+hitbox-matches-visual-footprint. If reusing an upstream insertion API, either:
+- verify its sizing is visually-tight across a representative range of content shapes before
+  shipping, not just the one equation used to smoke-test the feature, or
+- take over sizing ourselves (e.g. an invisible backing rectangle bound to the visual
+  element, sized from OUR OWN measurement of the actual content, not the upstream API's
+  self-reported dimensions) so the guarantee doesn't depend on a third party's internals
+  staying consistent across their own future updates.
+
+**Why this matters enough to be a standing rule and not a one-off fix**: this class of bug
+is invisible in normal development/testing (you insert one equation, click it once, it
+works) and only surfaces as an inconsistent, hard-to-reproduce annoyance across real usage
+with varied content -- exactly the shape of bug most likely to get "it works for me"'d past
+review. Any new canvas-insertion feature should be checked against several structurally
+different equation/content shapes (short, tall, wide, nested fractions/roots) for hitbox
+consistency before being considered done, not just checked for visual correctness.
+
 ## Coding Standards
 
 ### Imports
