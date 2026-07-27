@@ -36,8 +36,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          gh release create "$tag" \
-            --title "Release $tag" \
+          # Obsidian's community plugin directory requires the GitHub release tag to
+          # match manifest.json's "version" field EXACTLY (no "v" prefix) -- it looks
+          # for a release "tagged identically to the version inside manifest.json".
+          # Deriving the release tag from manifest.json itself (rather than trusting
+          # whatever git tag triggered this workflow) makes this correct regardless of
+          # what tag naming convention gets pushed.
+          version=$(node -p "require('./repo-v2/manifest.json').version")
+          gh release create "$version" \
+            --title "Release $version" \
             --generate-notes \
             main.js manifest.json styles.css
