@@ -1,4 +1,4 @@
-# CLAUDE.md — King's CalcLatex v2 Codebase
+# CLAUDE.md — Kings CalcLaTeX v2 Codebase
 
 > **Code-level reference. Read the antipatterns section before touching `editor/` or `renderer/`.**
 > New session? Start at `../SESSION_START.md` first.
@@ -12,7 +12,7 @@
 
 ## What This Is
 
-King's CalcLatex v2 is a **100% browser-native** Obsidian plugin for inline math evaluation and high-fidelity 2D/3D graphing. No backend server. All computation in-browser.
+Kings CalcLaTeX v2 is a **100% browser-native** Obsidian plugin for inline math evaluation and high-fidelity 2D/3D graphing. No backend server. All computation in-browser.
 
 ## Architecture
 

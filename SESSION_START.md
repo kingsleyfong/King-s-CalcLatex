@@ -1,4 +1,4 @@
-# King's CalcLatex — Session Entry Point
+# Kings CalcLaTeX — Session Entry Point
 
 > **Point new agent sessions HERE, not at the full project folder.**
 > Load deeper docs only as needed — see the nav table below.
@@ -17,7 +17,7 @@
 
 ## Project Status: 🟢 WORKING (2026-04-06)
 
-**King's CalcLatex v2** — 100% browser-native Obsidian plugin. Inline LaTeX evaluation + high-fidelity 2D/3D graphing. No backend. TypeScript + CM6 + Three.js + Giac WASM.
+**Kings CalcLaTeX v2** — 100% browser-native Obsidian plugin. Inline LaTeX evaluation + high-fidelity 2D/3D graphing. No backend. TypeScript + CM6 + Three.js + Giac WASM.
 
 ---
 

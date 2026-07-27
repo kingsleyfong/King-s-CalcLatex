@@ -1,4 +1,4 @@
-# King's CalcLatex v2 — Development Notes & Learnings
+# Kings CalcLaTeX v2 — Development Notes & Learnings
 
 > **For LLM agents and future developers:** This file captures every non-obvious bug, architectural decision, and CortexJS quirk discovered during development. Read this before touching anything.
 

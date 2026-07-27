@@ -1,5 +1,5 @@
 /**
- * King's CalcLatex v2 — Settings Tab
+ * Kings CalcLaTeX v2 — Settings Tab
  *
  * Provides split settings UI for Markdown Note features and Excalidraw OD features.
  */
@@ -20,7 +20,7 @@ export class KCLSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "King's CalcLatex Settings" });
+    containerEl.createEl("h2", { text: "Kings CalcLaTeX Settings" });
 
     // ══════════════════════════════════════════════════════════════
     //  SECTION 1: MARKDOWN NOTE FEATURES (.md)

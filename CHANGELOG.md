@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **King's CalcLatex** will be documented in this file.
+All notable changes to **Kings CalcLaTeX** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Excalidraw OD LHS Element Styling Shortcuts**: non-conflicting left-hand keyboard shortcuts for styling canvas elements (`Shift + F` for Line Style, `Shift + D` for Stroke Width, `Shift + X` for Edge Roundness, `Shift + Q` for Sloppiness/Roughness), secondary number-key selection (`1`-`4`) with `stopPropagation()` so Excalidraw's own tool-switching shortcuts don't fire, a floating HUD toast showing the active options, and full configuration in Settings → Excalidraw OD.
+
+---
+
+## [3.8.2] - 2026-07-27
+
+### Changed
+- **Renamed the plugin from "King's CalcLatex" to "Kings CalcLaTeX"** to comply with Obsidian's community plugin naming rules ahead of directory submission — the `name` field only permits hyphens, plus signs, and parentheses as punctuation, and the apostrophe in "King's" was flagged as a violation. The plugin `id` (`kings-calclatex`) was already compliant and is unchanged, so this does not affect existing installs. Also took the opportunity to fix "Latex" → the conventional "LaTeX" capitalization.
 
 ---
 
@@ -160,7 +167,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.3.0] - 2026-07-21
 
 ### Added
-- **Native LaTeX Suite Ingestion**: Ingested LaTeX Suite snippet engine directly into King's CalcLatex. Provides CodeMirror 6 markdown snippet auto-expansion (`mk`, `dm`, `sr`, `cb`, `fra`, `pmat`, `bmat`, matrices, operators) across both standard `.md` notes and Excalidraw canvas overlays.
+- **Native LaTeX Suite Ingestion**: Ingested LaTeX Suite snippet engine directly into Kings CalcLaTeX. Provides CodeMirror 6 markdown snippet auto-expansion (`mk`, `dm`, `sr`, `cb`, `fra`, `pmat`, `bmat`, matrices, operators) across both standard `.md` notes and Excalidraw canvas overlays.
 - **Section 3 Settings Tab**: Added dedicated settings section **LaTeX Suite Features (Snippets & Fast Math Entry)** with toggle controls for snippet expansion, auto-fractions, and matrix shortcuts.
 - **Open-Source Attribution**: Created `ACKNOWLEDGEMENTS.md` and updated `README.md` crediting Gilles Castel & Arturo (LaTeX Suite), Developer-Mike (CalcTex), and Zsviczian (Excalidraw).
 
@@ -180,7 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.0] - 2026-07-21
 
 ### Added
-- **Excalidraw OD (On-Demand) Integration**: Consolidated `kings-excalidraw-math-companion` directly into `King's CalcLatex`, eliminating redundant separate plugins.
+- **Excalidraw OD (On-Demand) Integration**: Consolidated `kings-excalidraw-math-companion` directly into `Kings CalcLaTeX`, eliminating redundant separate plugins.
 - **Custom LaTeX Prompt Modal Positioning**: Added user configurable modal window placement setting (`latexModalPosition`) with default location **Near Bottom of Screen** (`bottom: 40px`), as well as `center`, `top`, and `cursor` options.
 - **Excalidraw Canvas Plotting**: Support rendering 2D/3D plots and inserting PNG plot elements directly into Excalidraw scenes via ExcalidrawAutomate (`ea`).
 - **Textarea Math Companion**: Live MathJax preview tooltip, color dot bar (`\color{red}`), and `\bbox` panel inside Excalidraw text editing overlays.

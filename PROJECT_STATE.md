@@ -1,14 +1,25 @@
-# King's CalcLatex — Project State
+# Kings CalcLaTeX — Project State
 
 > **This file is the canonical source of truth for LLM agents working on this project.**
 > Read this file at the START of every conversation. Update it at the END of every conversation.
 
 ## Quick Summary
-**King's CalcLatex** is an Obsidian desktop plugin that provides inline LaTeX evaluation, CAS computation, and high-fidelity 2D/3D graphing — all rendered directly in the editor.
+**Kings CalcLaTeX** is an Obsidian desktop plugin that provides inline LaTeX evaluation, CAS computation, and high-fidelity 2D/3D graphing — all rendered directly in the editor.
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 v3.8.1 — "Edit LaTeX" modal now capped to the Excalidraw pane width, with horizontal cursor-follow panning for long equations
+## Current Status: 🟢 v3.8.2 — renamed to "Kings CalcLaTeX" for Obsidian community directory compliance
+
+### What Happened (Part 47 — renamed "King's CalcLatex" → "Kings CalcLaTeX" for directory naming compliance)
+User is submitting to the official Obsidian community plugin directory via community.obsidian.md and hit a naming-convention rejection. Checked the actual current docs (`docs.obsidian.md/Reference/Manifest`) rather than relying on memory: the `manifest.json` `name` field only permits hyphens, plus signs, and parentheses as punctuation — the apostrophe in "King's" was the violation. The plugin `id` (`kings-calclatex`) was already compliant (lowercase+hyphens, doesn't contain "obsidian", doesn't end in "plugin") and did not need to change.
+
+User chose "Kings CalcLaTeX" (dropped the apostrophe, also fixed "Latex" → conventional "LaTeX" capitalization) over the plainer "Kings CalcLatex". Replaced across all user-facing/compliance-relevant surfaces: both `manifest.json` copies (root + `repo-v2/`), both `README.md` copies, both `CHANGELOG.md` copies, `ACKNOWLEDGEMENTS.md`, this file, both `CLAUDE.md` copies, `SESSION_START.md`, `CHEATSHEET.md`, `repo-v2/DEVELOPMENT_NOTES.md`, and the two actual runtime-visible strings in source (`settings.ts`'s Settings-tab `<h2>` header, `main.ts`'s startup `console.log`). Deliberately left untouched: `repo/` (explicitly read-only v1 codebase per this project's own conventions), `development/*.md` planning docs and `handoff_log.md` (historical snapshots/session log — retroactively renaming past entries would be revisionist busywork for zero benefit), and per-file `.ts` header doc-comments outside `main.ts`/`settings.ts` (cosmetic only, not user-facing, not compliance-relevant).
+
+Also researched and corrected earlier-session guidance to the user about the submission mechanism itself: it is NOT a PR to `community-plugins.json` anymore (that's outdated) — it's now a web form at community.obsidian.md (sign in with Obsidian account, link GitHub to prove repo ownership, Plugins → New plugin, enter repo URL). Confirmed via `docs.obsidian.md/Plugins/Releasing/Submit+your+plugin` and cross-checked developer policies (`docs.obsidian.md/Developer+policies`) for other compliance risks: confirmed zero network calls anywhere in `src/` (`giacwasm.js` is read from the local plugin folder via `fs`, never fetched), no auto-update mechanism, LICENSE present — no other blockers found.
+
+Typecheck and build clean. Shipped as v3.8.2 (patch — cosmetic rename, `id` unchanged so it's not a breaking change for anyone already on the plugin).
+
+**Needs live confirmation from user**: re-check the Settings tab header renders "Kings CalcLaTeX Settings" correctly, then resubmit through community.obsidian.md and confirm the naming-convention rejection clears.
 
 ### What Happened (Part 46 — modal width capped to Excalidraw pane + cursor-follow panning for long equations)
 User runs Excalidraw in split-screen and reported that with a long equation, the "Edit LaTeX" modal isn't constrained to the pane (renders centered on/wider than the whole app window) and the cursor "physically won't move" past a certain point when navigating with End/arrow keys. Diagnosed live with the user (without DOM access) by walking through Excalidraw's own `main.js`/`styles.css` (`.excalidraw-LatexPrompt .cm-editor { justify-content:center }`, `.cm-scroller { width:100% }`, no explicit width cap anywhere) and confirmed via their own End-key test that the cursor *is* moving correctly — it's landing off-screen because nothing gives the modal a hard width to stop growing at, so `.cm-scroller`'s horizontal auto-scroll-to-cursor never has a fixed box to pan within in the first place.

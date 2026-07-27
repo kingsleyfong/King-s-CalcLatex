@@ -1,4 +1,4 @@
-# CLAUDE.md — King's CalcLatex Project Root
+# CLAUDE.md — Kings CalcLaTeX Project Root
 
 > **Start here:** → `SESSION_START.md` (lean entry point for new sessions)
 > This file is a brief navigation index. Details live in `SESSION_START.md` and `repo-v2/CLAUDE.md`.

@@ -1,4 +1,4 @@
-# King's CalcLatex v2 — Cheat Sheet
+# Kings CalcLaTeX v2 — Cheat Sheet
 
 > **100% browser-native.** Type LaTeX inside `$...$`, add a trigger suffix, and results or graphs appear inline. Press **Tab** to insert the result into your note. No backend, no server.
 
@@ -718,7 +718,7 @@ $(1,2);(3,5);(5,9) @scatter lin #red$
 
 ## 14. Settings
 
-Open **Obsidian Settings → King's CalcLatex**.
+Open **Obsidian Settings → Kings CalcLaTeX**.
 
 | Setting | Default | Description |
 |:--------|:--------|:------------|
@@ -777,7 +777,7 @@ Both 2D and 3D graphs support export via toolbar buttons.
 
 ## 16. Graph Inspector
 
-Open via Command Palette: **King's CalcLatex: Open Graph Inspector**
+Open via Command Palette: **Kings CalcLaTeX: Open Graph Inspector**
 
 Shows for the active graph:
 - Expression LaTeX source

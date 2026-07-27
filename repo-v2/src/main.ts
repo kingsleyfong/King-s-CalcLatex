@@ -1,5 +1,5 @@
 /**
- * King's CalcLatex v2 — Plugin Entry Point
+ * Kings CalcLaTeX v2 — Plugin Entry Point
  *
  * Wires together the engine, renderer, editor, and views modules.
  * This is the default export consumed by Obsidian's plugin loader.
@@ -121,7 +121,7 @@ export default class KingsCalcLatexPlugin extends Plugin {
     }
 
     // 9. Startup confirmation
-    console.log("King's CalcLatex v2 loaded");
+    console.log("Kings CalcLaTeX v2 loaded");
   }
 
   onunload(): void {

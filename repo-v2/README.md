@@ -1,4 +1,4 @@
-# King's CalcLatex
+# Kings CalcLaTeX
 
 A **browser-native** Obsidian plugin that turns your vault into an engineering math workstation. Type LaTeX with trigger suffixes, and results or interactive graphs appear inline — no backend server, no external dependencies.
 
@@ -121,7 +121,7 @@ $100\text{kg} \to \text{lb} @convert$   → 220.462 lb
 
 ### From Community Plugins (recommended)
 1. Open **Settings > Community Plugins > Browse**
-2. Search for "King's CalcLatex"
+2. Search for "Kings CalcLaTeX"
 3. Click **Install**, then **Enable**
 
 ### Manual Installation
@@ -174,7 +174,7 @@ npm run build   # Production build
 
 ## Acknowledgements & Inspirations
 
-King's CalcLatex is built upon and inspired by several outstanding open-source projects (MIT License):
+Kings CalcLaTeX is built upon and inspired by several outstanding open-source projects (MIT License):
 - **LaTeX Suite** (by Gilles Castel & Arturo): Inspiration for snippet auto-expansion (`mk`, `dm`, `fra`, `pmat`), math mode detection, and tabstop traversal.
 - **CalcTex** (by Developer-Mike): Inspiration for inline LaTeX math evaluation in Markdown notes.
 - **Excalidraw & ExcalidrawAutomate** (by Zsviczian): Canvas rendering and scene injection APIs.

@@ -1,4 +1,4 @@
-# King's CalcLatex
+# Kings CalcLaTeX
 
 A **browser-native** Obsidian plugin that turns your vault into an engineering math workstation. Type LaTeX with trigger suffixes, and results or interactive graphs appear inline in your notes — no backend server, no external dependencies. It also extends into **Excalidraw**: canvas text auto-renders into equation images, and the full LaTeX Suite snippet engine (tabstops, auto-fraction, Greek letters, conceal, bracket coloring) works both in Markdown notes and inside Excalidraw's own "Edit LaTeX" modal.
 
@@ -189,7 +189,7 @@ Turns Excalidraw canvases into a math-aware surface, entirely through this plugi
 
 ### From Community Plugins (recommended)
 1. Open **Settings > Community Plugins > Browse**
-2. Search for "King's CalcLatex"
+2. Search for "Kings CalcLaTeX"
 3. Click **Install**, then **Enable**
 
 ### Manual Installation
@@ -246,7 +246,7 @@ Settings are organized into three sections:
 
 **3. LaTeX Suite Features** — snippet engine behavior (applies to both Markdown notes and Excalidraw): inline/display math triggers, tabstop navigation, auto-fraction, matrix shortcuts, conceal, bracket coloring/highlighting, math-preview tooltip, custom/regex snippets, and related fine-tuning.
 
-There are ~70 individual settings across these sections — open **Settings → King's CalcLatex** in Obsidian for the full, current list with descriptions; this README covers the highlights.
+There are ~70 individual settings across these sections — open **Settings → Kings CalcLaTeX** in Obsidian for the full, current list with descriptions; this README covers the highlights.
 
 ## Development
 

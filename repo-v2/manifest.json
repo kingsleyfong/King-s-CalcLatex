@@ -1,6 +1,6 @@
 {
 	"id": "kings-calclatex",
-	"name": "King's CalcLatex",
+	"name": "Kings CalcLaTeX",
 	"version": "3.8.1",
 	"minAppVersion": "1.0.0",
 	"description": "Browser-native engineering math and high-fidelity graphing for Obsidian.",

@@ -1,4 +1,21 @@
-# Handoff Log: King's CalcLatex Session Summary
+# Handoff Log: Kings CalcLaTeX Session Summary
+
+## Session: 2026-07-27 (Part 47) — Renamed "King's CalcLatex" → "Kings CalcLaTeX" for directory naming compliance
+
+### Status: 🟢 Cosmetic rename, mechanically applied. Typechecks and builds clean; not yet live-confirmed.
+
+User is submitting to the official Obsidian community plugin directory (via community.obsidian.md, not the outdated PR-to-`community-plugins.json` process I'd described earlier in this session -- verified and corrected against current docs) and hit a naming rejection. Root cause, found by actually reading `docs.obsidian.md/Reference/Manifest` rather than guessing: `manifest.json`'s `name` field only allows hyphens, plus signs, and parentheses as punctuation -- the apostrophe in "King's" was the violation. `id` (`kings-calclatex`) was already compliant, untouched.
+
+Asked the user to choose between "Kings CalcLatex" and "Kings CalcLaTeX" (fixing capitalization too) -- picked the latter. Replaced the literal string across every user-facing or compliance-relevant file (both `manifest.json`s, both `README.md`s, both `CHANGELOG.md`s, `ACKNOWLEDGEMENTS.md`, `PROJECT_STATE.md`, both `CLAUDE.md`s, `SESSION_START.md`, `CHEATSHEET.md`, `repo-v2/DEVELOPMENT_NOTES.md`) plus the two runtime-visible strings in source: `settings.ts`'s Settings-tab `<h2>` and `main.ts`'s startup `console.log`. Did a straight `sed -i "s/King's CalcLatex/Kings CalcLaTeX/g"` per whitelisted file (safe here -- fixed literal string, no regex risk) rather than the Edit tool one-by-one, since it was a mechanical, identical replacement across many files. Deliberately skipped `repo/` (read-only v1), `development/*.md` planning docs, and `handoff_log.md` itself (historical logs -- renaming past entries retroactively is pure busywork, not user-facing).
+
+While in the developer-policies doc anyway, checked for other compliance risks proactively: confirmed via `grep -rn "fetch(\|XMLHttpRequest\|requestUrl(" src/` that there are zero network calls anywhere in the plugin -- `giacwasm.js` is read from the local plugin folder via `fs`, never fetched over the network, so no remote-services disclosure is needed in the README. No auto-update mechanism found either (also prohibited). No other blockers surfaced.
+
+Typecheck clean (grep-filtered for `settings.ts`/`main.ts`, no hits -- the file has pre-existing unrelated errors elsewhere, not touched here). Build clean, synced to vault. Shipped as **v3.8.2** (patch -- cosmetic, `id` unchanged, not a breaking change for existing installs).
+
+### Needs live confirmation
+Settings tab should now read "Kings CalcLaTeX Settings" in the header. Resubmit through community.obsidian.md and confirm the naming-convention rejection actually clears this time.
+
+---
 
 ## Session: 2026-07-27 (Part 46) — Modal width capped to Excalidraw pane; long-equation cursor-follow panning
 
