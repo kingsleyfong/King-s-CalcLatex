@@ -681,6 +681,41 @@ foreignEditorView.dispatch({
 });
 ```
 
+### 24. GitHub release tags MUST exactly match `manifest.json`'s `version` field, with NO `v` prefix (RUNTIME BUG 2026-07-27)
+
+Obsidian's community plugin directory (and the in-app updater, once listed) look for a
+GitHub release "tagged identically to the version inside manifest.json" -- an exact string
+match, e.g. `manifest.json` version `"3.8.2"` requires a release tagged literally `3.8.2`,
+not `v3.8.2`. Every release in this project's history (`v2.0.0` through `v3.8.2`, 20
+releases) used a `v`-prefixed tag, because `.github/workflows/release.yml` derived the
+release tag from whatever git ref triggered the push (`tag="${GITHUB_REF#refs/tags/}"`)
+instead of from `manifest.json` itself -- this silently never matched, for the entire
+project's lifetime, and only surfaced once Obsidian's directory review actually validated
+it ("No release matches your manifest version"). BRAT and manual installs never noticed
+because they just grab the latest release regardless of tag-vs-manifest match; only the
+official directory's strict validation catches this.
+
+**Fixed**: the release workflow now reads `manifest.json`'s `version` directly
+(`node -p "require('./repo-v2/manifest.json').version"`) and uses that as the release tag,
+decoupled from whatever git tag was actually pushed. **Going forward, push git tags WITHOUT
+a `v` prefix** (`git tag -a 3.8.3`, not `v3.8.3`) -- since the workflow triggers on any tag
+push (`tags: ["v*", "*"]`) and creates the release using the manifest version regardless,
+pushing a `v`-prefixed tag would still produce a correctly-tagged release, but as a SECOND,
+redundant tag alongside the one you pushed (two tags, same commit, only one of which the
+directory/updater will ever find). One tag per release, matching manifest.json exactly,
+avoids that redundancy entirely.
+
+```yaml
+# ❌ WRONG -- release tag is whatever the pushed git ref happened to be named,
+# never validated against manifest.json; matched nothing for 20 releases
+tag="${GITHUB_REF#refs/tags/}"
+gh release create "$tag" ...
+
+# ✅ CORRECT -- release tag is always exactly manifest.json's version
+version=$(node -p "require('./repo-v2/manifest.json').version")
+gh release create "$version" ...
+```
+
 ## Coding Standards
 
 ### Imports

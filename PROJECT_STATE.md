@@ -8,7 +8,18 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 v3.8.2 — renamed to "Kings CalcLaTeX" for Obsidian community directory compliance
+## Current Status: 🟢 v3.8.2 — release-tag/manifest-version mismatch fixed (blocked directory submission), retroactive `3.8.2` release created
+
+### What Happened (Part 48 — release workflow tagged releases wrong for the entire project's history; fixed + unblocked pending directory submission)
+User's community.obsidian.md submission showed "No release matches your manifest version" ("Make sure your GitHub release doesn't use a 'v' in front of the version number"). Read `.github/workflows/release.yml`: it derived the release tag from the pushed git ref (`tag="${GITHUB_REF#refs/tags/}"`) instead of from `manifest.json`'s `version` field. Every release this project has ever shipped (`v2.0.0` through `v3.8.2`, all 20) was tagged with a `v` prefix while `manifest.json`'s version never had one -- an exact-match mismatch that's existed since the very first release, invisible to BRAT/manual installs (they just grab the latest release regardless) and only caught now because the directory's review actually validates the match.
+
+**Fixed the workflow**: now reads `manifest.json`'s version directly (`node -p "require('./repo-v2/manifest.json').version"`) and tags the release with that string, decoupled from whatever git tag triggered the build. Documented as antipattern #24 in `repo-v2/CLAUDE.md`, including the going-forward convention: push git tags WITHOUT a `v` prefix from now on, since the workflow will still correctly self-tag off manifest.json either way, but a `v`-prefixed push would create a redundant second tag on the same commit.
+
+**Unblocked the immediate submission** without waiting for a new version cycle: created a `3.8.2` (no `v`) release by hand, `--target` pointed at the same commit as the existing `v3.8.2` release, with the same three assets (`main.js`, `manifest.json`, `styles.css`). Verified via `gh release view 3.8.2` that the tag, target commit, and asset list are all correct.
+
+**Left alone, deliberately**: the other 19 historical `vX.Y.Z` releases/tags. Only the current version needs to match for the directory review to pass -- retroactively fixing history would mean deleting+recreating 19 releases (real GitHub churn, breaks any existing links to those release URLs) for zero functional benefit, since nobody's manifest.json will ever again point at those old versions expecting a match. Flagged to the user as a scope choice rather than assumed.
+
+**Needs live confirmation from user**: refresh the community.obsidian.md submission page -- the "No release matches your manifest version" error should be gone now that a `3.8.2`-tagged release exists.
 
 ### What Happened (Part 47 — renamed "King's CalcLatex" → "Kings CalcLaTeX" for directory naming compliance)
 User is submitting to the official Obsidian community plugin directory via community.obsidian.md and hit a naming-convention rejection. Checked the actual current docs (`docs.obsidian.md/Reference/Manifest`) rather than relying on memory: the `manifest.json` `name` field only permits hyphens, plus signs, and parentheses as punctuation — the apostrophe in "King's" was the violation. The plugin `id` (`kings-calclatex`) was already compliant (lowercase+hyphens, doesn't contain "obsidian", doesn't end in "plugin") and did not need to change.
