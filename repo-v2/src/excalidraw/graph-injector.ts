@@ -47,11 +47,13 @@ export class GraphInjector {
 
   private async render2DToImage(spec: any, width: number, height: number): Promise<string | null> {
     const container = document.createElement("div");
-    container.style.width = `${width}px`;
-    container.style.height = `${height}px`;
-    container.style.position = "absolute";
-    container.style.left = "-9999px";
-    container.style.top = "-9999px";
+    container.setCssStyles({
+      width: `${width}px`,
+      height: `${height}px`,
+      position: "absolute",
+      left: "-9999px",
+      top: "-9999px",
+    });
     document.body.appendChild(container);
 
     try {

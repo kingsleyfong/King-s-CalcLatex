@@ -5,6 +5,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# v1 codebase -- kept locally for reference, no longer part of the GitHub repo
+# (unreferenced by the build; was tripping the Obsidian community plugin
+# directory's automated review, e.g. "Uses Obsidian APIs newer than
+# declared minAppVersion")
+/repo/
+
 # Build artifacts (keep main.js for reference)
 repo-v2/*.js.map
 repo-v2/dist/

@@ -430,7 +430,7 @@ export function compileToFunction(
   // ──────────────────────────────────────────────────────────────────
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval -- compiles a locally-generated numeric expression (from parsed LaTeX, never remote/user-typed-as-code) into a callable evaluator for graphing; no external code is ever executed here
     const fn = new Function(...vars, `"use strict"; ${freeVarBindings}return (${jsStr});`);
     return (...args: number[]): number => {
       try {

@@ -128,8 +128,6 @@ export default class KingsCalcLatexPlugin extends Plugin {
     if (this.excalidrawCompanion) {
       this.excalidrawCompanion.onunload();
     }
-    // Detach all Graph Inspector leaves to prevent orphaned views
-    this.app.workspace.detachLeavesOfType(GRAPH_INSPECTOR_VIEW);
     // Terminate Giac WASM worker to prevent memory leaks across plugin reloads
     terminateGiac();
   }

@@ -137,11 +137,8 @@ export function create2DGraph(
   // ── Canvas Setup ────────────────────────────────────────────────
 
   const canvas = document.createElement("canvas");
-  canvas.style.display = "block";
-  canvas.style.width = "100%";
-  canvas.style.height = "100%";
+  canvas.setCssStyles({ display: "block", width: "100%", height: "100%", outline: "none" });
   canvas.tabIndex = 0;
-  canvas.style.outline = "none";
   container.appendChild(canvas);
 
   const ctx = canvas.getContext("2d")!;
@@ -174,8 +171,13 @@ export function create2DGraph(
   // (e.g. with renderMath) by the caller after graph creation.
   const labelOverlayEl = document.createElement("div");
   labelOverlayEl.className = "kcl-graph-2d-labels";
-  labelOverlayEl.style.cssText =
-    "position:absolute;top:8px;left:8px;pointer-events:none;z-index:2;";
+  labelOverlayEl.setCssStyles({
+    position: "absolute",
+    top: "8px",
+    left: "8px",
+    pointerEvents: "none",
+    zIndex: "2",
+  });
   container.appendChild(labelOverlayEl);
 
   // ── Interaction State ───────────────────────────────────────────
@@ -1342,7 +1344,7 @@ export function create2DGraph(
 
       const lbl = document.createElement("div");
       lbl.className = "kcl-graph-2d-label";
-      lbl.style.cssText = `color:${color};font-size:12px;line-height:18px;`;
+      lbl.setCssStyles({ color, fontSize: "12px", lineHeight: "18px" });
       // data-latex: the LaTeX to render via MathJax. Empty for plain-text labels.
       lbl.dataset.latex = pd.label ? "" : cleanLatex;
       lbl.textContent = cleanLatex; // placeholder — replaced by caller via onLabelsBuilt
@@ -1464,8 +1466,7 @@ export function create2DGraph(
 
   // Grid toggle button
   const gridBtn = document.createElement("button");
-  gridBtn.className = "kcl-graph-reset";
-  gridBtn.style.right = "44px";
+  gridBtn.className = "kcl-graph-reset kcl-graph-grid-btn";
   gridBtn.textContent = "\u25A6";
   gridBtn.title = "Toggle grid: All / Major / None";
   gridBtn.addEventListener("click", (e) => {
@@ -1480,15 +1481,14 @@ export function create2DGraph(
 
   // POI toggle button
   const poiBtn = document.createElement("button");
-  poiBtn.className = "kcl-graph-reset";
-  poiBtn.style.right = "80px";
+  poiBtn.className = "kcl-graph-reset kcl-graph-poi-btn";
   poiBtn.textContent = "\u25C9"; // ◉
   poiBtn.title = "Toggle points of interest";
-  poiBtn.style.opacity = poisEnabled ? "" : "0.4";
+  poiBtn.classList.toggle("is-poi-disabled", !poisEnabled);
   poiBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     poisEnabled = !poisEnabled;
-    poiBtn.style.opacity = poisEnabled ? "" : "0.4";
+    poiBtn.classList.toggle("is-poi-disabled", !poisEnabled);
     if (poisEnabled && !cachedPOIs) recomputePOIs();
     scheduleRender();
   });

@@ -24,7 +24,7 @@ export class PreviewTooltip {
 
     this.tooltip = document.createElement("div");
     this.tooltip.className = "kcl-preview-tooltip";
-    this.tooltip.style.display = "none";
+    this.tooltip.setCssStyles({ display: "none" });
     document.body.appendChild(this.tooltip);
   }
 
@@ -63,7 +63,7 @@ export class PreviewTooltip {
   hide(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     if (this.tooltip) {
-      this.tooltip.style.display = "none";
+      this.tooltip.setCssStyles({ display: "none" });
     }
   }
 
@@ -95,25 +95,25 @@ export class PreviewTooltip {
     const rect = textarea.getBoundingClientRect();
     this.tooltip.innerHTML = "";
     this.tooltip.appendChild(svg);
-    this.tooltip.style.display = "block";
+    this.tooltip.setCssStyles({ display: "block" });
 
     let left = rect.left;
     const tooltipWidth = this.tooltip.offsetWidth;
     if (left + tooltipWidth > window.innerWidth) {
       left = Math.max(8, window.innerWidth - tooltipWidth - 8);
     }
-    this.tooltip.style.left = `${left}px`;
+    this.tooltip.setCssStyles({ left: `${left}px` });
 
     const position = this.settings.excalidrawPreviewPosition || "below";
     if (position === "above") {
-      this.tooltip.style.top = `${rect.top - this.tooltip.offsetHeight - 8}px`;
+      this.tooltip.setCssStyles({ top: `${rect.top - this.tooltip.offsetHeight - 8}px` });
       if (this.tooltip.getBoundingClientRect().top < 0) {
-        this.tooltip.style.top = `${rect.bottom + 8}px`;
+        this.tooltip.setCssStyles({ top: `${rect.bottom + 8}px` });
       }
     } else {
-      this.tooltip.style.top = `${rect.bottom + 8}px`;
+      this.tooltip.setCssStyles({ top: `${rect.bottom + 8}px` });
       if (this.tooltip.getBoundingClientRect().bottom > window.innerHeight) {
-        this.tooltip.style.top = `${rect.top - this.tooltip.offsetHeight - 8}px`;
+        this.tooltip.setCssStyles({ top: `${rect.top - this.tooltip.offsetHeight - 8}px` });
       }
     }
   }
@@ -199,8 +199,7 @@ export class PreviewTooltip {
         if (res?.dataURL) {
           const img = document.createElement("img");
           img.src = res.dataURL;
-          img.style.maxWidth = "400px";
-          img.style.maxHeight = "200px";
+          img.setCssStyles({ maxWidth: "400px", maxHeight: "200px" });
           this.setCache(latex, img);
           return img.cloneNode(true) as any;
         }

@@ -257,20 +257,19 @@ export class ExcalidrawShortcutManager {
 			];
 		}
 
-		const variantsHtml = variants
-			.map(
-				(v) => `
-			<span class="kcl-hud-badge ${v.num === activeVariantIdx ? "is-active" : ""}">
-				<kbd>${v.num}</kbd> ${v.label}
-			</span>
-		`
-			)
-			.join("");
+		hud.empty();
 
-		hud.innerHTML = `
-			<div class="kcl-hud-title">Excalidraw OD · ${categoryLabel}</div>
-			<div class="kcl-hud-variants">${variantsHtml}</div>
-		`;
+		const title = hud.createDiv({ cls: "kcl-hud-title" });
+		title.setText(`Excalidraw OD · ${categoryLabel}`);
+
+		const variantsRow = hud.createDiv({ cls: "kcl-hud-variants" });
+		for (const v of variants) {
+			const badge = variantsRow.createSpan({
+				cls: `kcl-hud-badge${v.num === activeVariantIdx ? " is-active" : ""}`,
+			});
+			badge.createEl("kbd", { text: String(v.num) });
+			badge.appendText(` ${v.label}`);
+		}
 
 		hud.classList.add("is-visible");
 		this.hudEl = hud;

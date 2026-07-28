@@ -9,67 +9,11 @@ import { ArrayNode, BaseNode, SnippetStringNode, SnippetTabstopOnlyNode, VisualS
 
 export type SnippetVariables = Record<string, string>;
 
-function importModule(source: string, identifier: string): Promise<object> {
-	const sourceWithSourceURL = `${source}\n//# sourceURL=latex-suite:${identifier}`;
-	const blob = new Blob([sourceWithSourceURL], { type: "text/javascript" });
-	const url = URL.createObjectURL(blob);
-	// eslint-disable-next-line no-unsanitized/method
-	const result = import(url);
-	URL.revokeObjectURL(url);
-	return result;
-}
-
-async function importRaw(module: string, identifier: string): Promise<unknown> {
-	let data: object;
-	try {
-		data = await importModule(module, identifier);
-	} catch (e) {
-		console.error(e)
-		try {
-		data = await importModule("export default " + module, identifier);
-		} catch (e) {
-			console.error(e)
-			throw new Error("Invalid format");
-		}
-	}
-	if ("default" in data) {
-		return data.default;
-	} else {
-		throw new Error("No default export found");
-	}
-}
-
-export async function parseSnippetVariables(snippetVariablesStr: string, identifier: string) {
-	const rawSnippetVariables = await importRaw(snippetVariablesStr, identifier) as SnippetVariables;
-
-	if (Array.isArray(rawSnippetVariables))
-		throw new Error("Cannot parse an array as a variables object");
-
-	const snippetVariables: SnippetVariables = {};
-	for (const [variable, value] of Object.entries(rawSnippetVariables)) {
-		if (variable.startsWith("${")) {
-			if (!variable.endsWith("}")) {
-				throw new Error(`Invalid snippet variable name '${variable}': Starts with '\${' but does not end with '}'. You need to have both or neither.`);
-			}
-			snippetVariables[variable] = value;
-		} else {
-			if (variable.endsWith("}")) {
-				throw new Error(`Invalid snippet variable name '${variable}': Ends with '}' but does not start with '\${'. You need to have both or neither.`);
-			}
-			snippetVariables["${" + variable + "}"] = value;
-		}
-	}
-	return snippetVariables;
-}
-const preamble = String.raw`
-var __latex_suite_require = window.__latex_suite_require;
-function require(module) {
-	if (!__latex_suite_require) {
-		__latex_suite_require = window.__latex_suite_require;
-	}
-	return __latex_suite_require(module);
-}
-`
+// NOTE: upstream LaTeX Suite also exports parseSnippets()/parseSnippetVariables() here, which
+// eval raw JS *source strings* via a Blob-URL dynamic import (importModule/importRaw). This fork
+// never calls them -- snippet data is pre-compiled at build time and fed to parseRawSnippetArray()
+// below instead (see repo-v2/CLAUDE.md antipattern 0(f)) -- so they were deleted entirely rather
+// than kept as unreachable eval-capable dead code.
 
 function latex_suite_require(default_snippets: SnippetVariables) {
 	const parsed_api = api(default_snippets);
@@ -97,33 +41,6 @@ export function parseRawSnippetArray(rawSnippetsInput: any[], snippetVariables: 
 		}
 	});
 	return sortSnippets(parsedSnippets);
-}
-
-export async function parseSnippets(snippetsStr: string, snippetVariables: SnippetVariables, identifier: string) {
-	window.__latex_suite_require = latex_suite_require(snippetVariables);
-	const rawSnippets = await importRaw(snippetsStr + preamble, identifier);
-
-	let parsedSnippets;
-	try {
-		// validate the shape of the raw snippets
-		const rawValidatedSnippets = validateRawSnippets(rawSnippets);
-
-		parsedSnippets = rawValidatedSnippets.map((raw) => {
-			try {
-				// Normalize the raw snippet and convert it into a Snippet
-				return parseSnippet(raw, snippetVariables);
-			} catch (e) {
-				// provide context of which snippet errored
-				throw new Error(`${e}\nErroring snippet:\n${serializeSnippetLike(raw)}`);
-			}
-		});
-	} catch(e) {
-		throw new Error(`Invalid snippet format: ${e}`);
-	}
-
-	parsedSnippets = sortSnippets(parsedSnippets);
-
-	return parsedSnippets;
 }
 
 /** raw snippet IR */

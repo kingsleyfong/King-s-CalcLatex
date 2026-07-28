@@ -111,26 +111,43 @@ export class SidebarStyleEnhancer {
       (el: any) => el.type === "text" && el.customData?.kclUnderlineLineId,
     );
 
-    stylesRow.innerHTML = `
-			<h3 class="control-label">Text Styles</h3>
-			<div class="buttonList">
-				<button type="button" class="kcl-underline-btn ${isUnderlined ? "is-active" : ""}" title="Underline">
-					<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: block;">
-						<path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6 -6V3"></path>
-						<line x1="4" y1="21" x2="20" y2="21"></line>
-					</svg>
-				</button>
-			</div>
-		`;
+    stylesRow.createEl("h3", { cls: "control-label", text: "Text Styles" });
+    const buttonList = stylesRow.createDiv({ cls: "buttonList" });
+    const btn = buttonList.createEl("button", {
+      cls: `kcl-underline-btn${isUnderlined ? " is-active" : ""}`,
+      attr: { type: "button", title: "Underline" },
+    });
 
-    const btn = stylesRow.querySelector(".kcl-underline-btn");
-    if (btn) {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggleUnderline(view);
-      });
-    }
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2.5");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("class", "kcl-underline-icon");
+
+    const path = document.createElementNS(svgNS, "path");
+    path.setAttribute("d", "M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6 -6V3");
+    svg.appendChild(path);
+
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", "4");
+    line.setAttribute("y1", "21");
+    line.setAttribute("x2", "20");
+    line.setAttribute("y2", "21");
+    svg.appendChild(line);
+
+    btn.appendChild(svg);
+
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleUnderline(view);
+    });
 
     targetRow.insertAdjacentElement("afterend", stylesRow);
   }

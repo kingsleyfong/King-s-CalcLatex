@@ -461,7 +461,6 @@ export function terminateGiac(): void {
   }
   giacReady = false;
   loadPromise = null;
-  _inlineCaseval = null;
   for (const [id, { resolve }] of pendingRequests) {
     resolve({ value: null, steps: [] });
   }
@@ -483,8 +482,8 @@ export function terminateGiac(): void {
  * This means the 19MB JS parse + WASM compile happen entirely off the main
  * thread, preventing any UI freeze.
  *
- * Fallback: if Worker creation fails (e.g. sandboxed environment), the
- * function resolves false without crashing.
+ * If Worker creation fails (e.g. sandboxed environment), the function
+ * resolves false without crashing.
  */
 export function initGiac(pluginDir: string): Promise<boolean> {
   if (loadPromise) return loadPromise;
@@ -525,10 +524,9 @@ export function initGiac(pluginDir: string): Promise<boolean> {
         // The URL can be revoked immediately after Worker construction
         URL.revokeObjectURL(workerUrl);
       } catch (workerErr) {
-        // Worker creation failed — fall back to old inline-script approach
-        console.warn("KCL: Web Worker creation failed, falling back to inline script:", workerErr);
+        console.warn("KCL: Web Worker creation failed:", workerErr);
         clearTimeout(timeout);
-        resolve(_fallbackInlineLoad(giacPath, fs));
+        resolve(false);
         return;
       }
 
@@ -600,67 +598,6 @@ export function initGiac(pluginDir: string): Promise<boolean> {
   return loadPromise;
 }
 
-/**
- * Fallback: load Giac on the main thread via inline <script> injection.
- * Used when Web Worker creation fails.
- */
-function _fallbackInlineLoad(giacPath: string, fs: any): Promise<boolean> {
-  return new Promise<boolean>((resolve) => {
-    try {
-      const oldModule = (window as any).Module;
-      const timeout = setTimeout(() => {
-        if (!giacReady) {
-          console.warn("KCL: Giac inline fallback timed out (60s)");
-          resolve(false);
-        }
-      }, 60000);
-
-      (window as any).Module = {
-        ready: false,
-        worker: false,
-        print: () => {},
-        printErr: () => {},
-        canvas: null,
-        setStatus: () => {},
-        onRuntimeInitialized: () => {
-          clearTimeout(timeout);
-          try {
-            // In fallback mode, wrap caseval to work with our async interface
-            const rawCaseval = (window as any).Module.cwrap("caseval", "string", ["string"]);
-            // Monkey-patch the worker.postMessage path to use the inline caseval
-            _inlineCaseval = rawCaseval;
-            giacReady = true;
-            console.log("KCL: Giac WASM initialized via inline fallback");
-            resolve(true);
-          } catch (e) {
-            console.error("KCL: Giac cwrap failed (inline fallback):", e);
-            if (oldModule) (window as any).Module = oldModule;
-            resolve(false);
-          }
-        },
-      };
-
-      console.log("KCL: Loading giacwasm.js via inline script (fallback)…");
-      const code = fs.readFileSync(giacPath, "utf8");
-      const script = document.createElement("script");
-      script.textContent = code;
-      document.head.appendChild(script);
-      document.head.removeChild(script);
-      console.log("KCL: giacwasm.js executed (inline fallback), waiting for WASM init…");
-    } catch (e) {
-      console.error("KCL: Giac inline fallback error:", e);
-      resolve(false);
-    }
-  });
-}
-
-/**
- * In fallback (inline) mode, this holds the raw caseval function.
- * It is used by _workerEval to directly call caseval synchronously,
- * while still preserving the async Promise interface.
- */
-let _inlineCaseval: ((s: string) => string) | null = null;
-
 // ══════════════════════════════════════════════════════════════
 //  RAW GIAC EVAL (async)
 // ══════════════════════════════════════════════════════════════
@@ -671,18 +608,6 @@ let _inlineCaseval: ((s: string) => string) | null = null;
  */
 function workerEval(expr: string): Promise<string | null> {
   if (!giacReady) return Promise.resolve(null);
-
-  // Inline fallback path: call caseval synchronously, wrap in Promise
-  if (!worker && _inlineCaseval) {
-    try {
-      const result = _inlineCaseval(expr);
-      if (!result || result.startsWith("GIAC_ERROR")) return Promise.resolve(null);
-      return Promise.resolve(result);
-    } catch {
-      return Promise.resolve(null);
-    }
-  }
-
   if (!worker) return Promise.resolve(null);
 
   return new Promise<string | null>((resolve, reject) => {
@@ -702,12 +627,6 @@ function workerEval(expr: string): Promise<string | null> {
 function workerEvalWithSteps(expr: string): Promise<WorkerResult> {
   const empty: WorkerResult = { value: null, steps: [] };
   if (!giacReady) return Promise.resolve(empty);
-
-  // Inline fallback path: intercept window.Module.print
-  if (!worker && _inlineCaseval) {
-    return _inlineEvalWithSteps(expr);
-  }
-
   if (!worker) return Promise.resolve(empty);
 
   return new Promise<WorkerResult>((resolve, reject) => {
@@ -715,37 +634,6 @@ function workerEvalWithSteps(expr: string): Promise<WorkerResult> {
     pendingRequests.set(id, { resolve, reject });
     worker!.postMessage({ type: "eval_steps", id, expr });
   });
-}
-
-/**
- * Inline fallback for step capture: temporarily intercept window.Module.print.
- */
-function _inlineEvalWithSteps(expr: string): Promise<WorkerResult> {
-  const empty: WorkerResult = { value: null, steps: [] };
-  try {
-    const steps: string[] = [];
-    const mod = (window as any).Module;
-    const origPrint = mod?.print;
-    if (mod) {
-      mod.print = (msg: string) => {
-        if (typeof msg === "string" && msg.trim()) steps.push(msg);
-      };
-    }
-    try {
-      _inlineCaseval!("debug_infolevel(1)");
-      const result = _inlineCaseval!(expr);
-      _inlineCaseval!("debug_infolevel(0)");
-      if (mod) mod.print = origPrint || (() => {});
-      const value = (result && !result.startsWith("GIAC_ERROR")) ? result : null;
-      return Promise.resolve({ value, steps });
-    } catch {
-      if (mod) mod.print = origPrint || (() => {});
-      try { _inlineCaseval!("debug_infolevel(0)"); } catch { /* ignore */ }
-      return Promise.resolve(empty);
-    }
-  } catch {
-    return Promise.resolve(empty);
-  }
 }
 
 /**

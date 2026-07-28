@@ -554,10 +554,10 @@ export class Graph2DWidget extends WidgetType {
       () => container.querySelector("canvas"),
       () => {
         requestAnimationFrame(() => {
-          container.style.display = "none";
-          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          container.setCssStyles({ display: "none" });
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- reading offsetHeight forces a synchronous reflow, flushing the display:none toggle before it's reversed on the next line
           container.offsetHeight;
-          container.style.display = "";
+          container.setCssStyles({ display: "" });
         });
       },
     );
@@ -772,7 +772,7 @@ export class Graph3DWidget extends WidgetType {
         const color = pd.color || COLORS[i % COLORS.length];
         const lbl = document.createElement("div");
         lbl.className = "kcl-graph-3d-label";
-        lbl.style.color = color;
+        lbl.setCssProps({ color });
         // Use plain-text label for dataset/scatter types; strip ALL trigger suffixes otherwise
         const cleanLatex = pd.label ?? pd.latex.replace(/@\w+.*$/i, "").trim();
         if (pd.label) {

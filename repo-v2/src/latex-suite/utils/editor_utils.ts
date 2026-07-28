@@ -135,11 +135,11 @@ export function escalateToToken(cursor: TreeCursor, dir: Direction, target: stri
  * Returns true even if the given event is the first keydown event of an IME composition.
  */
 export function isComposing(view: EditorView, event: KeyboardEvent): boolean {
-	// view.composing and event.isComposing are false for the first keydown event of an IME composition,
-	// so we need to check for event.keyCode === 229 to prevent IME from triggering keydown events.
-	// Note that keyCode is deprecated - it is used here because it is apparently the only way to detect the first keydown event of an IME composition.
-	// eslint-disable-next-line @typescript-eslint/no-deprecated
-	return view.composing || event.keyCode === 229;
+	// view.composing and event.isComposing are false for the first keydown event of an IME composition.
+	// event.key === "Process" is the modern, non-deprecated signal for exactly that first keydown
+	// (browsers set it whenever a key event is being handled by an IME), superseding the old
+	// event.keyCode === 229 check.
+	return view.composing || event.key === "Process";
 }
 
 /**

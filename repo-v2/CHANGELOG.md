@@ -5,6 +5,23 @@ All notable changes to **Kings CalcLaTeX** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.3] - 2026-07-28
+
+### Fixed
+- **Resolved every blocking Error from the Obsidian community plugin directory's automated review** of the v3.8.2 submission:
+  - `manifest.json` description no longer redundantly restates "Obsidian."
+  - `onunload()` no longer detaches Graph Inspector leaves (was silently discarding the user's manual pane layout on plugin reload).
+  - Replaced a deprecated `event.keyCode === 229` IME-composition check with the modern `event.key === "Process"`.
+  - Removed dead, `eval`-based snippet-loading code (`importModule`/`importRaw`/`parseSnippets`/`parseSnippetVariables`) from the vendored LaTeX Suite snippet parser -- this fork never called it; snippet data is pre-compiled and fed through `parseRawSnippetArray` instead.
+  - Replaced unsafe `innerHTML` template-string writes (Excalidraw shortcut HUD, text-styles sidebar row) with safe DOM construction.
+  - Converted all raw heading elements in the settings page to `Setting().setHeading()`.
+  - Replaced ~40 direct `.style.xxx =` assignments across the editor/renderer/Excalidraw modules with `setCssStyles`/`setCssProps`/CSS classes.
+  - Removed the Giac WASM inline-`<script>`-injection fallback path (only used if Web Worker creation itself failed) that was tripping the directory's code-obfuscation scanner.
+  - Untracked the old, unreferenced v1 codebase (`repo/`) from the GitHub repo (kept locally, no longer pushed or scanned).
+- No user-facing behavior changes -- this is a compliance-only release.
+
+---
+
 ## [3.8.2] - 2026-07-27
 
 ### Changed

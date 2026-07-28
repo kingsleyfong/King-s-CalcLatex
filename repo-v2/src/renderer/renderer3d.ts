@@ -90,10 +90,7 @@ const REBUILD_DEBOUNCE_MS = 150;
 
 function showError(container: HTMLElement, message: string): void {
   const div = document.createElement("div");
-  div.className = "kcl-graph-error";
-  div.style.cssText =
-    "padding:12px;color:#e55;font-size:13px;font-family:monospace;" +
-    "border:1px solid #e55;border-radius:4px;background:#2a1515;";
+  div.className = "kcl-graph-error kcl-graph-error-3d";
   div.textContent = `3D Graph error: ${message}`;
   container.appendChild(div);
 }
@@ -1386,7 +1383,7 @@ export function create3DGraph(
     // ── 3D Hover Coordinates (Raycaster + tooltip) ───────────────
     tooltip = document.createElement("div");
     tooltip.className = "kcl-graph-3d-tooltip";
-    tooltip.style.display = "none";
+    tooltip.setCssStyles({ display: "none" });
     container.appendChild(tooltip);
 
     const raycaster = new Raycaster();
@@ -1414,16 +1411,18 @@ export function create3DGraph(
         const fy = parseFloat(mathY.toPrecision(3));
         const fz = parseFloat(mathZ.toPrecision(3));
         tooltip.textContent = `(${fx}, ${fy}, ${fz})`;
-        tooltip.style.display = "block";
-        tooltip.style.left = `${e.clientX - rect.left + 12}px`;
-        tooltip.style.top = `${e.clientY - rect.top - 24}px`;
+        tooltip.setCssStyles({
+          display: "block",
+          left: `${e.clientX - rect.left + 12}px`,
+          top: `${e.clientY - rect.top - 24}px`,
+        });
       } else {
-        tooltip.style.display = "none";
+        tooltip.setCssStyles({ display: "none" });
       }
     };
 
     mouseLeaveHandler = () => {
-      tooltip.style.display = "none";
+      tooltip.setCssStyles({ display: "none" });
     };
 
     renderer.domElement.addEventListener("mousemove", mouseMoveHandler);
@@ -1815,11 +1814,11 @@ function createLabelOverlay(
     const text = pd.label ?? pd.latex.replace(/@\w+.*$/i, "").trim();
 
     if (failedLatexSet.has(pd.latex)) {
-      label.style.color = "#e05555";
+      label.setCssProps({ color: "#e05555" });
       label.textContent = `⚠ ${text}`;
       label.title = "Surface not found in current range. Check browser console for details.";
     } else {
-      label.style.color = color;
+      label.setCssProps({ color });
       label.textContent = text;
       // data-latex enables the widget to post-process with renderMath (renderer has no Obsidian API)
       if (!pd.label) label.dataset.latex = text;
@@ -1845,8 +1844,14 @@ export function renderSnapshot(
   showTicks = true,
 ): string {
   const temp = document.createElement("div");
-  temp.style.cssText =
-    "position:fixed;left:-10000px;top:-10000px;width:800px;height:400px;visibility:hidden;";
+  temp.setCssStyles({
+    position: "fixed",
+    left: "-10000px",
+    top: "-10000px",
+    width: "800px",
+    height: "400px",
+    visibility: "hidden",
+  });
   document.body.appendChild(temp);
 
   try {

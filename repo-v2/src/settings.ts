@@ -20,13 +20,15 @@ export class KCLSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Kings CalcLaTeX Settings" });
+    new Setting(containerEl).setName("Kings CalcLaTeX Settings").setHeading().setClass("kcl-settings-title");
 
     // ══════════════════════════════════════════════════════════════
     //  SECTION 1: MARKDOWN NOTE FEATURES (.md)
     // ══════════════════════════════════════════════════════════════
-    const mdHeader = containerEl.createEl("h3", { text: "Markdown Note Features (.md)" });
-    mdHeader.style.cssText = "color: var(--text-accent); margin-top: 1.5em; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 0.3em;";
+    new Setting(containerEl)
+      .setName("Markdown Note Features (.md)")
+      .setHeading()
+      .setClass("kcl-settings-section-header kcl-settings-section-header-first");
 
     new Setting(containerEl)
       .setName("2D default range")
@@ -211,8 +213,10 @@ export class KCLSettingTab extends PluginSettingTab {
     // ══════════════════════════════════════════════════════════════
     //  SECTION 2: EXCALIDRAW OD FEATURES (CANVAS & MATH COMPANION)
     // ══════════════════════════════════════════════════════════════
-    const exHeader = containerEl.createEl("h3", { text: "Excalidraw OD Features (Canvas & Math Companion)" });
-    exHeader.style.cssText = "color: var(--text-accent); margin-top: 2em; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 0.3em;";
+    new Setting(containerEl)
+      .setName("Excalidraw OD Features (Canvas & Math Companion)")
+      .setHeading()
+      .setClass("kcl-settings-section-header");
 
     new Setting(containerEl)
       .setName("Enable Excalidraw OD Integration")
@@ -480,8 +484,10 @@ export class KCLSettingTab extends PluginSettingTab {
     // ══════════════════════════════════════════════════════════════
     //  SECTION 3: LATEX SUITE FEATURES (SNIPPETS & FAST MATH ENTRY)
     // ══════════════════════════════════════════════════════════════
-    const lsHeader = containerEl.createEl("h3", { text: "LaTeX Suite Features (Snippets & Fast Math Entry)" });
-    lsHeader.style.cssText = "color: var(--text-accent); margin-top: 2em; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 0.3em;";
+    new Setting(containerEl)
+      .setName("LaTeX Suite Features (Snippets & Fast Math Entry)")
+      .setHeading()
+      .setClass("kcl-settings-section-header");
 
     new Setting(containerEl)
       .setName("Enable Ingested LaTeX Suite Snippet Engine")
@@ -601,8 +607,7 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     // ── Auto-fraction ──
-    const lsAutofractionHeader = containerEl.createEl("h4", { text: "Auto-Fraction" });
-    lsAutofractionHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+    new Setting(containerEl).setName("Auto-Fraction").setHeading().setClass("kcl-settings-subsection-header");
 
     new Setting(containerEl)
       .setName("Auto-Fraction Macro")
@@ -647,8 +652,7 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     // ── Concealment & Highlighting ──
-    const lsConcealHeader = containerEl.createEl("h4", { text: "Concealment & Highlighting" });
-    lsConcealHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+    new Setting(containerEl).setName("Concealment & Highlighting").setHeading().setClass("kcl-settings-subsection-header");
 
     new Setting(containerEl)
       .setName("Conceal LaTeX Commands")
@@ -703,8 +707,7 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     // ── Math Preview ──
-    const lsMathPreviewHeader = containerEl.createEl("h4", { text: "Math Preview" });
-    lsMathPreviewHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+    new Setting(containerEl).setName("Math Preview").setHeading().setClass("kcl-settings-subsection-header");
 
     new Setting(containerEl)
       .setName("Enable Math Preview Tooltip")
@@ -758,8 +761,7 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     // ── Matrix Shortcuts ──
-    const lsMatrixHeader = containerEl.createEl("h4", { text: "Matrix Shortcuts" });
-    lsMatrixHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+    new Setting(containerEl).setName("Matrix Shortcuts").setHeading().setClass("kcl-settings-subsection-header");
 
     new Setting(containerEl)
       .setName("Matrix Shortcut Environment Names")
@@ -788,8 +790,7 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     // ── Tabout ──
-    const lsTaboutHeader = containerEl.createEl("h4", { text: "Tabout" });
-    lsTaboutHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+    new Setting(containerEl).setName("Tabout").setHeading().setClass("kcl-settings-subsection-header");
 
     new Setting(containerEl)
       .setName("Tabout Only At End of Line")
@@ -817,8 +818,7 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     // ── Auto-Enlarge Brackets ──
-    const lsEnlargeHeader = containerEl.createEl("h4", { text: "Auto-Enlarge Brackets" });
-    lsEnlargeHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+    new Setting(containerEl).setName("Auto-Enlarge Brackets").setHeading().setClass("kcl-settings-subsection-header");
 
     new Setting(containerEl)
       .setName("Auto-Enlarge Brackets")
@@ -858,8 +858,7 @@ export class KCLSettingTab extends PluginSettingTab {
       );
 
     // ── Advanced ──
-    const lsAdvancedHeader = containerEl.createEl("h4", { text: "Advanced" });
-    lsAdvancedHeader.style.cssText = "color: var(--text-muted); margin-top: 1.2em;";
+    new Setting(containerEl).setName("Advanced").setHeading().setClass("kcl-settings-subsection-header");
 
     new Setting(containerEl)
       .setName("Suppress Snippet Trigger on IME")

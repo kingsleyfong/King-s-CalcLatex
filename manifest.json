@@ -1,9 +1,9 @@
 {
 	"id": "kings-calclatex",
 	"name": "Kings CalcLaTeX",
-	"version": "3.8.2",
+	"version": "3.8.3",
 	"minAppVersion": "1.0.0",
-	"description": "Browser-native engineering math and high-fidelity graphing for Obsidian.",
+	"description": "Browser-native engineering math and high-fidelity graphing, with an Excalidraw math companion.",
 	"author": "kingsleyfong",
 	"authorUrl": "https://github.com/kingsleyfong",
 	"fundingUrl": "",

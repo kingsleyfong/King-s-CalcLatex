@@ -80,6 +80,18 @@
   opacity: 0.8;
 }
 
+.kcl-graph-grid-btn {
+  right: 44px;
+}
+
+.kcl-graph-poi-btn {
+  right: 80px;
+}
+
+.kcl-graph-poi-btn.is-poi-disabled {
+  opacity: 0.4 !important;
+}
+
 .kcl-graph-reset:hover {
   opacity: 1 !important;
   background: rgba(0, 0, 0, 0.6);
@@ -195,6 +207,16 @@
   font-size: 0.85em;
   text-align: center;
   padding: 0 20px;
+}
+
+.kcl-graph-error-3d {
+  padding: 12px;
+  color: #e55;
+  font-size: 13px;
+  font-family: monospace;
+  border: 1px solid #e55;
+  border-radius: 4px;
+  background: #2a1515;
 }
 
 /* ── Graph Inspector Sidebar ──────────────────────────────────── */
@@ -964,6 +986,39 @@
   background: var(--button-active-bg-color, var(--background-modifier-border-hover));
   border-color: var(--interactive-accent, var(--text-accent));
   color: var(--interactive-accent, var(--text-accent));
+}
+
+.kcl-underline-icon {
+  display: block;
+}
+
+/* Settings Tab Heading Classes (Setting().setHeading() replacements for raw h2-h4) */
+.kcl-settings-title {
+  margin-top: 0;
+}
+
+.kcl-settings-section-header,
+.kcl-settings-section-header .setting-item-name {
+  color: var(--text-accent);
+}
+
+.kcl-settings-section-header {
+  margin-top: 2em;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 0.3em;
+}
+
+.kcl-settings-section-header-first {
+  margin-top: 1.5em;
+}
+
+.kcl-settings-subsection-header,
+.kcl-settings-subsection-header .setting-item-name {
+  color: var(--text-muted);
+}
+
+.kcl-settings-subsection-header {
+  margin-top: 1.2em;
 }
 
 /* Excalidraw LaTeX Modal Positioning Classes */

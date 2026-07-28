@@ -5,10 +5,20 @@ All notable changes to **Kings CalcLaTeX** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.8.0] - 2026-07-26
+## [3.8.3] - 2026-07-28
 
-### Added
-- **Excalidraw OD LHS Element Styling Shortcuts**: non-conflicting left-hand keyboard shortcuts for styling canvas elements (`Shift + F` for Line Style, `Shift + D` for Stroke Width, `Shift + X` for Edge Roundness, `Shift + Q` for Sloppiness/Roughness), secondary number-key selection (`1`-`4`) with `stopPropagation()` so Excalidraw's own tool-switching shortcuts don't fire, a floating HUD toast showing the active options, and full configuration in Settings → Excalidraw OD.
+### Fixed
+- **Resolved every blocking Error from the Obsidian community plugin directory's automated review** of the v3.8.2 submission:
+  - `manifest.json` description no longer redundantly restates "Obsidian."
+  - `onunload()` no longer detaches Graph Inspector leaves (was silently discarding the user's manual pane layout on plugin reload).
+  - Replaced a deprecated `event.keyCode === 229` IME-composition check with the modern `event.key === "Process"`.
+  - Removed dead, `eval`-based snippet-loading code (`importModule`/`importRaw`/`parseSnippets`/`parseSnippetVariables`) from the vendored LaTeX Suite snippet parser -- this fork never called it; snippet data is pre-compiled and fed through `parseRawSnippetArray` instead.
+  - Replaced unsafe `innerHTML` template-string writes (Excalidraw shortcut HUD, text-styles sidebar row) with safe DOM construction.
+  - Converted all raw heading elements in the settings page to `Setting().setHeading()`.
+  - Replaced ~40 direct `.style.xxx =` assignments across the editor/renderer/Excalidraw modules with `setCssStyles`/`setCssProps`/CSS classes.
+  - Removed the Giac WASM inline-`<script>`-injection fallback path (only used if Web Worker creation itself failed) that was tripping the directory's code-obfuscation scanner.
+  - Untracked the old, unreferenced v1 codebase (`repo/`) from the GitHub repo (kept locally, no longer pushed or scanned).
+- No user-facing behavior changes -- this is a compliance-only release.
 
 ---
 
@@ -23,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **"Edit LaTeX" modal could grow wider than the Excalidraw pane in split-screen, and long equations were unreachable at their far ends.** The modal is a body-level Obsidian `Modal` with no awareness of which split pane it was opened from, so it had no width limit and would keep growing to fit a long, unwrapped equation — the cursor was still moving correctly on Home/End/arrow keys, it was just landing in space rendered off-screen. `applyModalPosition()` now also caps the modal's `max-width` to the active Excalidraw pane's own width (minus 40px breathing room on each side, floored at 360px so a very narrow pane still stays usable), computed from the same `leafEl.getBoundingClientRect()` already used for vertical placement. With a real fixed width in place, `.cm-scroller`'s horizontal auto-scroll-to-cursor (pinned explicitly in `styles.css` as insurance) now has a box to pan within, so typing/navigating toward either end pans the visible window like a single-line text field instead of clipping.
+
+---
+
+## [3.8.0] - 2026-07-26
+
+### Added
+- **Excalidraw OD LHS Element Styling Shortcuts**: non-conflicting left-hand keyboard shortcuts for styling canvas elements (`Shift + F` for Line Style, `Shift + D` for Stroke Width, `Shift + X` for Edge Roundness, `Shift + Q` for Sloppiness/Roughness), secondary number-key selection (`1`-`4`) with `stopPropagation()` so Excalidraw's own tool-switching shortcuts don't fire, a floating HUD toast showing the active options, and full configuration in Settings → Excalidraw OD.
 
 ---
 
