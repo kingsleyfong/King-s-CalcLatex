@@ -20,8 +20,6 @@ export class KCLSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName("Kings CalcLaTeX Settings").setHeading().setClass("kcl-settings-title");
-
     // ══════════════════════════════════════════════════════════════
     //  SECTION 1: MARKDOWN NOTE FEATURES (.md)
     // ══════════════════════════════════════════════════════════════

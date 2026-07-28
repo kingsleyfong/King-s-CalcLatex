@@ -5,6 +5,16 @@ All notable changes to **Kings CalcLaTeX** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.4] - 2026-07-28
+
+### Fixed
+- **Cleared the remaining two blocking Errors from a second Obsidian community directory review pass**, both surfaced only after the v3.8.3 fixes:
+  - The settings page's top-level heading ("Kings CalcLaTeX Settings") violated two new rules -- headings can't include "settings" or the plugin name -- removed the redundant heading entirely (Obsidian's own UI already provides that context).
+  - `latex-modal.ts`'s 27 remaining `!important` static style writes (the "Edit LaTeX" modal's positioning logic, deliberately held off in v3.8.3) converted to `!important`-carrying CSS classes for the static/literal values only. The genuinely dynamic, rect-derived pixel offsets (bottom/top/left/max-width) stay as direct inline `!important` writes -- required to reliably beat Excalidraw's own `!important` CSS (confirmed via its bundled stylesheet, which anchor-positions `.cm-tooltip-cursor` tooltips with `!important`) -- since Obsidian's `no-static-styles-assignment` rule only flags static-literal style writes, not computed ones. Also replaced a `:has()` selector dependency with an explicit class applied via `classList`, clearing two CSS-lint Warnings as a side effect.
+- No user-facing behavior changes -- this is a compliance-only release, functionally identical to v3.8.3's positioning/panning/cursor-tooltip behavior.
+
+---
+
 ## [3.8.3] - 2026-07-28
 
 ### Fixed

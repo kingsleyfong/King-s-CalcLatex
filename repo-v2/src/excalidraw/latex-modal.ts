@@ -309,12 +309,22 @@ export class LaTexModalEnhancer {
         const targetLeft = `${left}px`;
         const targetTop = `${top}px`;
 
+        // position:fixed / transform:none are the same for every tooltip, every time --
+        // expressed as a class (see .kcl-latex-tooltip-positioned in styles.css) rather
+        // than repeated static inline writes. Applied unconditionally (idempotent,
+        // cheap) rather than gated on the pixel-position guard below, since a freshly
+        // CM6-positioned tooltip could otherwise coincidentally satisfy that comparison
+        // before ever getting the class.
+        t.classList.add("kcl-latex-tooltip-positioned");
+
         if (t.style.left === targetLeft && t.style.top === targetTop) return;
 
-        t.style.setProperty("position", "fixed", "important");
+        // left/top are genuinely dynamic (rect-derived pixel values) and stay as direct
+        // !important inline writes -- required to win against Excalidraw's own
+        // !important CSS-anchor-positioning rules for .cm-tooltip-cursor.cm-tooltip,
+        // which only inline !important is guaranteed to beat.
         t.style.setProperty("left", targetLeft, "important");
         t.style.setProperty("top", targetTop, "important");
-        t.style.setProperty("transform", "none", "important");
       };
 
       const tooltipObserver = new MutationObserver(() => {
@@ -363,10 +373,12 @@ export class LaTexModalEnhancer {
     const actualModal = (modalEl.closest(".modal") || modalEl) as HTMLElement;
     const modalContainer = (modalEl.closest(".modal-container") || modalEl.parentElement) as HTMLElement;
 
+    // display/pointer-events/z-index on the container, and pointer-events/margin/
+    // box-shadow on the modal itself, are static in every case (never rect-derived) --
+    // expressed as classes (see .kcl-latex-modal-container / .kcl-latex-modal-positioned
+    // in styles.css) instead of being re-asserted inline here on every call.
     if (modalContainer) {
-      modalContainer.style.setProperty("display", "flex", "important");
-      modalContainer.style.setProperty("pointer-events", "none", "important");
-      modalContainer.style.setProperty("z-index", "1000", "important");
+      modalContainer.classList.add("kcl-latex-modal-container");
     }
 
     const app = (window as any).app;
@@ -374,18 +386,30 @@ export class LaTexModalEnhancer {
     const leafEl = activeLeaf?.view?.contentEl as HTMLElement;
     const rect = leafEl?.getBoundingClientRect();
 
+    // position:fixed is common to every reachable branch below -- applied once via a
+    // shared class (see .kcl-latex-modal-positioned in styles.css) rather than repeated
+    // as a static inline write in each branch.
+    actualModal.classList.add("kcl-latex-modal-positioned");
+
     // Guard against the continuous repositioning MutationObserver in enhanceModal()
-    // looping forever: compare the ACTUAL live inline style values against the target
-    // before writing (matching positionTooltip()'s pattern above). Keying this off
-    // the leaf-rect-derived inputs instead (e.g. a cached signature of left/bottom)
-    // would be wrong: the rect can stay identical between calls while Excalidraw's own
-    // React re-render has *already* overwritten the inline style out from under us --
-    // that case must still re-apply, which a rect-only comparison would incorrectly skip.
-    const applyIfChanged = (props: Record<string, string>, write: () => void) => {
-      const alreadyApplied = Object.entries(props).every(
+    // looping forever: compare the ACTUAL live inline style values (for the dynamic,
+    // rect-derived pixel offsets) AND the active position-variant class (for the
+    // static shape, now expressed as a stylesheet rule -- see .kcl-latex-modal-pos-*
+    // in styles.css -- instead of a static inline write) against the target before
+    // writing (matching positionTooltip()'s pattern above). Keying this off the
+    // leaf-rect-derived inputs instead (e.g. a cached signature of left/bottom) would
+    // be wrong: the rect can stay identical between calls while Excalidraw's own React
+    // re-render has *already* overwritten the inline style out from under us -- that
+    // case must still re-apply, which a rect-only comparison would incorrectly skip.
+    const applyIfChanged = (
+      dynamicProps: Record<string, string>,
+      variantClass: string,
+      write: () => void,
+    ) => {
+      const dynamicMatch = Object.entries(dynamicProps).every(
         ([prop, value]) => actualModal.style.getPropertyValue(prop) === value,
       );
-      if (alreadyApplied) return;
+      if (dynamicMatch && actualModal.classList.contains(variantClass)) return;
       write();
     };
 
@@ -402,24 +426,24 @@ export class LaTexModalEnhancer {
     // Applied independent of `pos` (bottom/top/center/cursor all need this equally).
     if (rect) {
       const maxWidth = `${Math.max(MODAL_MIN_WIDTH_PX, Math.round(rect.width - MODAL_PANE_MARGIN_PX * 2))}px`;
-      applyIfChanged({ "max-width": maxWidth }, () => {
+      if (actualModal.style.getPropertyValue("max-width") !== maxWidth) {
         actualModal.style.setProperty("max-width", maxWidth, "important");
-      });
+      }
     }
 
     if (rect && (pos === "bottom" || pos === "cursor")) {
       const left = `${Math.round(rect.left + rect.width / 2)}px`;
       const bottom = `${Math.max(20, Math.round(window.innerHeight - rect.bottom + 40))}px`;
 
-      applyIfChanged({ bottom, left, top: "auto" }, () => {
-        actualModal.style.setProperty("position", "fixed", "important");
+      applyIfChanged({ bottom, left }, "kcl-latex-modal-pos-bottom", () => {
+        actualModal.classList.remove("kcl-latex-modal-pos-top", "kcl-latex-modal-pos-center");
+        actualModal.classList.add("kcl-latex-modal-pos-bottom");
+        // Clear any stale "top" from a previous top-mode application -- inline
+        // !important always beats the class's own "top: auto !important" rule, so a
+        // leftover pixel value here would otherwise silently win and misposition the modal.
+        actualModal.style.removeProperty("top");
         actualModal.style.setProperty("bottom", bottom, "important");
-        actualModal.style.setProperty("top", "auto", "important");
         actualModal.style.setProperty("left", left, "important");
-        actualModal.style.setProperty("transform", "translateX(-50%)", "important");
-        actualModal.style.setProperty("margin", "0", "important");
-        actualModal.style.setProperty("pointer-events", "auto", "important");
-        actualModal.style.setProperty("box-shadow", "0 8px 32px rgba(0, 0, 0, 0.4)", "important");
       });
       return;
     }
@@ -428,26 +452,30 @@ export class LaTexModalEnhancer {
       const left = `${Math.round(rect.left + rect.width / 2)}px`;
       const top = `${Math.round(rect.top + 60)}px`;
 
-      applyIfChanged({ top, left, bottom: "auto" }, () => {
-        actualModal.style.setProperty("position", "fixed", "important");
+      applyIfChanged({ top, left }, "kcl-latex-modal-pos-top", () => {
+        actualModal.classList.remove("kcl-latex-modal-pos-bottom", "kcl-latex-modal-pos-center");
+        actualModal.classList.add("kcl-latex-modal-pos-top");
+        // Clear any stale "bottom" from a previous bottom-mode application -- see the
+        // matching comment in the bottom-mode branch above.
+        actualModal.style.removeProperty("bottom");
         actualModal.style.setProperty("top", top, "important");
-        actualModal.style.setProperty("bottom", "auto", "important");
         actualModal.style.setProperty("left", left, "important");
-        actualModal.style.setProperty("transform", "translateX(-50%)", "important");
-        actualModal.style.setProperty("margin", "0", "important");
-        actualModal.style.setProperty("pointer-events", "auto", "important");
       });
       return;
     }
 
-    applyIfChanged({ top: "50%", left: "50%" }, () => {
-      actualModal.style.setProperty("position", "fixed", "important");
-      actualModal.style.setProperty("top", "50%", "important");
-      actualModal.style.setProperty("left", "50%", "important");
-      actualModal.style.setProperty("transform", "translate(-50%, -50%)", "important");
-      actualModal.style.setProperty("margin", "0", "important");
-      actualModal.style.setProperty("pointer-events", "auto", "important");
-    });
+    // Center fallback: reached when pos === "center", or when no active leaf/rect is
+    // available. Fully static (no rect-derived values), so no inline writes at all --
+    // just the class (see .kcl-latex-modal-pos-center in styles.css).
+    if (!actualModal.classList.contains("kcl-latex-modal-pos-center")) {
+      actualModal.classList.remove("kcl-latex-modal-pos-bottom", "kcl-latex-modal-pos-top");
+      actualModal.classList.add("kcl-latex-modal-pos-center");
+      // Clear any stale dynamic top/bottom/left from a previous bottom/top-mode
+      // application -- see the matching comments above.
+      actualModal.style.removeProperty("top");
+      actualModal.style.removeProperty("bottom");
+      actualModal.style.removeProperty("left");
+    }
   }
 
   /**
@@ -600,7 +628,7 @@ export class LaTexModalEnhancer {
     // above), and render the live preview ourselves via Obsidian's own renderMath API.
     const suggestion = modalEl.querySelector(".excalidraw-latex-suite-suggestion");
     if (suggestion instanceof HTMLElement) {
-      suggestion.style.display = "none";
+      suggestion.setCssStyles({ display: "none" });
     }
 
     const cmEditor = modalEl.querySelector(".cm-editor");
@@ -670,8 +698,7 @@ export class LaTexModalEnhancer {
     colorBar.appendChild(label);
 
     const dotsContainer = document.createElement("div");
-    dotsContainer.style.display = "flex";
-    dotsContainer.style.gap = "8px";
+    dotsContainer.className = "kcl-latex-color-bar-dots";
     colorBar.appendChild(dotsContainer);
 
     const refreshActiveState = () => {
@@ -893,7 +920,7 @@ export class LaTexModalEnhancer {
 
       if (parsed.box && parsed.box.enabled) {
         toggleBtn.classList.add("is-active");
-        settingsGrid.style.display = "flex";
+        settingsGrid.classList.remove("is-collapsed");
 
         const currentBorderColor = parsed.box.borderColor || "sync";
         borderColorContainer.querySelectorAll(".kcl-latex-border-color-dot").forEach((dot) => {
@@ -942,7 +969,7 @@ export class LaTexModalEnhancer {
         });
       } else {
         toggleBtn.classList.remove("is-active");
-        settingsGrid.style.display = "none";
+        settingsGrid.classList.add("is-collapsed");
       }
     };
 

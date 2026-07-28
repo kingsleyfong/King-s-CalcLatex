@@ -718,6 +718,11 @@
   user-select: none;
 }
 
+.kcl-latex-color-bar-dots {
+  display: flex;
+  gap: 8px;
+}
+
 .kcl-latex-color-dot {
   width: 22px;
   height: 22px;
@@ -823,6 +828,10 @@
   gap: 8px;
   padding-top: 8px;
   border-top: 1px dashed var(--background-modifier-border);
+}
+
+.kcl-latex-box-settings-grid.is-collapsed {
+  display: none;
 }
 
 .kcl-latex-box-row {
@@ -993,10 +1002,6 @@
 }
 
 /* Settings Tab Heading Classes (Setting().setHeading() replacements for raw h2-h4) */
-.kcl-settings-title {
-  margin-top: 0;
-}
-
 .kcl-settings-section-header,
 .kcl-settings-section-header .setting-item-name {
   color: var(--text-accent);
@@ -1021,17 +1026,15 @@
   margin-top: 1.2em;
 }
 
-/* Excalidraw LaTeX Modal Positioning Classes */
-.modal-container:has(.excalidraw-LatexPrompt) {
+/* Excalidraw LaTeX Modal Positioning Classes.
+   Applied via explicit classList calls in latex-modal.ts's applyModalPosition() rather
+   than :has() -- :has() would work here too, but an explicit class removes any
+   dependency on :has() resolving as expected (and sidesteps the CSS-lint Warning
+   against using :has() for broad selector invalidation). */
+.kcl-latex-modal-container {
   display: flex !important;
   pointer-events: none !important;
   z-index: 1000 !important;
-}
-
-.modal-container:has(.excalidraw-LatexPrompt) .modal {
-  pointer-events: auto !important;
-  margin: 0 !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Position: Bottom (Default) */
@@ -1059,6 +1062,46 @@
   align-items: flex-end !important;
   justify-content: center !important;
   padding-bottom: 80px !important;
+}
+
+/* Static shape for the LaTeX modal's fixed-position variants, applied in
+   latex-modal.ts's applyModalPosition(). The dynamic, rect-derived pixel offsets
+   (bottom/top/left) stay as direct inline !important writes in JS -- ESLint's
+   obsidianmd/no-static-styles-assignment only flags STATIC-literal style writes,
+   so only the fixed strings below (never the computed values) needed moving here. */
+.kcl-latex-modal-positioned {
+  position: fixed !important;
+  pointer-events: auto !important;
+  margin: 0 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.kcl-latex-modal-pos-bottom,
+.kcl-latex-modal-pos-top {
+  transform: translateX(-50%) !important;
+}
+
+.kcl-latex-modal-pos-bottom {
+  top: auto !important;
+}
+
+.kcl-latex-modal-pos-top {
+  bottom: auto !important;
+}
+
+.kcl-latex-modal-pos-center {
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* Static shape for the math-preview tooltip's fixed positioning in
+   latex-modal.ts's positionTooltip(). left/top stay dynamic inline !important
+   writes (see the JS comment) -- required to win against Excalidraw's own
+   !important CSS-anchor-positioning rules for .cm-tooltip-cursor.cm-tooltip. */
+.kcl-latex-tooltip-positioned {
+  position: fixed !important;
+  transform: none !important;
 }
 
 /* Long, unwrapped LaTeX source should pan horizontally to keep the cursor in view
