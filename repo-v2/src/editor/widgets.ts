@@ -61,8 +61,8 @@ function showToast(container: HTMLElement, text: string, className: string): voi
   toast.className = className;
   toast.textContent = text;
   container.appendChild(toast);
-  setTimeout(() => toast.classList.add("kcl-fading"), 800);
-  setTimeout(() => toast.remove(), 1500);
+  window.setTimeout(() => toast.classList.add("kcl-fading"), 800);
+  window.setTimeout(() => toast.remove(), 1500);
 }
 
 function addGraphToolbar(
@@ -143,8 +143,8 @@ function addGraphToolbar(
         hint.className = "kcl-graph-fullscreen-hint";
         hint.textContent = "Press Esc to exit fullscreen";
         container.appendChild(hint);
-        setTimeout(() => hint.classList.add("kcl-fading"), 1500);
-        setTimeout(() => hint.remove(), 2200);
+        window.setTimeout(() => hint.classList.add("kcl-fading"), 1500);
+        window.setTimeout(() => hint.remove(), 2200);
       }).catch(() => {});
     }
   });
@@ -185,7 +185,7 @@ function addSliders(
   sliderContainer.className = "kcl-slider-container";
 
   const varValues: Record<string, number> = {};
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let debounceTimer: number | null = null;
   const animStates: SliderAnimState[] = [];
   const animCleanups: (() => void)[] = [];
 
@@ -230,8 +230,8 @@ function addSliders(
       varValues[varName] = val;
       valueDisplay.textContent = val.toFixed(1);
 
-      if (debounceTimer !== null) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
+      if (debounceTimer !== null) window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => {
         debounceTimer = null;
         // Use setVariable for direct numeric assignment (bypasses LaTeX parsing)
         for (const [name, v] of Object.entries(varValues)) {
@@ -281,7 +281,7 @@ function addSliders(
 
     function animLoop(timestamp: number): void {
       if (!animState.playing) return;
-      animState.rafId = requestAnimationFrame(animLoop);
+      animState.rafId = window.requestAnimationFrame(animLoop);
 
       const dt = animState.lastFrame > 0 ? timestamp - animState.lastFrame : 16;
       animState.lastFrame = timestamp;
@@ -313,7 +313,7 @@ function addSliders(
       if (animState.playing) {
         animState.lastFrame = 0;
         animThrottleAccum = 0;
-        animState.rafId = requestAnimationFrame(animLoop);
+        animState.rafId = window.requestAnimationFrame(animLoop);
       } else if (animState.rafId !== null) {
         cancelAnimationFrame(animState.rafId);
         animState.rafId = null;
@@ -335,11 +335,11 @@ function addSliders(
     recordBtn.title = "Export animation as WebM";
 
     let _mrec: MediaRecorder | null = null;
-    let _mrecTimeout: ReturnType<typeof setTimeout> | null = null;
+    let _mrecTimeout: number | null = null;
     let _wasPlaying = false;
 
     function _stopRecord(): void {
-      if (_mrecTimeout !== null) { clearTimeout(_mrecTimeout); _mrecTimeout = null; }
+      if (_mrecTimeout !== null) { window.clearTimeout(_mrecTimeout); _mrecTimeout = null; }
       if (_mrec && _mrec.state !== "inactive") _mrec.stop();
     }
 
@@ -389,14 +389,14 @@ function addSliders(
         animState.lastFrame = 0;
         animThrottleAccum = 0;
         playBtn.textContent = "\u23F8"; // ⏸
-        animState.rafId = requestAnimationFrame(animLoop);
+        animState.rafId = window.requestAnimationFrame(animLoop);
       }
       recordBtn.classList.add("recording");
       recordBtn.textContent = "\u23F9"; // ⏹
       recordBtn.title = "Stop recording";
       _mrec.start(100); // collect blobs every 100 ms
       // Auto-stop after one full pass (min → max = 4 s, matching animLoop speed)
-      _mrecTimeout = setTimeout(_stopRecord, 4000);
+      _mrecTimeout = window.setTimeout(_stopRecord, 4000);
     });
 
     animCleanups.push(_stopRecord);
@@ -416,7 +416,7 @@ function addSliders(
   return {
     destroy(): void {
       for (const cleanup of animCleanups) cleanup();
-      if (debounceTimer !== null) clearTimeout(debounceTimer);
+      if (debounceTimer !== null) window.clearTimeout(debounceTimer);
       sliderContainer.remove();
     },
   };
@@ -553,7 +553,7 @@ export class Graph2DWidget extends WidgetType {
       container,
       () => container.querySelector("canvas"),
       () => {
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
           container.setCssStyles({ display: "none" });
           // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- reading offsetHeight forces a synchronous reflow, flushing the display:none toggle before it's reversed on the next line
           container.offsetHeight;
@@ -817,7 +817,7 @@ export class Graph3DWidget extends WidgetType {
       },
       () => {
         if (this.handle?.resize) {
-          requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
             if (!this.container) return;
             const w = this.container.clientWidth;
             const h = this.container.clientHeight;
@@ -900,7 +900,7 @@ export class Graph3DWidget extends WidgetType {
         () => container.querySelector("canvas"),
         () => {
           if (this.handle?.resize) {
-            requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
               if (!this.container) return;
               const w = this.container.clientWidth;
               const h = this.container.clientHeight;

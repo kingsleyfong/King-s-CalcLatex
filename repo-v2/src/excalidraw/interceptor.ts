@@ -180,7 +180,7 @@ export class TextareaInterceptor {
       const finalText = textarea.value;
       this.onBlurCommit?.(finalText, view);
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         if (this.activeTextarea === textarea) {
           this.handleDetach();
         }
@@ -244,7 +244,7 @@ export function updateTextarea(
   textarea.dispatchEvent(new Event("change", { bubbles: true }));
 
   for (const delay of [0, 10, 30]) {
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (textarea && typeof textarea.setSelectionRange === "function") {
         textarea.setSelectionRange(selectionStart, selectionEnd);
         textarea.focus();

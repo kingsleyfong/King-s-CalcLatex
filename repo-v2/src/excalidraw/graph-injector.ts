@@ -60,8 +60,8 @@ export class GraphInjector {
       this.plugin.renderer2d.create(container, spec, true);
 
       await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => resolve());
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
         }),
       );
 

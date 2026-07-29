@@ -1250,7 +1250,7 @@ export function create3DGraph(
   const initialRanges: AxisRanges = cloneRanges(spec.ranges);
   let currentRanges: AxisRanges = cloneRanges(spec.ranges);
 
-  let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+  let rebuildTimer: number | null = null;
 
   // Per-expression disposables (cleared on each spec update / rebuild)
   const geometryDisposables: { dispose(): void }[] = [];
@@ -1473,7 +1473,7 @@ export function create3DGraph(
 
     function animate(): void {
       if (destroyed) return;
-      animationId = requestAnimationFrame(animate);
+      animationId = window.requestAnimationFrame(animate);
       if (controls) controls.update();
       if (needsRender && renderer && scene && camera) {
         renderer.render(scene, camera);
@@ -1641,8 +1641,8 @@ export function create3DGraph(
   }
 
   function scheduleGeometryRebuild(): void {
-    if (rebuildTimer !== null) clearTimeout(rebuildTimer);
-    rebuildTimer = setTimeout(() => {
+    if (rebuildTimer !== null) window.clearTimeout(rebuildTimer);
+    rebuildTimer = window.setTimeout(() => {
       rebuildTimer = null;
       rebuildGeometry();
     }, REBUILD_DEBOUNCE_MS);
@@ -1693,7 +1693,7 @@ export function create3DGraph(
 
       // Cancel pending rebuild
       if (rebuildTimer !== null) {
-        clearTimeout(rebuildTimer);
+        window.clearTimeout(rebuildTimer);
         rebuildTimer = null;
       }
 

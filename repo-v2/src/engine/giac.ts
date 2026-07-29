@@ -4,8 +4,8 @@
  * Lazy-loads the Giac computer algebra system via WASM in a Web Worker,
  * eliminating the main-thread freeze during initialization (19MB JS parse
  * + WASM compile). The worker receives the giacwasm.js source from the
- * main thread (which reads it via fs.readFileSync), sets up the Emscripten
- * Module, and exposes caseval via postMessage.
+ * main thread (which reads it via the vault adapter, see initGiac()), sets
+ * up the Emscripten Module, and exposes caseval via postMessage.
  *
  * Setup: place `giacwasm.js` in the Obsidian plugin folder
  * (.obsidian/plugins/kings-calclatex/giacwasm.js).
@@ -15,10 +15,11 @@
  * immediately when Giac is not ready.
  */
 
-import { parseLatex, getCE, jsonToLatex } from "./parser";
+import type { App } from "obsidian";
+import { parseLatex } from "./parser";
 import { latexToReadable } from "./cas";
 import type { EvalResult, Result, Diagnostic } from "../types";
-import { ok, err } from "../types";
+import { ok } from "../types";
 
 // ══════════════════════════════════════════════════════════════
 //  WEB WORKER SOURCE (inlined as Blob URL)
@@ -461,7 +462,7 @@ export function terminateGiac(): void {
   }
   giacReady = false;
   loadPromise = null;
-  for (const [id, { resolve }] of pendingRequests) {
+  for (const [, { resolve }] of pendingRequests) {
     resolve({ value: null, steps: [] });
   }
   pendingRequests.clear();
@@ -473,7 +474,7 @@ export function terminateGiac(): void {
  * Safe to call multiple times — only loads once.
  *
  * Loading strategy:
- *   1. Main thread reads giacwasm.js via Node fs (async, non-blocking).
+ *   1. Main thread reads giacwasm.js via the vault adapter (async, non-blocking).
  *   2. Worker is created from an inline Blob URL (no separate file needed).
  *   3. Main thread sends the file content to the worker via postMessage.
  *   4. Worker sets up self.Module and eval()s the code.
@@ -484,109 +485,111 @@ export function terminateGiac(): void {
  *
  * If Worker creation fails (e.g. sandboxed environment), the function
  * resolves false without crashing.
+ *
+ * @param pluginDir vault-relative plugin folder (e.g. `manifest.dir`, which
+ *   resolves to `.obsidian/plugins/<id>` under the vault's actual config
+ *   dir name -- never hardcode ".obsidian", it's user-configurable).
  */
-export function initGiac(pluginDir: string): Promise<boolean> {
+export function initGiac(app: App, pluginDir: string): Promise<boolean> {
   if (loadPromise) return loadPromise;
 
   loadPromise = new Promise<boolean>((resolve) => {
     try {
-      const giacPath = pluginDir.replace(/\\/g, "/") + "/giacwasm.js";
+      const giacPath = `${pluginDir}/giacwasm.js`;
+      const adapter = app.vault.adapter;
 
-      // Check fs availability (Electron exposes require)
-      let fs: any;
-      try {
-        fs = (window as any).require("fs");
-        if (!fs.existsSync(giacPath)) {
+      adapter.exists(giacPath).then((exists) => {
+        if (!exists) {
           console.log("KCL: giacwasm.js not found at", giacPath);
           resolve(false);
           return;
         }
-      } catch {
-        console.log("KCL: Cannot check for giacwasm.js (no fs access)");
-        resolve(false);
-        return;
-      }
 
-      // Timeout: WASM compilation can be slow on first load
-      const timeout = setTimeout(() => {
-        if (!giacReady) {
-          console.warn("KCL: Giac Worker initialization timed out (90s)");
+        // Timeout: WASM compilation can be slow on first load
+        const timeout = window.setTimeout(() => {
+          if (!giacReady) {
+            console.warn("KCL: Giac Worker initialization timed out (90s)");
+            resolve(false);
+          }
+        }, 90000);
+
+        // Create the Worker from a Blob URL — no separate file needed
+        let newWorker: Worker;
+        try {
+          const blob = new Blob([WORKER_SOURCE], { type: "application/javascript" });
+          const workerUrl = URL.createObjectURL(blob);
+          newWorker = new Worker(workerUrl);
+          // The URL can be revoked immediately after Worker construction
+          URL.revokeObjectURL(workerUrl);
+        } catch (workerErr) {
+          console.warn("KCL: Web Worker creation failed:", workerErr);
+          window.clearTimeout(timeout);
           resolve(false);
-        }
-      }, 90000);
-
-      // Create the Worker from a Blob URL — no separate file needed
-      let newWorker: Worker;
-      try {
-        const blob = new Blob([WORKER_SOURCE], { type: "application/javascript" });
-        const workerUrl = URL.createObjectURL(blob);
-        newWorker = new Worker(workerUrl);
-        // The URL can be revoked immediately after Worker construction
-        URL.revokeObjectURL(workerUrl);
-      } catch (workerErr) {
-        console.warn("KCL: Web Worker creation failed:", workerErr);
-        clearTimeout(timeout);
-        resolve(false);
-        return;
-      }
-
-      worker = newWorker;
-
-      // Set up main-thread message handler
-      worker.onmessage = (e) => {
-        const data = e.data;
-
-        if (data.type === "ready") {
-          clearTimeout(timeout);
-          giacReady = true;
-          console.log("KCL: Giac WASM initialized in Worker successfully");
-          resolve(true);
           return;
         }
 
-        if (data.type === "error") {
-          console.error("KCL: Giac Worker error:", data.message);
-          clearTimeout(timeout);
-          // Drain pending requests
+        worker = newWorker;
+
+        // Set up main-thread message handler
+        worker.onmessage = (e) => {
+          const data = e.data;
+
+          if (data.type === "ready") {
+            window.clearTimeout(timeout);
+            giacReady = true;
+            console.log("KCL: Giac WASM initialized in Worker successfully");
+            resolve(true);
+            return;
+          }
+
+          if (data.type === "error") {
+            console.error("KCL: Giac Worker error:", data.message);
+            window.clearTimeout(timeout);
+            // Drain pending requests
+            for (const [id, { resolve: res }] of pendingRequests) {
+              res({ value: null, steps: [] });
+              pendingRequests.delete(id);
+            }
+            resolve(false);
+            return;
+          }
+
+          if (data.type === "result") {
+            const pending = pendingRequests.get(data.id);
+            if (pending) {
+              pending.resolve({ value: data.value, steps: data.steps || [] });
+              pendingRequests.delete(data.id);
+            }
+            return;
+          }
+        };
+
+        worker.onerror = (e) => {
+          console.error("KCL: Giac Worker runtime error:", e.message);
+          window.clearTimeout(timeout);
           for (const [id, { resolve: res }] of pendingRequests) {
-            res({ value: null, steps: [] });
+            res(null);
             pendingRequests.delete(id);
           }
-          resolve(false);
-          return;
-        }
+          if (!giacReady) resolve(false);
+        };
 
-        if (data.type === "result") {
-          const pending = pendingRequests.get(data.id);
-          if (pending) {
-            pending.resolve({ value: data.value, steps: data.steps || [] });
-            pendingRequests.delete(data.id);
-          }
-          return;
-        }
-      };
-
-      worker.onerror = (e) => {
-        console.error("KCL: Giac Worker runtime error:", e.message);
-        clearTimeout(timeout);
-        for (const [id, { resolve: res }] of pendingRequests) {
-          res(null);
-          pendingRequests.delete(id);
-        }
-        if (!giacReady) resolve(false);
-      };
-
-      // Read the file asynchronously (non-blocking) then send to worker
-      console.log("KCL: Reading giacwasm.js for Worker…", giacPath);
-      fs.readFile(giacPath, "utf8", (readErr: any, code: string) => {
-        if (readErr) {
-          console.error("KCL: Failed to read giacwasm.js:", readErr);
-          clearTimeout(timeout);
-          resolve(false);
-          return;
-        }
-        console.log("KCL: Sending giacwasm.js to Worker (", Math.round(code.length / 1024), "KB)…");
-        worker!.postMessage({ type: "init", code });
+        // Read the file asynchronously (non-blocking) then send to worker
+        console.log("KCL: Reading giacwasm.js for Worker…", giacPath);
+        adapter
+          .read(giacPath)
+          .then((code) => {
+            console.log("KCL: Sending giacwasm.js to Worker (", Math.round(code.length / 1024), "KB)…");
+            worker!.postMessage({ type: "init", code });
+          })
+          .catch((readErr: unknown) => {
+            console.error("KCL: Failed to read giacwasm.js:", readErr);
+            window.clearTimeout(timeout);
+            resolve(false);
+          });
+      }).catch((existsErr: unknown) => {
+        console.log("KCL: Cannot check for giacwasm.js:", existsErr);
+        resolve(false);
       });
 
     } catch (e) {
@@ -991,7 +994,7 @@ function parseLimitTarget(
     targetRaw = targetRaw.replace(/\^(\{?\+\}?)$/, "").trim();
   } else if (targetRaw.endsWith("^-") || targetRaw.endsWith("^{-}")) {
     direction = -1;
-    targetRaw = targetRaw.replace(/\^(\{?\-\}?)$/, "").trim();
+    targetRaw = targetRaw.replace(/\^(\{?-\}?)$/, "").trim();
   }
 
   // Convert LaTeX target to Giac value
@@ -1185,7 +1188,7 @@ function isNoiseStep(s: string): boolean {
   if (/^[_]{1,2}[a-zA-Z0-9_]+$/.test(t)) return true;
   if (/^gen_\d+/.test(t)) return true;
   // Lines that are just whitespace or single punctuation
-  if (/^[{}\[\]();,]+$/.test(t)) return true;
+  if (/^[{}[\]();,]+$/.test(t)) return true;
   // Very short lines that are just status markers
   if (t.length <= 2 && !/[=>]/.test(t)) return true;
   return false;

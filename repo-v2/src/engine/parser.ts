@@ -1049,11 +1049,6 @@ export function classifyExpression(latex: string): ExprType {
   return "explicit_2d"; // Default: treat as y = f(x)
 }
 
-/** Check if a set of symbols is exactly {"z"} (or another single var) → simple LHS. */
-function isSimpleLHS(syms: Set<string>, target: string): boolean {
-  return syms.size === 1 && syms.has(target);
-}
-
 /**
  * Split a LaTeX string on the first top-level `=` sign.
  * Returns null if no `=` is found. Skips `\leq`, `\geq`, `\neq`, `\equiv`.

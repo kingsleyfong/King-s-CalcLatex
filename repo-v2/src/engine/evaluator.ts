@@ -27,7 +27,6 @@ import {
   giacIntegrate,
   giacLaplace,
   giacILaplace,
-  latexToGiac,
   isGiacReady,
 } from "./giac";
 import type { EvalMode, EvalResult, Result, Diagnostic } from "../types";
@@ -1495,79 +1494,6 @@ function jsonEqual(a: unknown, b: unknown): boolean {
     return a.every((v, i) => jsonEqual(v, b[i]));
   }
   return false;
-}
-
-/**
- * Solve an equation for a variable.
- *
- * Attempts to detect the solve target variable automatically. If the
- * expression contains `=`, treats it as an equation. Otherwise wraps
- * the expression as `expr = 0`.
- */
-function evaluateSolve(
-  expr: BoxedExpression,
-  latex: string,
-  diagnostics: Diagnostic[],
-): Result<EvalResult> {
-  const ce = getCE();
-
-  try {
-    // Detect the variable to solve for
-    const json = expr.json;
-    let solveExpr: BoxedExpression = expr;
-    let variable = "x"; // default
-
-    // If the expression is an equation (Equal), extract it
-    if (Array.isArray(json) && json[0] === "Equal" && json.length === 3) {
-      // Build: LHS - RHS = 0, then solve
-      const lhs = ce.box(json[1]);
-      const rhs = ce.box(json[2]);
-      solveExpr = ce.box(["Subtract", lhs.json, rhs.json]);
-    }
-
-    // Try to find the primary variable
-    const symbols = solveExpr.freeVariables;
-    if (symbols && symbols.length > 0) {
-      // Prefer x, then y, then first available
-      if (symbols.includes("x")) variable = "x";
-      else if (symbols.includes("y")) variable = "y";
-      else variable = symbols[0];
-    }
-
-    // Attempt CortexJS solve
-    const solutions = ce.box(["Solve", solveExpr.json, variable]);
-    const result = solutions.evaluate();
-
-    // Check if we got a meaningful result
-    const resultStr = String(result);
-    if (
-      resultStr === "Solve" ||
-      resultStr.includes("Solve") ||
-      resultStr === "Nothing"
-    ) {
-      diagnostics.push({
-        level: "info",
-        message:
-          "CortexJS could not solve this equation. Future versions will use Giac WASM for advanced solving.",
-      });
-      return err(
-        "Equation solving not supported for this expression type yet",
-        diagnostics,
-      );
-    }
-
-    return ok(toEvalResult(result), diagnostics);
-  } catch (e) {
-    diagnostics.push({
-      level: "info",
-      message:
-        "Solve operation failed. This may require Giac WASM (planned for future release).",
-    });
-    return err(
-      `Solve failed: ${e instanceof Error ? e.message : String(e)}`,
-      diagnostics,
-    );
-  }
 }
 
 // evaluateFactor removed — factoring now handled entirely by cas.ts (casFactor)

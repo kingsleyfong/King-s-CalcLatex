@@ -1,5 +1,30 @@
 # Handoff Log: Kings CalcLaTeX Session Summary
 
+## Session: 2026-07-29 (Part 51) — v3.8.4 review PASSED; cleaned up remaining non-blocking Warnings/Recommendations
+
+### Status: 🟢 Shipped as v3.8.5. Typecheck/build clean (identical pre-existing baseline errors, zero new). Not yet live-confirmed.
+
+User confirmed v3.8.4's Obsidian directory review completed with zero Errors, then pasted the same report's ~2,700 lines of remaining Warnings/Recommendations and asked to fix what's reasonable. Given the scale (the bulk is ~2,500 `no-explicit-any`/unsafe-type findings across nearly the entire codebase, including vendored `latex-suite/**`), scoped this via two `AskUserQuestion` calls before touching anything: user chose to skip the any/unsafe-type category entirely (separate future strict-mode-migration project), and chose to attempt the "Direct Filesystem Access" fix (giac.ts's raw Node `fs` usage) carefully.
+
+**Highest-risk fix**: `giac.ts`'s `window.require("fs")` + `fs.readFile()` (used to load the 19MB `giacwasm.js` for the Giac WASM Worker) replaced with `app.vault.adapter.exists()`/`.read()` -- both Promise-based, same async-non-blocking shape. `initGiac()` signature changed to take `(app, pluginDir)`; `main.ts`'s call site now derives the plugin dir from `manifest.dir` (public API) instead of the old `(vault.adapter as any).basePath` hack, which also cleared a separate "hardcoded .obsidian" Warning as a bonus. Verified via full rebuild; genuinely can't be live-tested in this environment, flagged for the user to confirm Giac still initializes.
+
+**Other fixes, roughly in order of how much judgment they needed**:
+- 3 more `innerHTML` writes in `latex-modal.ts` missed in the prior pass (a clear-to-empty, two static SVG icons) -- same DOM-builder pattern as before.
+- Popout-window compat: `window.`-prefixed all bare `setTimeout`/`clearTimeout`/`requestAnimationFrame` across 12 files. This surfaced a real type quirk: `ReturnType<typeof setTimeout>` resolves through `@types/node`'s global augmentation to `NodeJS.Timeout`, but `window.setTimeout` actually returns `number` at runtime -- fixed 6 timer-variable type declarations to explicit `number` rather than leaving a wrong-but-compiling type annotation.
+- Deleted 2 fully dead functions (`evaluateSolve`, `isSimpleLHS` -- the latter is literally the function CLAUDE.md's antipattern #9 already documents as replaced) plus 11 more unused imports/vars across 9 files. One near-miss: a blanket regex fix for 3 identical-looking `for (const [id, {resolve}] of pendingRequests)` loops in giac.ts broke 2 of them, because only 1 of the 3 genuinely didn't use `id` in its body (the other 2 called `pendingRequests.delete(id)`) -- caught by `tsc`, reverted the 2 wrong ones individually.
+- `instanceof` → Obsidian's `.instanceOf()` cross-window-safe check, 9 call sites across 3 files -- caught two real pre-existing bugs while doing it: a possible-null crash (`.instanceOf()` unlike `instanceof` throws on null, needed `?.`) and a genuine type gap where `.isContentEditable` was read off `Element` (doesn't have it) instead of `HTMLElement`.
+- 5 empty `catch {}` blocks (all intentional fall-through patterns) given explanatory comments.
+- `.github/workflows/release.yml`: added `actions/attest-build-provenance@v2` for `main.js`/`styles.css`, clearing the RELEASES-category attestation Recommendation. Can't test locally (needs GitHub OIDC infra) -- confirms on the next real release.
+
+**Deliberately NOT fixed, with reasoning** (see PROJECT_STATE.md Part 51 for full detail): the ~2,500 any/unsafe warnings (user's choice); `\$` escapes in `snippets/default-snippets.ts` -- investigating this uncovered that the file's real export name doesn't match what two other files try to import, meaning it's dead/unreachable code from a **pre-existing, unrelated functional bug** worth its own session, not something to touch while doing cosmetic lint cleanup; the dynamic `require()` in `parse.ts` (genuinely needed, can't be a static import, and the report didn't give an exact rule ID to target with a disable comment); `getSettingDefinitions()` (a whole new declarative settings API requiring a `minAppVersion` bump to 1.13.0 -- a real compatibility-narrowing decision, not a mechanical fix); Dynamic Code Execution / Clipboard Access Recommendations (inherent to real features); CSS `!important` Warnings on the position classes (load-bearing, per last pass's advisor-verified analysis).
+
+Verified zero regressions the same way as Part 50: full `tsc --noEmit` after all edits shows the identical pre-existing error set. Build clean throughout. Shipped as v3.8.5, same authorship/tagging conventions.
+
+### Needs live confirmation from user
+Confirm Giac WASM still initializes correctly (Settings → toggle "Enable Giac" or just try a CAS-only operation like `\lim` or partial fractions). Check the next Obsidian directory review report's Warning/Recommendation count actually dropped. Separately: the `default-snippets.ts` broken-import discovery is worth its own investigation whenever there's time -- `cm6-extension.ts` and `snippet-manager.ts` are currently importing a name that doesn't exist from that module, which is a real `tsc` error today, not just a lint nit.
+
+---
+
 ## Session: 2026-07-28 (Part 50) — Fixed a SECOND Obsidian directory review report for v3.8.3, including the previously-deferred latex-modal.ts
 
 ### Status: 🟢 Both remaining blocking Errors fixed. Typecheck + build clean. Shipped as v3.8.4. Not yet live-confirmed by user (need to re-check community.obsidian.md submission).

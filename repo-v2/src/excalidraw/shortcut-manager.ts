@@ -5,7 +5,7 @@ export class ExcalidrawShortcutManager {
 	private keydownListener: ((e: KeyboardEvent) => void) | null = null;
 	private activeCategory: "lineStyle" | "strokeWidth" | "edgeRoundness" | "sloppiness" | null = null;
 	private hudEl: HTMLElement | null = null;
-	private hudTimeout: ReturnType<typeof setTimeout> | null = null;
+	private hudTimeout: number | null = null;
 
 	constructor(
 		private plugin: KingsCalcLatexPlugin,
@@ -33,7 +33,9 @@ export class ExcalidrawShortcutManager {
 			if ((window as any).ExcalidrawAutomate) {
 				return (window as any).ExcalidrawAutomate.getExcalidrawAPI();
 			}
-		} catch {}
+		} catch {
+			// no ExcalidrawAutomate API available on this view -- fall through to null
+		}
 		return null;
 	}
 
@@ -44,9 +46,9 @@ export class ExcalidrawShortcutManager {
 		const activeEl = document.activeElement;
 		if (
 			activeEl &&
-			(activeEl instanceof HTMLInputElement ||
-				activeEl instanceof HTMLTextAreaElement ||
-				activeEl.isContentEditable ||
+			(activeEl.instanceOf(HTMLInputElement) ||
+				activeEl.instanceOf(HTMLTextAreaElement) ||
+				(activeEl.instanceOf(HTMLElement) && activeEl.isContentEditable) ||
 				activeEl.classList.contains("cm-content"))
 		) {
 			return;
@@ -210,7 +212,7 @@ export class ExcalidrawShortcutManager {
 		this.activeCategory = category;
 
 		if (this.hudTimeout) {
-			clearTimeout(this.hudTimeout);
+			window.clearTimeout(this.hudTimeout);
 			this.hudTimeout = null;
 		}
 
@@ -275,7 +277,7 @@ export class ExcalidrawShortcutManager {
 		this.hudEl = hud;
 
 		// Keep HUD active for 2.2 seconds to allow secondary key selection
-		this.hudTimeout = setTimeout(() => {
+		this.hudTimeout = window.setTimeout(() => {
 			this.hideHud();
 		}, 2200);
 	}
@@ -283,12 +285,12 @@ export class ExcalidrawShortcutManager {
 	private hideHud(): void {
 		this.activeCategory = null;
 		if (this.hudTimeout) {
-			clearTimeout(this.hudTimeout);
+			window.clearTimeout(this.hudTimeout);
 			this.hudTimeout = null;
 		}
 		if (this.hudEl) {
 			this.hudEl.classList.remove("is-visible");
-			setTimeout(() => {
+			window.setTimeout(() => {
 				if (this.hudEl && !this.hudEl.classList.contains("is-visible")) {
 					this.hudEl.remove();
 					this.hudEl = null;

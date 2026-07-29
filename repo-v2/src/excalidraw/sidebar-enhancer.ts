@@ -1,6 +1,6 @@
 import { WorkspaceLeaf } from "obsidian";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export class SidebarStyleEnhancer {
   private observers = new Map<WorkspaceLeaf, MutationObserver>();
@@ -18,7 +18,7 @@ export class SidebarStyleEnhancer {
     const observer = new MutationObserver(() => {
       if (frameRequested) return;
       frameRequested = true;
-      requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
         this.checkAndEnhance(container, view);
         frameRequested = false;
       });
@@ -60,7 +60,9 @@ export class SidebarStyleEnhancer {
           view.contentEl
         );
       }
-    } catch {}
+    } catch {
+      // view shape didn't match any known Excalidraw container path -- fall through to null
+    }
     return null;
   }
 

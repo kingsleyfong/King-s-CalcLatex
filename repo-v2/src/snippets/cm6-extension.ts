@@ -170,7 +170,9 @@ function isMathMode(state: EditorState, pos: number): boolean {
       if (!node.parent) break;
       node = node.parent;
     }
-  } catch {}
+  } catch {
+    // syntax tree walk failed -- fall through to the current-line fallback check below
+  }
 
   // Fallback: check only the CURRENT LINE for inline $ pair
   const line = state.doc.lineAt(pos);
@@ -193,7 +195,9 @@ function getActiveSnippetsList(plugin: KingsCalcLatexPlugin): RawSnippet[] {
       if (Array.isArray(parsed)) {
         list = [...parsed, ...list];
       }
-    } catch {}
+    } catch {
+      // invalid custom-snippets JSON -- fall back to defaults only
+    }
   }
   return list;
 }

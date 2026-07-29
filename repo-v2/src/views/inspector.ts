@@ -10,7 +10,7 @@ import type { InspectorState, GraphHandle } from "../types";
 import type KingsCalcLatexPlugin from "../main";
 import { create2DGraph } from "../renderer/renderer2d";
 import { create3DGraph } from "../renderer/renderer3d";
-import { createParameterControls, destroyParameterControls } from "./controls";
+import { createParameterControls } from "./controls";
 
 export const GRAPH_INSPECTOR_VIEW = "kcl-graph-inspector-view";
 

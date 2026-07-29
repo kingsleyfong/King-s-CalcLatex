@@ -196,7 +196,7 @@ export function create2DGraph(
 
   // POI cache
   let cachedPOIs: POI[] | null = null;
-  let poiDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let poiDebounceTimer: number | null = null;
 
   // ── Coordinate Transforms ──────────────────────────────────────
 
@@ -227,8 +227,8 @@ export function create2DGraph(
   // ── POI Computation ─────────────────────────────────────────────
 
   function recomputePOIs(): void {
-    if (poiDebounceTimer !== null) clearTimeout(poiDebounceTimer);
-    poiDebounceTimer = setTimeout(() => {
+    if (poiDebounceTimer !== null) window.clearTimeout(poiDebounceTimer);
+    poiDebounceTimer = window.setTimeout(() => {
       poiDebounceTimer = null;
       if (!poisEnabled) { cachedPOIs = null; return; }
       try {
@@ -1361,7 +1361,7 @@ export function create2DGraph(
   function scheduleRender(): void {
     if (rafPending || destroyed) return;
     rafPending = true;
-    requestAnimationFrame(render);
+    window.requestAnimationFrame(render);
   }
 
   // ── Event Handlers ─────────────────────────────────────────────
@@ -1538,7 +1538,7 @@ export function create2DGraph(
       if (destroyed) return;
       destroyed = true;
 
-      if (poiDebounceTimer !== null) clearTimeout(poiDebounceTimer);
+      if (poiDebounceTimer !== null) window.clearTimeout(poiDebounceTimer);
       resizeObserver.disconnect();
 
       canvas.removeEventListener("wheel", onWheel);

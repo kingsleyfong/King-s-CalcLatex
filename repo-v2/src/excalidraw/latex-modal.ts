@@ -35,6 +35,27 @@ export interface BBoxOptions {
   borderColor?: string;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** Builds a static inline SVG icon without innerHTML -- see obsidianmd's unsafe-innerHTML rule. */
+function createSvgIcon(
+  svgAttrs: Record<string, string>,
+  children: { tag: string; attrs: Record<string, string> }[],
+): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [key, value] of Object.entries(svgAttrs)) {
+    svg.setAttribute(key, value);
+  }
+  for (const child of children) {
+    const el = document.createElementNS(SVG_NS, child.tag);
+    for (const [key, value] of Object.entries(child.attrs)) {
+      el.setAttribute(key, value);
+    }
+    svg.appendChild(el);
+  }
+  return svg;
+}
+
 function getOuterBBox(text: string): { options: string; content: string } | null {
   const match = text.match(/^\\bbox\[([^\]]*)\]\{/);
   if (!match) return null;
@@ -198,7 +219,7 @@ export class LaTexModalEnhancer {
       for (const m of mutations) {
         for (let i = 0; i < m.addedNodes.length; i++) {
           const node = m.addedNodes[i];
-          if (node instanceof HTMLElement) {
+          if (node.instanceOf(HTMLElement)) {
             if (node.classList.contains("modal-container")) {
               this.watchModalContainer(node);
             } else {
@@ -208,7 +229,7 @@ export class LaTexModalEnhancer {
         }
         for (let i = 0; i < m.removedNodes.length; i++) {
           const node = m.removedNodes[i];
-          if (node instanceof HTMLElement && node.classList.contains("modal-container")) {
+          if (node.instanceOf(HTMLElement) && node.classList.contains("modal-container")) {
             this.unwatchModalContainer();
           }
         }
@@ -239,7 +260,7 @@ export class LaTexModalEnhancer {
       for (const m of mutations) {
         for (let i = 0; i < m.addedNodes.length; i++) {
           const node = m.addedNodes[i];
-          if (node instanceof HTMLElement) {
+          if (node.instanceOf(HTMLElement)) {
             this.checkForModal(node);
           }
         }
@@ -266,7 +287,7 @@ export class LaTexModalEnhancer {
   }
 
   private enhanceModal(modalEl: HTMLElement): void {
-    setTimeout(() => {
+    window.setTimeout(() => {
       const cmContent = modalEl.querySelector(".cm-content");
       const editorView = (cmContent as any)?.cmView?.view;
 
@@ -330,7 +351,7 @@ export class LaTexModalEnhancer {
       const tooltipObserver = new MutationObserver(() => {
         const tooltips = document.querySelectorAll(".cm-tooltip");
         tooltips.forEach((t) => {
-          if (t instanceof HTMLElement) {
+          if (t.instanceOf(HTMLElement)) {
             positionTooltip(t);
 
             if (!activeTooltips.has(t)) {
@@ -627,7 +648,7 @@ export class LaTexModalEnhancer {
     // our own real engine's CM6 extensions directly (injectRealOrFallbackSnippetEngine()
     // above), and render the live preview ourselves via Obsidian's own renderMath API.
     const suggestion = modalEl.querySelector(".excalidraw-latex-suite-suggestion");
-    if (suggestion instanceof HTMLElement) {
+    if (suggestion?.instanceOf(HTMLElement)) {
       suggestion.setCssStyles({ display: "none" });
     }
 
@@ -651,7 +672,7 @@ export class LaTexModalEnhancer {
     const update = () => {
       if (!mathJaxReady) return;
       const text = editorView.state.doc.toString().trim();
-      preview.innerHTML = "";
+      preview.empty();
       if (!text) return;
       try {
         const rendered = renderMath(text, true);
@@ -804,11 +825,11 @@ export class LaTexModalEnhancer {
     toggleBtn.type = "button";
     toggleBtn.className = "kcl-latex-box-toggle-btn";
     toggleBtn.title = "Toggle Border Box";
-    toggleBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-      </svg>
-    `;
+    const toggleSvg = createSvgIcon(
+      { viewBox: "0 0 24 24", width: "14", height: "14", stroke: "currentColor", "stroke-width": "2.5", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" },
+      [{ tag: "rect", attrs: { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" } }],
+    );
+    toggleBtn.appendChild(toggleSvg);
     toggleRow.appendChild(toggleBtn);
     boxPanel.appendChild(toggleRow);
 
@@ -834,12 +855,14 @@ export class LaTexModalEnhancer {
     syncDot.className = "kcl-latex-border-color-dot is-sync";
     syncDot.setAttribute("data-color", "sync");
     syncDot.title = "Sync with Text Color";
-    syncDot.innerHTML = `
-      <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="3" fill="none">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-      </svg>
-    `;
+    const syncSvg = createSvgIcon(
+      { viewBox: "0 0 24 24", width: "10", height: "10", stroke: "currentColor", "stroke-width": "3", fill: "none" },
+      [
+        { tag: "path", attrs: { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" } },
+        { tag: "path", attrs: { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" } },
+      ],
+    );
+    syncDot.appendChild(syncSvg);
     borderColorContainer.appendChild(syncDot);
 
     for (const color of COMMON_COLORS) {

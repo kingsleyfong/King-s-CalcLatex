@@ -5,6 +5,20 @@ All notable changes to **Kings CalcLaTeX** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.5] - 2026-07-29
+
+### Fixed
+- **Cleaned up remaining non-blocking Warnings/Recommendations from the Obsidian community directory review** (v3.8.4 already passed with zero Errors -- this is a discretionary polish pass):
+  - Replaced raw Node `fs` file access in the Giac WASM loader with the vault adapter API (`app.vault.adapter.exists()`/`.read()`), and replaced an internal-property path hack (`vault.adapter.basePath`) with the public `manifest.dir` API.
+  - Fixed 3 more unsafe `innerHTML` writes in the "Edit LaTeX" modal.
+  - Made all `setTimeout`/`clearTimeout`/`requestAnimationFrame` calls popout-window-safe (`window.*`-prefixed) across 12 files.
+  - Replaced `instanceof HTMLElement`/`HTMLInputElement`/`HTMLTextAreaElement` checks with Obsidian's cross-window-safe `.instanceOf()` -- this also fixed two small pre-existing bugs (a possible-null crash, and a type gap where a content-editable check ran against the wrong element type).
+  - Removed dead code: 2 fully unused functions and 11 unused imports/variables.
+  - Release workflow now generates cryptographic build-provenance attestations for `main.js`/`styles.css`.
+- No user-facing behavior changes -- this is a compliance-only release.
+
+---
+
 ## [3.8.4] - 2026-07-28
 
 ### Fixed

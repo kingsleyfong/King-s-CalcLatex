@@ -18,7 +18,7 @@ function filterRegexFlags(flags: string): string {
 }
 
 function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 /**
@@ -321,8 +321,8 @@ export class ExcalidrawCompanionManager {
     const activeEl = document.activeElement;
     if (
       activeEl &&
-      (activeEl instanceof HTMLInputElement ||
-        activeEl instanceof HTMLTextAreaElement ||
+      (activeEl.instanceOf(HTMLInputElement) ||
+        activeEl.instanceOf(HTMLTextAreaElement) ||
         activeEl.classList.contains("cm-content"))
     ) {
       return;
@@ -415,7 +415,9 @@ export class ExcalidrawCompanionManager {
       if (view.ea?.getExcalidrawAPI) return view.ea.getExcalidrawAPI();
       const ea = (window as any).ExcalidrawAutomate;
       if (ea?.getExcalidrawAPI) return ea.getExcalidrawAPI();
-    } catch {}
+    } catch {
+      // no ExcalidrawAutomate API available on this view -- fall through to null
+    }
     return null;
   }
 }

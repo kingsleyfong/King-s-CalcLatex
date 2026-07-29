@@ -534,7 +534,7 @@ export class SnippetEngine {
     // Check again on the next microtask/macrotask in case Excalidraw's own React
     // re-render (triggered by the "input" event we just dispatched) overwrites our
     // change asynchronously.
-    setTimeout(() => {
+    window.setTimeout(() => {
       console.log("[KCL-DEBUG] applyExpansion: textarea.value 50ms later=", JSON.stringify(this.surface?.getValue()));
     }, 50);
 

@@ -17,7 +17,7 @@ import {
   detectInequality,
 } from "./parser";
 import { evaluate } from "./evaluator";
-import { differentiate, integrate, solveEquation, factorExpression } from "./cas";
+import { differentiate, integrate, solveEquation } from "./cas";
 import { convertUnits } from "./units";
 import type {
   EvalMode,
@@ -1149,7 +1149,7 @@ function computeRanges(
         let zMax = -Infinity;
         const SAMPLES = 20;
         const [xLo, xHi] = base3d.x;
-        const [yLo, yHi] = base3d.y;
+        const [yLo] = base3d.y;
         const dx = (xHi - xLo) / SAMPLES;
         const zSearchLo = -50, zSearchHi = 50;
         const dz = (zSearchHi - zSearchLo) / 100;

@@ -7,13 +7,12 @@
  * (integration, solving, factoring).
  */
 
-import { parseLatex, getCE, detectFreeVars, toFnString, jsonToLatex } from "./parser";
+import { parseLatex, getCE, jsonToLatex } from "./parser";
 import {
   giacDifferentiate,
   giacIntegrate,
   giacSolve,
   giacFactor,
-  giacSimplify,
   giacPartialDerivative,
   giacGradient,
 } from "./giac";

@@ -2,7 +2,7 @@ import type { KCLSettings } from "../types";
 
 export class PreviewTooltip {
   private tooltip: HTMLDivElement | null = null;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private debounceTimer: number | null = null;
   private currentLatex = "";
   private renderCache = new Map<string, any>();
   private cacheMaxSize = 150;
@@ -29,7 +29,7 @@ export class PreviewTooltip {
   }
 
   destroy(): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
     if (this.tooltip) {
       this.tooltip.remove();
       this.tooltip = null;
@@ -41,7 +41,7 @@ export class PreviewTooltip {
     textarea: HTMLTextAreaElement | HTMLInputElement,
     excalidrawView: any,
   ): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
 
     const cursor = textarea.selectionStart ?? text.length;
     const latex = this.extractLatexAtCursor(text, cursor);
@@ -54,14 +54,14 @@ export class PreviewTooltip {
     if (this.renderCache.has(latex)) {
       this.renderPreview(text, textarea, excalidrawView);
     } else {
-      this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = window.setTimeout(() => {
         this.renderPreview(text, textarea, excalidrawView);
       }, 100);
     }
   }
 
   hide(): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
     if (this.tooltip) {
       this.tooltip.setCssStyles({ display: "none" });
     }

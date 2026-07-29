@@ -111,9 +111,8 @@ export default class KingsCalcLatexPlugin extends Plugin {
 
     // 8. Initialize Giac WASM CAS (async, non-blocking)
     if (this.settings.enableGiac) {
-      const basePath = (this.app.vault.adapter as any).basePath as string;
-      const pluginDir = basePath + "/.obsidian/plugins/" + this.manifest.id;
-      initGiac(pluginDir).then((loaded) => {
+      const pluginDir = this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+      initGiac(this.app, pluginDir).then((loaded) => {
         if (loaded) {
           console.log("KCL: Giac CAS engine ready");
         }
