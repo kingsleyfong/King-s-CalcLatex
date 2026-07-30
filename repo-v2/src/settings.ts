@@ -26,7 +26,8 @@ export class KCLSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Markdown Note Features (.md)")
       .setHeading()
-      .setClass("kcl-settings-section-header kcl-settings-section-header-first");
+      .setClass("kcl-settings-section-header")
+      .setClass("kcl-settings-section-header-first");
 
     new Setting(containerEl)
       .setName("2D default range")

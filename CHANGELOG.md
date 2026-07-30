@@ -5,6 +5,13 @@ All notable changes to **Kings CalcLaTeX** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.6] - 2026-07-30
+
+### Fixed
+- **Settings tab was completely blank since v3.8.3.** `Setting.setClass()` expects a single class name and internally calls `classList.add()` with the whole string as one token -- passing a space-separated string (`"kcl-settings-section-header kcl-settings-section-header-first"`, from the v3.8.3 heading-conversion pass) threw `InvalidCharacterError` the instant the settings tab tried to render, before any setting row was drawn, leaving the tab entirely empty. Fixed by chaining two separate `.setClass()` calls instead. Confirmed no other multi-class `.setClass()` calls exist anywhere in the codebase. Caught via a live user report with the actual browser console error -- this class of bug can't be caught by `tsc`/`build`, since `setClass()`'s type signature is just `(cls: string): this`.
+
+---
+
 ## [3.8.5] - 2026-07-29
 
 ### Fixed

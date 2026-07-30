@@ -1,6 +1,6 @@
 {
   "name": "kings-calclatex",
-  "version": "3.8.5",
+  "version": "3.8.6",
   "description": "Browser-native engineering math and high-fidelity graphing for Obsidian",
   "main": "main.js",
   "scripts": {

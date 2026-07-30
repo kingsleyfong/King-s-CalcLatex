@@ -1,5 +1,34 @@
 # Handoff Log: Kings CalcLaTeX Session Summary
 
+## Session: 2026-07-30 (Part 52) — Hotfix: settings tab blank since v3.8.3 (`Setting.setClass()` rejects multi-class strings)
+
+### Status: 🟢 Shipped as v3.8.6. Not yet live-confirmed.
+
+User live-tested the Part 51 (v3.8.5) Giac fix -- confirmed working via console (`Giac WASM initialized in Worker successfully`, `Giac CAS engine ready`) -- but reported the settings tab now showed nothing at all. Asked for the actual browser console error rather than guessing (this couldn't be reproduced or caught statically in this environment). User provided it:
+
+```
+Uncaught InvalidCharacterError: Failed to execute 'add' on 'DOMTokenList': The token provided
+('kcl-settings-section-header kcl-settings-section-header-first') contains HTML space characters...
+    at Element.addClass (enhance.js:1:3703)
+    at e.setClass (app.js:1:1160543)
+    at Qx.display (plugin:kings-calclatex:4285:9791)
+```
+
+**Root cause**: `Setting.setClass(cls: string)` -- added during Part 49's v3.8.3 heading-conversion work (the fix for Obsidian's "use Setting().setHeading()" review Error) -- calls `.addClass(cls)` internally, which wraps `classList.add(cls)`. Unlike setting `.className`, `classList.add()` treats its argument as **one token**, not a space-separated list. One call site passed two classes as a single space-joined string; `classList.add()` throws `InvalidCharacterError` on any token containing whitespace. Since this was the very first Setting row in `display()`, the exception fired before anything else rendered -- Obsidian shows a totally blank pane with no visible error unless devtools are open, which is exactly the symptom reported.
+
+**Fix**: chain two separate `.setClass()` calls instead of one space-joined string (`addClass` is additive across multiple calls, so this correctly applies both classes). Grepped the whole codebase for any other multi-class `.setClass(...)` call before considering this done -- confirmed it was the only one.
+
+**Why none of Part 49-51's `tsc`/build verification could have caught this**: `setClass()`'s type signature is just `(cls: string): this` -- a space-containing string type-checks fine. This is a pure runtime API-shape gap (single-token vs. space-separated), invisible to static analysis, only surfaces with the actual Obsidian runtime rendering the tab. Reinforces: when a user report doesn't match what static verification shows, ask for the real error immediately rather than iterating on guesses.
+
+Severity note for future reference: this bug has been live in **every release since v3.8.3** -- anyone who upgraded in that window had a completely non-functional settings tab, not a cosmetic issue.
+
+Shipped as v3.8.6, same conventions as prior parts.
+
+### Needs live confirmation from user
+Reload Obsidian (or disable/re-enable the plugin) and confirm the settings tab fully renders again -- all sections, all subsections, no blank pane.
+
+---
+
 ## Session: 2026-07-29 (Part 51) — v3.8.4 review PASSED; cleaned up remaining non-blocking Warnings/Recommendations
 
 ### Status: 🟢 Shipped as v3.8.5. Typecheck/build clean (identical pre-existing baseline errors, zero new). Not yet live-confirmed.

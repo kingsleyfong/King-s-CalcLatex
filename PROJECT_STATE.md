@@ -8,7 +8,30 @@
 
 **v2.0** is a complete ground-up rewrite: 100% browser-native, no Python backend.
 
-## Current Status: 🟢 v3.8.5 — v3.8.4 review PASSED; this is a discretionary Warning/Recommendation cleanup pass, shipped, resubmission pending live confirmation
+## Current Status: 🟢 v3.8.6 — hotfix: settings tab was completely blank since v3.8.3 (`Setting.setClass()` can't take a space-separated string); shipped
+
+### What Happened (Part 52 — hotfix: settings tab blank since v3.8.3, `Setting.setClass()` doesn't accept multi-class strings)
+User live-tested v3.8.5's Giac fix (confirmed working -- `"Giac WASM initialized in Worker successfully"` in console) but reported the settings tab now showed literally nothing. Asked for the console error rather than guessing blind, since this couldn't be reproduced or caught by `tsc`/`build` in this environment. User pasted the actual error:
+
+```
+enhance.js:1 Uncaught InvalidCharacterError: Failed to execute 'add' on 'DOMTokenList': The token provided
+('kcl-settings-section-header kcl-settings-section-header-first') contains HTML space characters, which are
+not valid in tokens.
+    at Element.addClasses (enhance.js:1:3806)
+    at Element.addClass (enhance.js:1:3703)
+    at e.setClass (app.js:1:1160543)
+    at Qx.display (plugin:kings-calclatex:4285:9791)
+```
+
+**Root cause**: `Setting.setClass(cls: string)` (added to `settings.ts` during Part 49's v3.8.3 heading-conversion pass, to satisfy Obsidian's "use Setting().setHeading() instead of raw HTML headings" review Error) internally calls the setting element's `.addClass(cls)`, which wraps `classList.add(cls)` treating the **entire string as one token** -- unlike a plain `className =` assignment, it does NOT split on whitespace. One call site passed `"kcl-settings-section-header kcl-settings-section-header-first"` (two classes, space-separated), which threw synchronously the instant Obsidian tried to render the "Markdown Note Features" heading -- the very first row in `display()`. Since the exception happened before ANY setting row was appended, the entire tab rendered as a blank pane with zero visible error (unless devtools were open).
+
+**Fix**: split into two chained `.setClass()` calls (`.setClass("kcl-settings-section-header").setClass("kcl-settings-section-header-first")` -- `addClass` is additive, so chaining correctly applies both classes). Grepped the entire codebase for any other multi-class `.setClass(...)` call -- confirmed this was the only one.
+
+**Why this couldn't be caught by any of this session's typecheck/build verification**: `Setting.setClass()`'s TypeScript signature is just `(cls: string): this` -- a space-containing string is a perfectly valid `string` value at the type level. This is a pure runtime behavior gap between Obsidian's `setClass()` (single-token) and the intuitive mental model of "just set the className" (space-separated). Confirms the standing practice of asking for the actual browser console error the moment a report doesn't match static analysis, rather than guessing at fixes.
+
+Shipped as v3.8.6 (patch, hotfix), same authorship/tagging conventions. This bug has been live in every release since v3.8.3 -- worth flagging to the user as a "everyone who upgraded since v3.8.3 had a dead settings tab" severity note, not just a cosmetic issue.
+
+**Needs live confirmation from user**: reload Obsidian (or disable/re-enable the plugin) and confirm the settings tab renders fully again, all sections visible.
 
 ### What Happened (Part 51 — v3.8.4 review passed; cleaned up remaining non-blocking Warnings/Recommendations)
 User confirmed v3.8.4 cleared the Obsidian directory review (status "Completed", no Errors). Pasted the same report's remaining ~2,700 lines of non-blocking Warning/Recommendation findings and asked to fix what's reasonable. Triaged via two `AskUserQuestion` calls: user chose to **skip the ~2,500 `no-explicit-any`/`no-unsafe-*` warnings entirely** (spans nearly the whole codebase including vendored `latex-suite/**`, would be a full strict-mode migration -- separate future project), and chose to **attempt the "Direct Filesystem Access" fix carefully** (giac.ts's raw `fs` usage).
