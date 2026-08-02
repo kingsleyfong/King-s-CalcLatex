@@ -1,5 +1,26 @@
 # Handoff Log: Kings CalcLaTeX Session Summary
 
+## Session: 2026-08-01 (Part 53) — New feature: Excalidraw drawing snapshot/restore commands
+
+### Status: 🟢 Shipped as v3.9.0. Typecheck/build clean (identical pre-existing baseline). Not yet live-confirmed.
+
+Grew directly out of a separate report in the same conversation as Part 52: user found that manually-resized LaTeX equations on Excalidraw canvases were reverting to default size after Obsidian reloads -- specifically threatening exam-critical formula sheets, real urgency. Diagnosed by reading Excalidraw's own bundled `main.js` (not our code): it stores only LaTeX source in the file, regenerates the rendered image on every load, and is supposed to rescale the fresh render back to the element's current size via a `shouldScale: true` flag -- but that rescale step is fragile in practice. User's own live isolation test (real OK-click saves, both with and without an edit, both preserved size) ruled out King's CalcLaTeX's own edit-modal code as the cause -- confirmed by testing, not just code-reading. A full-codebase grep confirmed we have exactly one `ea.addLaTex()` call site (new-equation creation only), nothing touching size/scale anywhere else, and definitely nothing running on file-load/reload. This is upstream Excalidraw territory we can't patch directly.
+
+As an immediate stopgap, built external Node scripts (`extract.js`/`restore.js`, using `lz-string` to match Excalidraw's own internal compression) that could decompress/recompress the `.excalidraw.md` file directly and surgically restore sizes from a snapshot. Verified byte-perfect round-trip (0 mismatches across all 760 elements in the user's three real formula sheets) before trusting it, and backed up the actual files to `_backups/excalidraw-formula-sheets-2026-07-31/` in the vault as an immediate safety net.
+
+User then asked the natural follow-up: could this become an actual King's CalcLaTeX feature, Command-Palette-triggered, saving snapshots next to the drawing with a timestamp? Yes -- and proposed (and built) something better than the external-script version: instead of parsing Excalidraw's internal compressed-file format (an implementation detail, not a stable contract), use `ExcalidrawAutomate`'s own public `getSceneElements()`/`updateScene()` API -- the exact pattern already used in `companion-manager.ts` and `graph-injector.ts` throughout this codebase. Two quick `AskUserQuestion` calls settled the two real design decisions: snapshot **all elements** (not just equations, negligible extra cost, broader protection) and restore via a **picker** (not auto-newest, since the newest snapshot could itself already be corrupted).
+
+**New file**: `src/excalidraw/snapshot-manager.ts`. `snapshotCurrentDrawing()` reads the live scene via `getSceneElements()`, captures `type`/`x`/`y`/`width`/`height`/`angle`/`scale` for every non-deleted element, writes `<name>.snapshot.<timestamp>.json` next to the drawing via `vault.create()` (the public API -- keeps this consistent with the fs→vault.adapter compliance work from a few sessions ago, not raw filesystem access). `restoreFromSnapshot()` finds all matching snapshot files in the folder, shows a `FuzzySuggestModal<TFile>` picker, then on selection surgically overwrites only the elements whose position/size actually drifted from the snapshot (leaves anything added/removed since completely alone) and calls `api.updateScene({elements: updated})` -- same mutate-and-updateScene shape `graph-injector.ts` already uses for existing-element edits (no `addElementsToView` needed, that's only for *new* elements coming from the EA staging buffer). Two commands registered in `main.ts` alongside the existing three, same `addCommand({id, name, callback})` shape.
+
+One small implementation snag: `import { moment } from "obsidian"` type-checked as "not callable" (a namespace-import typing quirk in this project's installed `@types/moment`) -- not worth fighting, just wrote a small local `formatTimestamp()` with plain `Date` methods instead, since a filename-safe timestamp doesn't need moment's full feature set anyway.
+
+Verified zero regressions the same way as every part this session: full `tsc --noEmit` matches the exact pre-existing baseline. Build clean. Shipped as v3.9.0 -- **minor** version bump, not patch, since this is a genuine new feature (this project bumps minor for features, patch for fixes).
+
+### Needs live confirmation from user
+Run the snapshot command on a real drawing and confirm the JSON lands in the right folder with sane contents. Then -- ideally after triggering the actual resize-reset bug again -- run restore, confirm the picker lists the snapshot(s), and confirm sizes come back correctly and nothing else in the drawing gets touched.
+
+---
+
 ## Session: 2026-07-30 (Part 52) — Hotfix: settings tab blank since v3.8.3 (`Setting.setClass()` rejects multi-class strings)
 
 ### Status: 🟢 Shipped as v3.8.6. Not yet live-confirmed.

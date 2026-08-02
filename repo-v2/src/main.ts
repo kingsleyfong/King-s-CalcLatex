@@ -16,6 +16,7 @@ import { KCLSettingTab } from "./settings";
 import { GraphInspectorView, GRAPH_INSPECTOR_VIEW } from "./views/inspector";
 import { initGiac, isGiacReady, terminateGiac } from "./engine/giac";
 import { ExcalidrawCompanionManager } from "./excalidraw/companion-manager";
+import { ExcalidrawSnapshotManager } from "./excalidraw/snapshot-manager";
 
 import { initLaTeXSuiteEngine, getLaTeXSuiteEngineExtension } from "./latex-suite/provider";
 
@@ -23,6 +24,7 @@ export default class KingsCalcLatexPlugin extends Plugin {
   settings!: KCLSettings;
   engine!: ExpressionEngine;
   excalidrawCompanion!: ExcalidrawCompanionManager;
+  excalidrawSnapshots!: ExcalidrawSnapshotManager;
   inspectorState: InspectorState = {
     title: "",
     summary: "",
@@ -100,6 +102,22 @@ export default class KingsCalcLatexPlugin extends Plugin {
       callback: () => {
         this.engine.clearVariables();
         new Notice("KCL: All persisted variables cleared.");
+      },
+    });
+
+    this.excalidrawSnapshots = new ExcalidrawSnapshotManager(this.app, this);
+    this.addCommand({
+      id: "snapshot-excalidraw-drawing",
+      name: "Excalidraw: Snapshot current drawing (element positions/sizes)",
+      callback: () => {
+        void this.excalidrawSnapshots.snapshotCurrentDrawing();
+      },
+    });
+    this.addCommand({
+      id: "restore-excalidraw-drawing",
+      name: "Excalidraw: Restore current drawing from a snapshot",
+      callback: () => {
+        void this.excalidrawSnapshots.restoreFromSnapshot();
       },
     });
 

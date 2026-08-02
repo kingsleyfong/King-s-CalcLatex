@@ -151,6 +151,10 @@ Turns Excalidraw canvases into a math-aware surface, entirely through this plugi
   - Quick-open shortcut on a selected equation element (default **Ctrl + L**, configurable modifier/key).
 - **Element styling shortcuts**: with elements selected, left-hand keyboard shortcuts cycle common style properties without touching the mouse — default **Shift + F** (line style: solid/dashed/dotted), **Shift + D** (stroke width), **Shift + X** (edge roundness), **Shift + Q** (sloppiness/roughness). A number key (`1`–`4`) picks a specific variant directly, and a floating HUD shows the active options. All trigger keys and the modifier are configurable.
 - **Text underline toggle**: adds an underline button directly into Excalidraw's own text-properties panel when a text element is selected.
+- **Drawing snapshot/restore** (Command Palette): Excalidraw regenerates equation images from their stored LaTeX source on every load, rescaling each one back to its current on-canvas size -- a step that has proven fragile in practice and can silently reset manually-resized equations back to their natural size after a reload. Two commands protect against this:
+  - **"Kings CalcLaTeX — Excalidraw: Snapshot current drawing (element positions/sizes)"**: captures every element's current `x`/`y`/`width`/`height`/`angle` and saves it as a timestamped JSON file next to the drawing (e.g. `MyDrawing.snapshot.2026-08-01_14-30-00.json`).
+  - **"Kings CalcLaTeX — Excalidraw: Restore current drawing from a snapshot"**: lists every snapshot found for the current drawing, and after picking one, restores only the elements whose position/size actually drifted from the snapshot -- anything added or removed since is left untouched.
+  - Snapshot before any big resizing session (e.g. building a formula sheet), and again whenever you're happy with the layout -- if a reload ever resets sizes, restoring is one command instead of manually re-resizing everything.
 
 ## All Triggers
 

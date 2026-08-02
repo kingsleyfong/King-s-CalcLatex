@@ -5,6 +5,16 @@ All notable changes to **Kings CalcLaTeX** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-08-01
+
+### Added
+- **Excalidraw drawing snapshot/restore commands.** Excalidraw regenerates equation images from their stored LaTeX source on every load, rescaling each one back to its current on-canvas size -- a step that has proven fragile in practice and can silently reset manually-resized equations to their natural size after a reload. Two new Command Palette commands protect against this:
+  - **"Excalidraw: Snapshot current drawing (element positions/sizes)"** -- captures every element's `x`/`y`/`width`/`height`/`angle` and saves it as a timestamped JSON file next to the drawing.
+  - **"Excalidraw: Restore current drawing from a snapshot"** -- lists every snapshot found for the current drawing and, after picking one, restores only the elements whose position/size actually drifted -- anything added or removed since is left untouched.
+  - Built on `ExcalidrawAutomate`'s public `getSceneElements()`/`updateScene()` API rather than parsing Excalidraw's internal compressed-file format, so it stays correct regardless of what file format Excalidraw uses internally.
+
+---
+
 ## [3.8.6] - 2026-07-30
 
 ### Fixed
