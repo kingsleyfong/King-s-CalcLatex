@@ -1,7 +1,7 @@
 {
 	"id": "kings-calclatex",
 	"name": "Kings CalcLaTeX",
-	"version": "3.9.0",
+	"version": "3.9.1",
 	"minAppVersion": "1.0.0",
 	"description": "Browser-native engineering math and high-fidelity graphing, with an Excalidraw math companion.",
 	"author": "kingsleyfong",

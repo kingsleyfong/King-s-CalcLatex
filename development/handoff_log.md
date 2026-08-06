@@ -1,5 +1,31 @@
 # Handoff Log: Kings CalcLaTeX Session Summary
 
+## Session: 2026-08-06 (Part 54) — Perf fix: typing lag in large .md notes, root-caused to vendored LaTeX Suite's unbounded per-keystroke slice
+
+### Status: 🟢 Shipped as v3.9.1. Typecheck/build clean (identical pre-existing baseline). Not yet live-confirmed -- cannot be verified in this environment.
+
+User, mid-finals and explicitly time-pressured, asked for a full audit of reported typing lag in large `.md` notes with lots of equations, specifically while editing inside `$...$`, with an explicit "won't break current functionality" bar given the exam stakes. Treated as a real audit, not a guess: checked every layer active during math-mode typing in order, confirming each was actually fine (not just assuming) before moving to the next --
+
+1. `editor/decorations.ts`'s StateField `update()`: confirmed properly scoped to `changedLines` only, matches the project's own antipattern #1 documentation.
+2. `editor/widgets.ts`'s `ResultWidget`: confirmed `eq()` compares content (not reference identity) and `toDOM()` defers evaluation via a microtask, never blocks synchronously.
+3. `latex-suite/utils/context.ts`'s math-bounds tracking: confirmed viewport-scoped (`view.visibleRanges`), and boundary computation uses bounded tree-cursor traversal, not a text scan.
+4. `latex-suite/features/run_snippets.ts`: **found it**. `getSliceAroundCursor()` calls `sliceDoc(0, to)` on every keystroke -- materializes the entire document from position 0 to the cursor as a string, every single time the snippet engine runs while typing.
+
+Being vendored code, diffed against real upstream `artisticat1/obsidian-latex-suite` before touching anything (per this project's own antipattern 0(e) convention) -- byte-identical, confirming this is upstream's own behavior, not a fork regression. Searched upstream's issue tracker and found direct external corroboration: still-open issue #320, "LaTeX Suite will significantly affect Obsidian's performance" on documents over ~10-25k characters -- an exact match, not a coincidence. Also found merged PR #450 which optimized a *different* part of the same file (dispatch batching during snippet expansion, not this slice) -- confirmed via its diff that `sliceDoc(0, to)` is untouched, so this remains a real, unfixed upstream bug as of the latest commit checked.
+
+The fix needed real care beyond "just bound the slice," because `runSnippetCursor()`'s downstream position math (`triggerPos`/`triggerEndPos`, fed into `isOnWordBoundary()` and `queueSnippet()`) silently assumes the slice starts at document position 0. Worked through the exact contract for all three snippet types: `VisualSnippet`'s `triggerPos` comes from `range.from` (already absolute, independent of the slice -- must NOT be offset), while `RegexSnippet`/`StringSnippet`'s positions are relative to the slice's own start (must have the window's start offset added back). Verified the derived rule against a concrete worked example (hypothetical document, explicit cursor position, explicit trigger length) before trusting it, rather than shipping on reasoning alone.
+
+**Implementation**: `SNIPPET_CONTEXT_WINDOW = 2000` (generous -- realistic snippet triggers are at most a few dozen characters), bounds both the backward slice and a second, previously-unbounded forward slice (`effectiveLineAfter`, used for `triggerAfter` matching, used to run all the way to document end). `getSliceAroundCursor()` now returns `windowStart`; `runSnippetCursor()` adds it back where needed per the type-aware rule above. The key safety property: for any cursor position with fewer than 2000 preceding characters -- i.e. every short/normal document, the overwhelming common case -- `windowStart` computes to exactly 0, making the change a complete no-op with byte-identical behavior to the original. The fix (and any behavior change at all) only exists for the specific large-document case the bug report was about.
+
+While sweeping the rest of `latex-suite/` for the same pattern, found a second unbounded slice in `context.ts`'s `getEquations()` (`sliceDoc(0, doc.length)` -- the *entire* document) -- but confirmed this one is a KCL fork addition (not upstream), gated behind `alwaysMathFacet` (antipattern #22), which only fires inside the Excalidraw "Edit LaTeX" modal's foreign editor, not the main markdown editor, and is memoized rather than re-run every keystroke. Doesn't match the user's reported symptom (long `.md` notes) and is much lower severity in its actual context (single-equation buffers, not whole notes) -- deliberately left untouched and flagged as a minor deferred item rather than opportunistically fixed.
+
+Verified zero regressions the same way as every part this session: full `tsc --noEmit` matches the exact pre-existing baseline, build clean. Shipped as v3.9.1 (patch).
+
+### Needs live confirmation from user
+Cannot be verified in this environment at all -- no way to run Obsidian interactively here. User needs to: (1) test snippet expansion (a string trigger, a regex trigger, and a visual/selection snippet if regularly used) in both a short document and a genuinely large one, confirming expansion lands in the correct position; (2) confirm the reported lag is actually gone typing near the end of a real large note.
+
+---
+
 ## Session: 2026-08-01 (Part 53) — New feature: Excalidraw drawing snapshot/restore commands
 
 ### Status: 🟢 Shipped as v3.9.0. Typecheck/build clean (identical pre-existing baseline). Not yet live-confirmed.

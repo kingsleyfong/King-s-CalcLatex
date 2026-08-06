@@ -5,6 +5,13 @@ All notable changes to **Kings CalcLaTeX** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.1] - 2026-08-06
+
+### Fixed
+- **Typing lag in large `.md` notes with many equations, specifically while editing inside math mode.** Root-caused to the vendored LaTeX Suite snippet-matching engine (`latex-suite/features/run_snippets.ts`): on every keystroke it re-sliced the entire document from position 0 up to the cursor (`sliceDoc(0, to)`) to check for snippet triggers -- an O(cursor position) cost repeated on every keystroke, so typing near the end of a large document got progressively slower the more content preceded the cursor. This is inherited unchanged from upstream `artisticat1/obsidian-latex-suite` (confirmed via diff) and matches a still-open upstream report (issue #320: "LaTeX Suite will significantly affect Obsidian's performance" on documents over ~10-25k characters). Bounded the slice to a generous fixed window (2000 characters) around the cursor instead -- built-in and realistic custom snippet triggers never need more lookback than that, and for any document/cursor position where the old and new behavior would differ (i.e. more than 2000 characters precede the cursor), correctness is preserved by converting positions back to absolute document coordinates before use. For documents under 2000 characters (the common case), the computed window start is always position 0, making this a no-op -- behavior is byte-for-byte identical to before.
+
+---
+
 ## [3.9.0] - 2026-08-01
 
 ### Added

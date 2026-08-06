@@ -43,14 +43,27 @@ export const runSnippets = (view: EditorView, snippetInfo: SnippetInfo, options:
 	}
 	return didExpand
 }
+// KCL fork addition -- upstream slices sliceDoc(0, to) unconditionally, which is O(cursor
+// position) on EVERY keystroke: for a large document with the cursor far from the start,
+// this re-materializes a huge string every single keystroke (confirmed via upstream issue
+// artisticat1/obsidian-latex-suite#320, still open -- "LaTeX Suite will significantly
+// affect Obsidian's performance" on documents over ~10-25k characters). All trigger
+// matching (string .endsWith(), regex $-anchored .exec()) only ever needs to look at text
+// near the cursor -- built-in and realistic custom snippet triggers are at most a few dozen
+// characters -- so bounding the slice to a large-but-fixed window turns this into O(1)
+// relative to document size instead of O(document length before cursor), with the same
+// generous margin on the forward slice (used for ^-anchored `triggerAfter` matching).
+const SNIPPET_CONTEXT_WINDOW = 2000;
+
 const getSliceAroundCursor = (view: EditorView, to: number) => {
-	const line = view.state.sliceDoc(0, to);
+	const windowStart = Math.max(0, to - SNIPPET_CONTEXT_WINDOW);
+	const line = view.state.sliceDoc(windowStart, to);
 	let cachedLineAfter: string | null = null;
 	const effectiveLineAfter = () => {
-		cachedLineAfter = cachedLineAfter ?? view.state.sliceDoc(to);
+		cachedLineAfter = cachedLineAfter ?? view.state.sliceDoc(to, Math.min(view.state.doc.length, to + SNIPPET_CONTEXT_WINDOW));
 		return cachedLineAfter;
 	};
-	return {line, effectiveLineAfter};
+	return {line, effectiveLineAfter, windowStart};
 }
 
 const runSnippetCursor = (view: EditorView, ctx: Context, snippetInfo: SnippetInfo, range: SelectionRange, debug: snippetDebugLevel):{success: boolean; shouldAutoEnlargeBrackets: boolean} => {
@@ -58,7 +71,7 @@ const runSnippetCursor = (view: EditorView, ctx: Context, snippetInfo: SnippetIn
 	const settings = getLatexSuiteConfig(view);
 	const {from, to} = range;
 	const sel = view.state.sliceDoc(from, to);
-	const {line, effectiveLineAfter} = getSliceAroundCursor(view, to);
+	const {line, effectiveLineAfter, windowStart} = getSliceAroundCursor(view, to);
 	const key = snippetInfo.key ?? "";
 	// If the key pressed wasn't a text character, continue
 	if (snippetInfo.key && snippetInfo.key.length !== 1) {
@@ -86,9 +99,14 @@ const runSnippetCursor = (view: EditorView, ctx: Context, snippetInfo: SnippetIn
 		// but labels are extremely rarely used, so we do this construction instead
 		if (isExcluded) { continue; }
 
-		const triggerPos = result.triggerPos;
+		// result.triggerPos/triggerEndPos come back as positions WITHIN `updatedLine` (i.e.
+		// relative to `windowStart`) for string/regex snippets -- except VisualSnippet, whose
+		// triggerPos is `range.from` (already an absolute document position, computed
+		// independently of the slice). Only the former need windowStart added back; adding it
+		// to an already-absolute VisualSnippet position would double-count the offset.
+		const triggerPos = snippet.type === "visual" ? result.triggerPos : result.triggerPos + windowStart;
 		const triggerEndPos = result.triggerEndPos
-			? result.triggerEndPos - key.length
+			? result.triggerEndPos + windowStart - key.length
 			: to;
 
 		if (snippet.options.onWordBoundary) {
